@@ -2,7 +2,17 @@
 
 ## Active Risks
 
-- CP5 is complete but not yet merged in this working tree.
-- CP6 must not start until the user explicitly approves a separate CP6 plan.
-- Frontend lint currently reports existing React hook dependency warnings; the command exits successfully.
-- Frontend build reports known large chunk warnings related to Mermaid/lazy-loaded assets; build succeeds.
+- Risk: Codex quota can be exhausted.
+- Risk: Antigravity CLI may be unavailable.
+- Risk: Bash may be unavailable in Windows PowerShell PATH.
+- Risk: accidentally starting CP6 without human approval.
+- Risk: scripts modifying product code if state gates are bypassed.
+
+## Mitigations
+
+- Keep `AI_STATE.json` at `CP5_COMPLETE`, `next_agent = human`, and `human_approval_required = true`.
+- Scripts stop on `CP5_COMPLETE` plus human approval required.
+- Scripts stop when `lock` is not null.
+- Scripts stop on `state = BLOCKED`.
+- PowerShell wrappers are the primary Windows path.
+- Do not write a CP6 task until human approval is explicit.

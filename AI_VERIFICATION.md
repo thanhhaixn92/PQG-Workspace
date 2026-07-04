@@ -2,22 +2,35 @@
 
 ## 2026-07-04
 
-## CP5 Final Gate
+## Environment Observations
 
-- Backend tests: `203 passed, 1 pre-existing Starlette warning`.
-- Frontend type-check: passed.
-- Frontend lint: passed with existing React hook dependency warnings.
-- Frontend tests: `106 passed`.
-- Frontend build: passed with known large Mermaid/chunk warning.
-- `git diff --check`: passed.
+- Current shell/OS: Windows PowerShell on Windows.
+- Codex CLI availability: available, `codex-cli 0.142.5`.
+- Antigravity CLI availability: unavailable; neither `antigravity` nor `ag` is in PATH.
+- Bash availability: unavailable in current Windows PowerShell PATH.
+- Python availability: available, `Python 3.11.2`.
+- Node/npm availability: available, Node `v24.16.0`, npm `11.13.0`.
 
-## Scope Verification
+## Scripts Created
 
-- CP5 frontend migration files are present in the working tree.
-- CP5 checklist is complete.
-- CP6 Outbox Dispatcher has not started in this checkpoint.
-- Out-of-scope automation scripts and `.agents` workflow files are not part of the CP5 merge candidate.
+- `scripts/run-codex.sh`
+- `scripts/run-antigravity.sh`
+- `scripts/agent-loop.sh`
+- `scripts/ai-auto.sh`
+- `scripts/run-codex.ps1`
+- `scripts/run-antigravity.ps1`
+- `scripts/agent-loop.ps1`
+- `scripts/ai-auto.ps1`
+- `scripts/codex-tick.ps1`
 
-## Current State
+## Validation
 
-CP5 is complete and waiting for human approval before any CP6 planning starts.
+- `AI_STATE.json`: valid with `python -m json.tool AI_STATE.json`.
+- `git diff --check`: passed; Git reported Windows LF/CRLF working-copy warnings only.
+- `scripts/run-codex.ps1`: stopped safely at CP5 human gate.
+- `scripts/run-antigravity.ps1`: stopped safely at CP5 human gate.
+- `scripts/agent-loop.ps1`: stopped safely at closed state gate.
+- `scripts/codex-tick.ps1`: stopped safely at closed Codex gate.
+- `scripts/ai-auto.ps1`: printed environment summary, stopped safely at closed state gate, and did not commit.
+- Product tests: not rerun for automation because no product code was modified by automation setup.
+- Product code modified by automation setup: no.

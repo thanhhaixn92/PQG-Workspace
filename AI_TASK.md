@@ -1,27 +1,30 @@
 # AI Task
 
-Finalize CP5 Frontend Migration and stop before CP6.
+## Task
 
-## Goal
+Create safe Codex + Antigravity automation infrastructure after CP5 has been completed and committed.
 
-Record a clean CP5 checkpoint after verification.
+## Current Checkpoint
 
-## Context
-
-- CP5 migrated the frontend to optionally use the public Task API behind `VITE_USE_TASK_API`.
-- Legacy session/chat behavior remains the default fallback.
-- CP6 Outbox Dispatcher has not started.
+- Current checkpoint: CP5 complete gate.
+- State: CP5_COMPLETE.
+- CP6 Outbox Dispatcher: not approved.
 
 ## Constraints
 
+- Do not plan CP6.
 - Do not implement CP6.
-- Do not add automation agent loops or Antigravity workflow scripts in the CP5 merge candidate.
-- Do not modify secrets, deployment config, billing config, or production database settings.
-- Do not commit, push, deploy, publish, reset, clean, or drop databases automatically.
+- Do not modify product code as part of automation setup.
+- Do not modify secrets, deployment config, billing config, production database settings, database files, or migrations.
+- Do not auto commit, push, merge, deploy, reset, clean, or run destructive commands.
+- Keep automation paused at human approval.
 
 ## Done When
 
-- CP5 checklist is complete.
-- Backend tests pass.
-- Frontend type-check, lint, tests, and build pass.
-- Project state clearly says CP6 requires a separate human-approved planning step.
+- Required AI files exist.
+- Required shell scripts exist.
+- Required PowerShell scripts exist.
+- Antigravity workflow skill exists.
+- `AI_STATE.json` is valid JSON.
+- Automation is safely paused at human approval.
+- No product code was modified by automation setup.

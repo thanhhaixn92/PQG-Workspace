@@ -1,8 +1,8 @@
 # AGENTS.md
 
-## Mission
+## Project Identity
 
-Build Hermes Local Stack as a local-first AI office assistant.
+Hermes Local Stack is a local-first AI office assistant.
 
 Canonical docs:
 
@@ -12,18 +12,28 @@ Canonical docs:
 - `docs/03_EXECUTION_PRINCIPLES.md` - engineering rules.
 - `docs/04_SECURITY_PERMISSION_POLICY.md` - security, approval, audit.
 - `docs/05_ACCEPTANCE_EVALUATION.md` - acceptance gates and tests.
-- `docs/06_HANDOFF_REVIEW_PROTOCOL.md` - Antigravity -> Codex review protocol.
+- `docs/06_HANDOFF_REVIEW_PROTOCOL.md` - review protocol.
 - `docs/07_DECISION_LOG.md` - accepted architecture decisions.
 - `docs/08_TEST_DATA_SCENARIOS.md` - reusable validation scenarios.
 - `docs/ANTIGRAVITY_IMPLEMENTATION_PLAN.md` - phased build plan.
 
 Read only the docs needed for the current task. Do not load every file by default.
 
-## Roles
+## Agent Roles
 
-- Antigravity implements.
-- Codex checks implementation quality, runs relevant tests, and approves phases only when acceptance criteria pass.
-- User approval is still required for external/destructive actions, credentials, public exposure, or scope expansion.
+- Codex role: implementation engineer and reviewer when explicitly assigned by the user.
+- Antigravity role: coordinator and verifier for approved handoff workflows.
+- One-agent-at-a-time rule: only one agent may edit product code at a time.
+- State-file rule: agents must obey `AI_STATE.json`.
+- Handoff rule: agents must update `AI_HANDOFF.md`, `AI_CHANGELOG.md`, `AI_VERIFICATION.md`, and `AI_RISK_REGISTER.md` as applicable.
+- User approval is required for external/destructive actions, credentials, public exposure, scope expansion, and any checkpoint transition.
+
+## Current Gate
+
+- CP5 Frontend Migration is complete.
+- CP6 Outbox Dispatcher is not approved.
+- No CP6 planning or implementation is allowed until explicit human approval.
+- Keep `AI_STATE.json` at `state = CP5_COMPLETE`, `next_agent = human`, and `human_approval_required = true` until the user intentionally opens new work.
 
 ## Hard Rules
 
@@ -36,6 +46,71 @@ Read only the docs needed for the current task. Do not load every file by defaul
 - No hardcoded secrets.
 - No `allow always` for `external_or_destructive` actions.
 - Do not expand beyond MVP without updating docs and getting user approval.
+- Never auto commit, push, merge, or deploy.
+- Never run destructive commands.
+
+## Protected Files And Areas
+
+Do not edit without explicit human approval:
+
+- `.env`
+- `.env.local`
+- `.env.production`
+- secrets
+- deployment config
+- billing config
+- production database settings
+- database files
+- database migrations
+
+## Safe Commands
+
+- `git status --short`
+- `git diff`
+- `git diff --check`
+- `python -m json.tool AI_STATE.json`
+- `codex --version`
+- `antigravity --version`
+- `ag --version`
+- `bash --version`
+- `node --version`
+- `npm --version`
+- `python --version`
+
+Frontend checks only when explicitly needed:
+
+- `cd frontend; npm run lint`
+- `cd frontend; npm run type-check`
+- `cd frontend; npm run test -- --run`
+- `cd frontend; npm run build`
+
+Backend checks only when explicitly needed:
+
+- `cd backend; .\.venv\Scripts\pytest`
+
+## Approval-Required Commands
+
+- Package installation.
+- Dependency changes.
+- Database migration changes.
+- Docker or container changes.
+- Network-heavy commands.
+- Any command that modifies project state outside automation files.
+- `git commit`
+- `git push`
+- merge
+- deploy
+
+## Forbidden Commands
+
+- `git reset --hard`
+- `git clean -fdx`
+- `rm -rf`
+- `del /s /q`
+- `rmdir /s /q`
+- deploy or publish commands
+- database drop/reset
+- editing env/secrets/billing/deployment/production database files
 
 ## Implementation Defaults
 
@@ -61,7 +136,7 @@ Read only the docs needed for the current task. Do not load every file by defaul
 
 ## Review Pattern
 
-When reviewing Antigravity output:
+When reviewing output:
 
 1. Compare against PRD, data model, security policy, and phase acceptance criteria.
 2. Prioritize findings by severity.

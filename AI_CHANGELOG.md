@@ -2,9 +2,28 @@
 
 ## 2026-07-04
 
-- Finalized CP5 Frontend Migration checkpoint.
-- Removed out-of-scope automation agent loop files from the CP5 merge candidate.
-- Confirmed CP6 Outbox Dispatcher has not started and requires separate human-approved planning.
-- Updated `PROJECT_STATE.md`, `docs/implementation/CURRENT_CHECKPOINT.md`, `AI_TASK.md`, `AI_STATE.json`, `AI_HANDOFF.md`, `AI_VERIFICATION.md`, and `AI_RISK_REGISTER.md` for CP5 final state.
-- Verified backend test suite: 203 passed, 1 pre-existing Starlette warning.
-- Verified frontend gates: type-check passed, lint passed with existing warnings, 106 tests passed, build passed with known large chunk warning.
+- CP5 Frontend Migration was completed and committed before automation setup.
+- Automation infrastructure created from clean/restored state after CP5.
+- CP5 gate preserved.
+- CP6 not started.
+- No product code modified by automation setup.
+
+## Files Created Or Updated
+
+- `AGENTS.md`
+- `AI_TASK.md`
+- `AI_STATE.json`
+- `AI_HANDOFF.md`
+- `AI_CHANGELOG.md`
+- `AI_VERIFICATION.md`
+- `AI_RISK_REGISTER.md`
+- `.agents/skills/verify-and-handoff/SKILL.md`
+- `scripts/run-codex.sh`
+- `scripts/run-antigravity.sh`
+- `scripts/agent-loop.sh`
+- `scripts/ai-auto.sh`
+- `scripts/run-codex.ps1`
+- `scripts/run-antigravity.ps1`
+- `scripts/agent-loop.ps1`
+- `scripts/ai-auto.ps1`
+- `scripts/codex-tick.ps1`
