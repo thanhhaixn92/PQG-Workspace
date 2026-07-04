@@ -1,0 +1,20 @@
+services:
+  n8n:
+    image: n8nio/n8n:1.70.0
+    restart: always
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      - N8N_HOST=127.0.0.1
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://127.0.0.1:5678/
+      # The following keys MUST be passed in via .env
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:?N8N_ENCRYPTION_KEY is required}
+      - HERMES_N8N_WEBHOOK_SECRET=${HERMES_N8N_WEBHOOK_SECRET:?HERMES_N8N_WEBHOOK_SECRET is required}
+    volumes:
+      - hermes_n8n_data:/home/node/.n8n
+
+volumes:
+  hermes_n8n_data:
