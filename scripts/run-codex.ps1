@@ -33,7 +33,8 @@ try {
 Read AGENTS.md, AI_TASK.md, AI_STATE.json, AI_HANDOFF.md, AI_CHANGELOG.md, AI_VERIFICATION.md, and AI_RISK_REGISTER.md.
 Follow only AI_HANDOFF.md.
 Never commit, push, merge, deploy, reset, clean, delete, or modify forbidden files.
-Never start CP6 without explicit human approval.
+Only work on CP6 when AI_STATE.json and AI_HANDOFF.md explicitly show CP6 is approved, human_approval_required is false, and next_agent is codex.
+For the current approved CP6 task, implement only the Outbox Dispatcher scope described in AI_TASK.md and AI_HANDOFF.md.
 "@
     codex exec --sandbox workspace-write $prompt
 }
