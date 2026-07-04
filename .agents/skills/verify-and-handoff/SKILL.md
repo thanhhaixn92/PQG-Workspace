@@ -1,3 +1,8 @@
+---
+name: verify-and-handoff
+description: Verify approved Codex automation handoffs, update AI coordination files, and stop at Hermes state gates without starting CP6.
+---
+
 # verify-and-handoff
 
 ## Purpose

@@ -18,8 +18,11 @@
 - Bash may be unavailable in Windows PowerShell.
 - PowerShell scripts are the primary Windows entrypoints.
 - Codex CLI is invoked with currently supported `codex exec --sandbox workspace-write`; approval behavior must be enforced by human gate/state rules and any local Codex profile config available at runtime.
-- Antigravity wrappers must lock before CLI execution and block to human review if the CLI is unavailable or fails.
+- Antigravity wrappers must prefer `agy`, then `antigravity`, then `ag`; they must verify `-p` or `--prompt` support from `--help` before non-interactive execution.
+- On Windows, PowerShell wrappers also check `%LOCALAPPDATA%\agy\bin\agy.exe` when `agy` has been installed but the current shell has not refreshed PATH.
+- Antigravity wrappers must invoke `agy --sandbox -p "<prompt>"` when `--sandbox` is supported, otherwise `agy -p "<prompt>"`; they must lock before CLI execution and block to human review if the CLI is unavailable, lacks `-p`, or fails.
 - Agent loops must stop when no state transition occurs.
+- Do not use `agy --dangerously-skip-permissions` or `codex --dangerously-bypass-approvals-and-sandbox`.
 
 ## Allowed Files
 

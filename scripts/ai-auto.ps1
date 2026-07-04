@@ -4,6 +4,14 @@ Set-Location $Root
 
 function Show-ToolVersion($Name, $Arguments) {
     $command = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($null -eq $command -and $Name -eq "agy") {
+        $knownPath = Join-Path $env:LOCALAPPDATA "agy\bin\agy.exe"
+        if (Test-Path -LiteralPath $knownPath) {
+            $command = [pscustomobject]@{
+                Source = $knownPath
+            }
+        }
+    }
     if ($null -eq $command) {
         Write-Host "$Name unavailable"
         return
@@ -24,6 +32,7 @@ Show-ToolVersion "node" @("--version")
 Show-ToolVersion "npm" @("--version")
 Show-ToolVersion "bash" @("--version")
 Show-ToolVersion "codex" @("--version")
+Show-ToolVersion "agy" @("--version")
 Show-ToolVersion "antigravity" @("--version")
 Show-ToolVersion "ag" @("--version")
 

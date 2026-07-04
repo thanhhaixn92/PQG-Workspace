@@ -11,6 +11,7 @@ node --version 2>&1 || true
 npm --version 2>&1 || true
 bash --version 2>&1 | head -n 1 || true
 codex --version 2>&1 || true
+agy --version 2>&1 || true
 antigravity --version 2>&1 || true
 ag --version 2>&1 || true
 

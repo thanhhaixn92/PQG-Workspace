@@ -37,6 +37,26 @@ fi
 
 PROMPT="Read .agents/skills/verify-and-handoff/SKILL.md and run /verify-and-handoff with safe checks only."
 
+find_antigravity_cli() {
+  local candidate
+  for candidate in agy antigravity ag; do
+    if ! command -v "$candidate" >/dev/null 2>&1; then
+      continue
+    fi
+    help_text="$("$candidate" --help 2>&1)"
+    if printf '%s\n' "$help_text" | grep -Eq '(^|[[:space:]])-p([[:space:],]|$)|--prompt'; then
+      if printf '%s\n' "$help_text" | grep -q -- '--sandbox'; then
+        printf '%s\t%s\n' "$candidate" "sandbox"
+      else
+        printf '%s\t%s\n' "$candidate" "nosandbox"
+      fi
+      return 0
+    fi
+    echo "Skipping $candidate: non-interactive -p/--prompt support was not found in --help." >&2
+  done
+  return 1
+}
+
 block_antigravity() {
   local message="$1"
   MESSAGE="$message" python - <<'PY'
@@ -85,22 +105,22 @@ if data.get("lock") == "antigravity":
 PY
 }
 
-if command -v antigravity >/dev/null 2>&1; then
+CLI_RESULT="$(find_antigravity_cli || true)"
+CLI="$(printf '%s' "$CLI_RESULT" | cut -f1)"
+CLI_SANDBOX="$(printf '%s' "$CLI_RESULT" | cut -f2)"
+
+if [[ -n "$CLI" ]]; then
   set_antigravity_lock
   trap release_antigravity_lock EXIT
-  echo "Antigravity CLI detected. Safe prompt:"
+  echo "$CLI CLI detected. Safe prompt:"
   echo "$PROMPT"
-  if ! antigravity "$PROMPT"; then
-    block_antigravity "Antigravity CLI execution failed."
-    exit 1
+  if [[ "$CLI_SANDBOX" == "sandbox" ]]; then
+    CLI_ARGS=(--sandbox -p "$PROMPT")
+  else
+    CLI_ARGS=(-p "$PROMPT")
   fi
-elif command -v ag >/dev/null 2>&1; then
-  set_antigravity_lock
-  trap release_antigravity_lock EXIT
-  echo "ag CLI detected. Safe prompt:"
-  echo "$PROMPT"
-  if ! ag "$PROMPT"; then
-    block_antigravity "ag CLI execution failed."
+  if ! "$CLI" "${CLI_ARGS[@]}"; then
+    block_antigravity "$CLI CLI execution failed."
     exit 1
   fi
 else
@@ -109,5 +129,5 @@ else
   echo "1. Open Antigravity IDE."
   echo "2. Open this repo: $ROOT"
   echo "3. Run /verify-and-handoff."
-  block_antigravity "Antigravity CLI unavailable. Human must use GUI fallback and explicitly reset AI_STATE.json before resuming automation."
+  block_antigravity "Antigravity CLI unavailable or missing non-interactive -p support. Human must use GUI fallback and explicitly reset AI_STATE.json before resuming automation."
 fi

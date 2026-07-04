@@ -12,6 +12,17 @@
   - Added Antigravity CLI lock/release behavior.
   - Added Antigravity missing-CLI/failure block back to human review.
   - Added loop no-state-change protection.
+- Automation runner setup update:
+  - Prefer current Antigravity CLI command `agy`.
+  - Require non-interactive `-p` or `--prompt` support before invoking Antigravity from scripts.
+  - Use Antigravity `--sandbox` when the installed CLI supports it.
+  - Keep `antigravity` and `ag` as compatibility fallbacks only.
+  - Document forbidden dangerous bypass flags.
+- Antigravity CLI readiness:
+  - Official installer found `agy.exe` installed at `%LOCALAPPDATA%\agy\bin\agy.exe`.
+  - Added the installed `agy` directory to User PATH.
+  - Verified `agy 1.0.16` and successful sandboxed non-interactive prompt execution.
+  - Added required YAML frontmatter to `.agents/skills/verify-and-handoff/SKILL.md`.
 
 ## Files Created Or Updated
 

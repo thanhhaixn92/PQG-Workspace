@@ -23,6 +23,20 @@ function Block-Antigravity($Message) {
     Write-Host "Blocked: $Message"
 }
 
+function Get-CommandOrKnownPath($Name, $KnownPath) {
+    $command = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($null -ne $command) {
+        return $command
+    }
+    if ($KnownPath -and (Test-Path -LiteralPath $KnownPath)) {
+        return [pscustomobject]@{
+            Name = $Name
+            Source = $KnownPath
+        }
+    }
+    return $null
+}
+
 $state = Read-AIState
 
 if ($state.state -eq "CP5_COMPLETE" -and $state.next_agent -eq "human") {
@@ -39,16 +53,47 @@ if ($state.next_agent -ne "antigravity") {
 }
 
 $prompt = "Read .agents/skills/verify-and-handoff/SKILL.md and run /verify-and-handoff with safe checks only."
+$agy = Get-CommandOrKnownPath "agy" (Join-Path $env:LOCALAPPDATA "agy\bin\agy.exe")
 $antigravity = Get-Command antigravity -ErrorAction SilentlyContinue
 $ag = Get-Command ag -ErrorAction SilentlyContinue
 
-if ($null -eq $antigravity -and $null -eq $ag) {
+function Get-UsableAntigravityCli {
+    param($Candidates)
+
+    foreach ($candidate in $Candidates) {
+        if ($null -eq $candidate) {
+            continue
+        }
+        $helpText = ""
+        try {
+            $helpText = (& $candidate.Source --help 2>&1 | Out-String)
+        }
+        catch {
+            Write-Host "Skipping $($candidate.Name): --help failed: $($_.Exception.Message)"
+            continue
+        }
+        if ($helpText -match "(^|\s)-p(\s|,|$)" -or $helpText -match "--prompt") {
+            return [pscustomobject]@{
+                Name = $candidate.Name
+                Source = $candidate.Source
+                UseSandbox = ($helpText -match "--sandbox")
+            }
+        }
+        Write-Host "Skipping $($candidate.Name): non-interactive -p/--prompt support was not found in --help."
+    }
+
+    return $null
+}
+
+$cli = Get-UsableAntigravityCli @($agy, $antigravity, $ag)
+
+if ($null -eq $cli) {
     Write-Host "Antigravity CLI not found."
     Write-Host "GUI fallback:"
     Write-Host "1. Open Antigravity IDE."
     Write-Host "2. Open this repo: $Root"
     Write-Host "3. Run /verify-and-handoff."
-    Block-Antigravity "Antigravity CLI unavailable. Human must use GUI fallback and explicitly reset AI_STATE.json before resuming automation."
+    Block-Antigravity "Antigravity CLI unavailable or missing non-interactive -p support. Human must use GUI fallback and explicitly reset AI_STATE.json before resuming automation."
     exit 0
 }
 
@@ -56,23 +101,17 @@ $state.lock = "antigravity"
 Write-AIState $state
 
 try {
-    if ($antigravity) {
-        Write-Host "Antigravity CLI detected. Safe prompt:"
-        Write-Host $prompt
-        & $antigravity.Source $prompt
-        if ($LASTEXITCODE -ne 0) {
-            Block-Antigravity "Antigravity CLI execution failed with exit code $LASTEXITCODE."
-            exit $LASTEXITCODE
-        }
+    Write-Host "$($cli.Name) CLI detected. Safe prompt:"
+    Write-Host $prompt
+    if ($cli.UseSandbox) {
+        & $cli.Source --sandbox -p $prompt
     }
     else {
-        Write-Host "ag CLI detected. Safe prompt:"
-        Write-Host $prompt
-        & $ag.Source $prompt
-        if ($LASTEXITCODE -ne 0) {
-            Block-Antigravity "ag CLI execution failed with exit code $LASTEXITCODE."
-            exit $LASTEXITCODE
-        }
+        & $cli.Source -p $prompt
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Block-Antigravity "$($cli.Name) CLI execution failed with exit code $LASTEXITCODE."
+        exit $LASTEXITCODE
     }
 }
 catch {

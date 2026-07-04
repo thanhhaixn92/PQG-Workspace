@@ -70,6 +70,8 @@ Do not edit without explicit human approval:
 - `git diff --check`
 - `python -m json.tool AI_STATE.json`
 - `codex --version`
+- `agy --version`
+- `agy --help`
 - `antigravity --version`
 - `ag --version`
 - `bash --version`
@@ -111,6 +113,8 @@ Backend checks only when explicitly needed:
 - deploy or publish commands
 - database drop/reset
 - editing env/secrets/billing/deployment/production database files
+- `codex --dangerously-bypass-approvals-and-sandbox`
+- `agy --dangerously-skip-permissions`
 
 ## Implementation Defaults
 
