@@ -207,9 +207,14 @@ _APPROVAL_ACTION_REF_SQL = """
 ALTER TABLE approval_requests ADD COLUMN task_action_id TEXT REFERENCES task_actions(id);
 """
 
+_IDEMPOTENCY_HASH_SQL = """
+ALTER TABLE idempotency_records ADD COLUMN request_hash TEXT;
+"""
+
 _IDEMPOTENCY_SQL = """
 CREATE TABLE IF NOT EXISTS idempotency_records (
     key             TEXT    PRIMARY KEY,
+    request_hash    TEXT,
     response_json   TEXT    NOT NULL,
     status_code     INTEGER NOT NULL,
     created_at      INTEGER NOT NULL,
@@ -252,6 +257,7 @@ MIGRATIONS: list[tuple[str, str]] = [
     ("0009_approval_action_ref", _APPROVAL_ACTION_REF_SQL),
     ("0010_idempotency", _IDEMPOTENCY_SQL),
     ("0011_notification_outbox", _NOTIFICATION_OUTBOX_SQL),
+    ("0012_idempotency_request_hash", _IDEMPOTENCY_HASH_SQL),
 ]
 
 

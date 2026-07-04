@@ -140,7 +140,8 @@ async def test_cp1_migrations_recorded(migrated_db_path):
 
     cp1_versions = {"0005_tasks", "0006_task_runs_task_id", "0007_task_events",
                     "0008_task_actions", "0009_approval_action_ref",
-                    "0010_idempotency", "0011_notification_outbox"}
+                    "0010_idempotency", "0011_notification_outbox",
+                    "0012_idempotency_request_hash"}
     missing = cp1_versions - set(versions)
     assert not missing, f"Missing CP1 migrations: {missing}"
 

@@ -122,7 +122,7 @@ class TestTaskService:
             await conn.close()
 
     @pytest.mark.asyncio
-    async def test_create_task_idempotent(self, migrated_db_path):
+    async def test_create_task_idempotent_same_payload(self, migrated_db_path):
         conn = await open_db(migrated_db_path)
         try:
             svc = TaskService(conn)
@@ -131,6 +131,18 @@ class TestTaskService:
             t2, is_dup2 = await svc.create_task(title="Idem", idempotency_key="key-1")
             assert is_dup2
             assert t2["id"] == t1["id"]
+        finally:
+            await conn.close()
+
+    @pytest.mark.asyncio
+    async def test_create_task_idempotent_different_payload_raises(self, migrated_db_path):
+        conn = await open_db(migrated_db_path)
+        try:
+            svc = TaskService(conn)
+            await svc.create_task(title="First", idempotency_key="key-1")
+            from app.repositories.idempotency_repository import IdempotencyConflict
+            with pytest.raises(IdempotencyConflict):
+                await svc.create_task(title="Different", idempotency_key="key-1")
         finally:
             await conn.close()
 

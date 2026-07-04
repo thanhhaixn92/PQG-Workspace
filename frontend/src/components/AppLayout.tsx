@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Moon, Sun } from 'lucide-react';
 import { useHermesStore } from '../store/store';
 import { getLatestSessionTaskRun, getSessionMessages, getSessions } from '../api/sessions';
 import { fetchHealth } from '../api/health';
@@ -54,7 +53,6 @@ export const AppLayout: React.FC = () => {
   const appError = useHermesStore(state => state.appError);
   const setAppError = useHermesStore(state => state.setAppError);
   const theme = useHermesStore(state => state.theme);
-  const toggleTheme = useHermesStore(state => state.toggleTheme);
 
   useMemo(() => {
     document.documentElement.setAttribute('data-theme', theme);

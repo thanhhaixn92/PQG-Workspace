@@ -2,11 +2,18 @@ from __future__ import annotations
 
 from typing import Optional
 
+import hashlib
 import json
+from typing import Optional
 
-from app.repositories.idempotency_repository import IdempotencyRepository
+from app.repositories.idempotency_repository import IdempotencyConflict, IdempotencyRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.state_machine import TaskStateMachine
+
+
+def _request_hash(session_id: Optional[str], title: Optional[str], task_type: str, parent_task_id: Optional[str]) -> str:
+    raw = json.dumps({"session_id": session_id, "title": title, "task_type": task_type, "parent_task_id": parent_task_id}, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 class TaskService:
@@ -30,7 +37,8 @@ class TaskService:
         idempotency_key: Optional[str] = None,
     ) -> tuple[dict, bool]:
         if idempotency_key:
-            existing = await self._idempotency.get(idempotency_key)
+            req_hash = _request_hash(session_id, title, task_type, parent_task_id)
+            existing = await self._idempotency.check_key(idempotency_key, request_hash=req_hash)
             if existing is not None:
                 return json.loads(existing["response_json"]), True
 
@@ -41,7 +49,8 @@ class TaskService:
             parent_task_id=parent_task_id,
         )
         if idempotency_key:
-            await self._idempotency.set(idempotency_key, json.dumps(task, default=str), 200)
+            req_hash = _request_hash(session_id, title, task_type, parent_task_id)
+            await self._idempotency.set(idempotency_key, json.dumps(task, default=str), 200, request_hash=req_hash)
         return task, False
 
     async def start_task(self, task_id: str) -> dict:
@@ -71,7 +80,7 @@ class TaskService:
         TaskStateMachine.validate(task["status"], "failed")
         updated = await self._task_repo.update_task_status(task_id, "failed", error=error)
         await self._task_repo.create_event(
-            task_id, "status_change", "failed", data_json=f'{{"error":"{error}"}}'
+            task_id, "status_change", "failed", data_json=json.dumps({"error": error})
         )
         return updated
 
@@ -95,7 +104,7 @@ class TaskService:
         )
         await self._task_repo.create_event(
             task_id, "approval_requested", "waiting_approval",
-            data_json=f'{{"action_id":"{action["id"]}","tool":"{tool_name}"}}',
+            data_json=json.dumps({"action_id": action["id"], "tool": tool_name}),
         )
         return updated
 
@@ -107,12 +116,12 @@ class TaskService:
             TaskStateMachine.validate(task["status"], "running")
             updated = await self._task_repo.update_task_status(task_id, "running")
             await self._task_repo.update_action_status(action_id, "allowed", output_json=output_json)
-            await self._task_repo.create_event(task_id, "approval_granted", "running", f'{{"action_id":"{action_id}"}}')
+            await self._task_repo.create_event(task_id, "approval_granted", "running", json.dumps({"action_id": action_id}))
         else:
             TaskStateMachine.validate(task["status"], "failed")
             updated = await self._task_repo.update_task_status(task_id, "failed", error="Approval denied")
             await self._task_repo.update_action_status(action_id, "denied")
-            await self._task_repo.create_event(task_id, "approval_denied", "failed", f'{{"action_id":"{action_id}"}}')
+            await self._task_repo.create_event(task_id, "approval_denied", "failed", json.dumps({"action_id": action_id}))
         return updated
 
     async def request_follow_up(self, task_id: str, prompt: str) -> dict:
@@ -127,13 +136,13 @@ class TaskService:
             )
             await self._task_repo.create_event(
                 task_id, "child_task_created", task["status"],
-                data_json=f'{{"child_id":"{child["id"]}"}}',
+                data_json=json.dumps({"child_id": child["id"]}),
             )
             return {"action": "child_task_created", "child_task": child}
         else:
             evt = await self._task_repo.create_event(
                 task_id, "follow_up", task["status"],
-                data_json=f'{{"prompt":"{prompt}"}}',
+                data_json=json.dumps({"prompt": prompt}),
             )
             return {"action": "follow_up_event", "event": evt}
 
