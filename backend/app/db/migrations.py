@@ -150,12 +150,108 @@ _APPROVAL_PAYLOAD_SQL = """
 ALTER TABLE approval_requests ADD COLUMN payload_json TEXT;
 """
 
+_TASKS_SQL = """
+CREATE TABLE IF NOT EXISTS tasks (
+    id          TEXT    PRIMARY KEY,
+    session_id  TEXT    REFERENCES sessions(id),
+    parent_task_id TEXT REFERENCES tasks(id),
+    title       TEXT,
+    description TEXT,
+    status      TEXT    NOT NULL DEFAULT 'queued',
+    priority    INTEGER DEFAULT 0,
+    task_type   TEXT    DEFAULT 'prompt',
+    created_at  INTEGER NOT NULL,
+    updated_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+"""
+
+_TASK_RUNS_TASK_ID_SQL = """
+ALTER TABLE task_runs ADD COLUMN task_id TEXT REFERENCES tasks(id);
+"""
+
+_TASK_EVENTS_SQL = """
+CREATE TABLE IF NOT EXISTS task_events (
+    id          TEXT    PRIMARY KEY,
+    task_id     TEXT    NOT NULL REFERENCES tasks(id),
+    run_id      TEXT    REFERENCES task_runs(id),
+    type        TEXT    NOT NULL,
+    status      TEXT    NOT NULL,
+    data_json   TEXT,
+    created_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id, created_at);
+"""
+
+_TASK_ACTIONS_SQL = """
+CREATE TABLE IF NOT EXISTS task_actions (
+    id          TEXT    PRIMARY KEY,
+    task_id     TEXT    NOT NULL REFERENCES tasks(id),
+    tool_name   TEXT    NOT NULL,
+    risk_level  TEXT    NOT NULL DEFAULT 'read',
+    status      TEXT    NOT NULL DEFAULT 'pending',
+    description TEXT,
+    input_json  TEXT,
+    output_json TEXT,
+    created_at  INTEGER NOT NULL,
+    resolved_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_actions_task ON task_actions(task_id);
+"""
+
+_APPROVAL_ACTION_REF_SQL = """
+ALTER TABLE approval_requests ADD COLUMN task_action_id TEXT REFERENCES task_actions(id);
+"""
+
+_IDEMPOTENCY_SQL = """
+CREATE TABLE IF NOT EXISTS idempotency_records (
+    key             TEXT    PRIMARY KEY,
+    response_json   TEXT    NOT NULL,
+    status_code     INTEGER NOT NULL,
+    created_at      INTEGER NOT NULL,
+    expires_at      INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_idempotency_expires ON idempotency_records(expires_at);
+"""
+
+_NOTIFICATION_OUTBOX_SQL = """
+CREATE TABLE IF NOT EXISTS notification_outbox (
+    id              TEXT    PRIMARY KEY,
+    channel         TEXT    NOT NULL,
+    event_type      TEXT    NOT NULL,
+    payload_json    TEXT    NOT NULL,
+    status          TEXT    NOT NULL DEFAULT 'pending',
+    attempt_count   INTEGER DEFAULT 0,
+    max_attempts    INTEGER DEFAULT 5,
+    last_error      TEXT,
+    locked_at       INTEGER,
+    locked_by       TEXT,
+    created_at      INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbox_pending ON notification_outbox(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_outbox_locked ON notification_outbox(locked_at);
+"""
+
 # Ordered list of (version_tag, sql) migration entries.
 MIGRATIONS: list[tuple[str, str]] = [
     ("0001_initial", _SCHEMA_SQL),
     ("0002_chat_messages", _CHAT_MESSAGES_SQL),
     ("0003_approval_requests", _APPROVAL_REQUESTS_SQL),
     ("0004_approval_payload", _APPROVAL_PAYLOAD_SQL),
+    ("0005_tasks", _TASKS_SQL),
+    ("0006_task_runs_task_id", _TASK_RUNS_TASK_ID_SQL),
+    ("0007_task_events", _TASK_EVENTS_SQL),
+    ("0008_task_actions", _TASK_ACTIONS_SQL),
+    ("0009_approval_action_ref", _APPROVAL_ACTION_REF_SQL),
+    ("0010_idempotency", _IDEMPOTENCY_SQL),
+    ("0011_notification_outbox", _NOTIFICATION_OUTBOX_SQL),
 ]
 
 
@@ -192,8 +288,8 @@ async def run_migrations(db_path: Path) -> None:
             try:
                 await conn.executescript(sql)
             except Exception as exc:
-                if version == "0004_approval_payload" and "duplicate column name" in str(exc).lower():
-                    logger.info("approval_requests.payload_json already exists, recording migration.")
+                if "duplicate column name" in str(exc).lower():
+                    logger.info("Column already exists in migration %s, recording.", version)
                 else:
                     raise
             await conn.execute(

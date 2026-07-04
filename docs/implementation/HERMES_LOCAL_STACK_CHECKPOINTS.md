@@ -20,9 +20,9 @@ Mỗi checkpoint chỉ tick khi:
 ---
 
 ## CP1 Schema
-- [ ] Migrations 0005-0011 up/down pass
-- [ ] Repository tests pass
-- [ ] Backup app.db created
+- [x] Migrations 0005-0011 up/down pass
+- [x] Repository tests pass
+- [x] Backup app.db created (`app.db.baseline`)
 
 ---
 

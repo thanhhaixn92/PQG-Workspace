@@ -28,10 +28,18 @@ REQUIRED_TABLES = {
     "files_index",
 }
 
+CP1_TABLES = {
+    "tasks",
+    "task_events",
+    "task_actions",
+    "idempotency_records",
+    "notification_outbox",
+}
+
 
 @pytest.mark.asyncio
 async def test_all_required_tables_exist(migrated_db_path):
-    """All 8 tables (7 business + schema_migrations) must be present."""
+    """All required tables must be present."""
     conn = await open_db(migrated_db_path)
     try:
         async with conn.execute(
@@ -43,6 +51,9 @@ async def test_all_required_tables_exist(migrated_db_path):
 
     missing = REQUIRED_TABLES - tables
     assert not missing, f"Missing tables: {missing}"
+
+    cp1_missing = CP1_TABLES - tables
+    assert not cp1_missing, f"Missing CP1 tables: {cp1_missing}"
 
 
 @pytest.mark.asyncio
@@ -113,6 +124,25 @@ async def test_indexes_exist(migrated_db_path):
 
     missing = expected_indexes - indexes
     assert not missing, f"Missing indexes: {missing}"
+
+
+@pytest.mark.asyncio
+async def test_cp1_migrations_recorded(migrated_db_path):
+    """CP1 migration versions must be recorded in schema_migrations."""
+    conn = await open_db(migrated_db_path)
+    try:
+        async with conn.execute(
+            "SELECT version FROM schema_migrations;"
+        ) as cursor:
+            versions = [row[0] async for row in cursor]
+    finally:
+        await conn.close()
+
+    cp1_versions = {"0005_tasks", "0006_task_runs_task_id", "0007_task_events",
+                    "0008_task_actions", "0009_approval_action_ref",
+                    "0010_idempotency", "0011_notification_outbox"}
+    missing = cp1_versions - set(versions)
+    assert not missing, f"Missing CP1 migrations: {missing}"
 
 
 @pytest.mark.asyncio
