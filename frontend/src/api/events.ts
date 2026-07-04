@@ -1,7 +1,8 @@
 import { useHermesStore } from '../store/store';
 import type { HermesEvent, TaskRun } from '../store/store';
-import { BASE_URL } from './client';
+import { BASE_URL, VITE_USE_TASK_API } from './client';
 import { getLatestSessionTaskRun } from './sessions';
+import { getTask } from './tasks';
 
 let currentEventSource: EventSource | null = null;
 let currentSessionId: string | null = null;
@@ -237,4 +238,108 @@ export const unsubscribeFromSessionEvents = (clearReconnectState = true) => {
     reconnectAttemptedBySession[currentSessionId] = false;
   }
   currentSessionId = null;
+};
+
+export const subscribeToTaskEvents = (sessionId: string, taskId: string) => {
+  if (currentSessionId === taskId && currentEventSource) {
+    return;
+  }
+
+  unsubscribeFromSessionEvents(false);
+
+  currentSessionId = taskId;
+  currentEventSource = new EventSource(`${BASE_URL}/api/tasks/${taskId}/events/stream`);
+
+  const handleEvent = (event: MessageEvent) => {
+    if (!event.data) {
+      return;
+    }
+
+    const store = useHermesStore.getState();
+
+    try {
+      const data = JSON.parse(event.data);
+      const msgData = data.data_json ? JSON.parse(data.data_json) : {};
+
+      const hermesEvent = {
+        id: data.id || `${event.type}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        type: (event.type === 'status_change' ? 'status' : event.type) as any,
+        text: msgData.msg || msgData.error || `Trạng thái: ${data.status}`,
+        message: msgData.msg || msgData.error || `Trạng thái: ${data.status}`,
+        created_at: data.created_at,
+        status: data.status,
+        task_id: taskId,
+      };
+
+      store.addEvent(sessionId, hermesEvent);
+
+      if (event.type === 'done' || data.status === 'succeeded' || data.status === 'failed' || data.status === 'cancelled') {
+        store.setSessionStatus(sessionId, 'idle');
+        store.setSessionError(sessionId, data.status === 'failed' ? (msgData.error || 'Task bị lỗi') : null);
+        store.setSessionStartedAt(sessionId, null);
+
+        const latestTask = store.latestTaskBySession[sessionId];
+        if (latestTask && latestTask.id === taskId) {
+          store.setLatestTask(sessionId, {
+            ...latestTask,
+            status: data.status === 'succeeded' ? 'succeeded' : data.status,
+            finished_at: Math.floor(Date.now() / 1000),
+            error: data.status === 'failed' ? (msgData.error || 'Task bị lỗi') : null,
+          });
+        }
+        unsubscribeFromSessionEvents();
+      } else {
+        store.setSessionStatus(sessionId, data.status === 'waiting_approval' ? 'waiting_approval' : 'running');
+        const latestTask = store.latestTaskBySession[sessionId];
+        if (latestTask && latestTask.id === taskId) {
+          store.setLatestTask(sessionId, {
+            ...latestTask,
+            status: data.status,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to parse task event', err);
+    }
+  };
+
+  const eventTypes = ['status_change', 'done', 'error'];
+
+  eventTypes.forEach(type => {
+    currentEventSource!.addEventListener(type, handleEvent);
+  });
+
+  currentEventSource.onerror = () => {
+    if (!currentEventSource || currentEventSource.readyState === EventSource.CLOSED) {
+      return;
+    }
+    currentEventSource.close();
+    currentEventSource = null;
+
+    if (VITE_USE_TASK_API) {
+      getTask(taskId)
+        .then(actualTask => {
+          const store = useHermesStore.getState();
+          store.setSessionStatus(sessionId, 'idle');
+          store.setSessionStartedAt(sessionId, null);
+
+          const latestTask = store.latestTaskBySession[sessionId];
+          if (latestTask && latestTask.id === taskId) {
+            store.setLatestTask(sessionId, {
+              ...latestTask,
+              status: actualTask.status,
+              finished_at: ['succeeded', 'failed', 'cancelled'].includes(actualTask.status)
+                ? Math.floor(Date.now() / 1000)
+                : latestTask.finished_at,
+            });
+          }
+        })
+        .catch(err => {
+          console.error('Failed to refresh task status on stream end', err);
+          const store = useHermesStore.getState();
+          store.setSessionStatus(sessionId, 'idle');
+          store.setSessionStartedAt(sessionId, null);
+        });
+    }
+  };
 };

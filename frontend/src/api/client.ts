@@ -21,6 +21,10 @@ export const BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
   defaultApiBaseUrl();
 
+export const VITE_USE_TASK_API =
+  import.meta.env.VITE_USE_TASK_API === 'true' ||
+  import.meta.env.VITE_USE_TASK_API === '1';
+
 export class ApiError extends Error {
   public readonly status: number;
 

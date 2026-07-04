@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, ChevronDown, RefreshCw } from 'lucide-react';
 import { getSessionAuditEvents, type AuditEvent } from '../api/audit';
 import { useHermesStore } from '../store/store';
+import { VITE_USE_TASK_API } from '../api/client';
+import { listTaskEvents } from '../api/tasks';
 
 const MAX_LIVE_EVENTS = 80;
 const MAX_AUDIT_EVENTS_PER_GROUP = 80;
@@ -184,11 +186,13 @@ export const ActivityInspector: React.FC = () => {
   const events = useHermesStore(state => state.events);
   const sessionStatusById = useHermesStore(state => state.sessionStatusById);
   const auditRefreshVersion = useHermesStore(state => state.auditRefreshVersion);
+  const latestTaskBySession = useHermesStore(state => state.latestTaskBySession);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'summary' | 'technical'>('summary');
 
+  const latestTask = activeSessionId ? latestTaskBySession[activeSessionId] : null;
   const sessionStatus = activeSessionId ? (sessionStatusById[activeSessionId] ?? 'idle') : 'idle';
   const sessionEvents = activeSessionId ? events[activeSessionId] || [] : [];
   const inspectorEvents = sessionEvents.filter(event => event.type !== 'token' && event.type !== 'user_message');
@@ -204,9 +208,7 @@ export const ActivityInspector: React.FC = () => {
     return Array.from(groups.entries()).map(([taskId, items]) => ({ taskId, items }));
   }, [auditEvents]);
 
-  useEffect(() => {
-    let cancelled = false;
-
+  const fetchEvents = (isCancelled: () => boolean) => {
     if (!activeSessionId) {
       setAuditEvents([]);
       setAuditError(null);
@@ -215,28 +217,62 @@ export const ActivityInspector: React.FC = () => {
 
     setLoadingAudit(true);
     setAuditError(null);
-    getSessionAuditEvents(activeSessionId)
-      .then(items => {
-        if (!cancelled) {
-          setAuditEvents(items);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAuditEvents([]);
-          setAuditError('Không tải được lịch sử hoạt động đã lưu.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingAudit(false);
-        }
-      });
 
+    if (VITE_USE_TASK_API && latestTask) {
+      listTaskEvents(latestTask.id)
+        .then(items => {
+          if (!isCancelled()) {
+            const mapped: AuditEvent[] = items.map(evt => ({
+              id: evt.id,
+              session_id: activeSessionId,
+              actor: 'system',
+              action: `task.${evt.status}`,
+              target: evt.task_id,
+              payload_json: evt.data_json,
+              created_at: evt.created_at,
+            }));
+            setAuditEvents(mapped);
+          }
+        })
+        .catch(() => {
+          if (!isCancelled()) {
+            setAuditEvents([]);
+            setAuditError('Không tải được lịch sử hoạt động của task.');
+          }
+        })
+        .finally(() => {
+          if (!isCancelled()) {
+            setLoadingAudit(false);
+          }
+        });
+    } else {
+      getSessionAuditEvents(activeSessionId)
+        .then(items => {
+          if (!isCancelled()) {
+            setAuditEvents(items);
+          }
+        })
+        .catch(() => {
+          if (!isCancelled()) {
+            setAuditEvents([]);
+            setAuditError('Không tải được lịch sử hoạt động đã lưu.');
+          }
+        })
+        .finally(() => {
+          if (!isCancelled()) {
+            setLoadingAudit(false);
+          }
+        });
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchEvents(() => cancelled);
     return () => {
       cancelled = true;
     };
-  }, [activeSessionId, auditRefreshVersion]);
+  }, [activeSessionId, auditRefreshVersion, latestTask]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -248,20 +284,12 @@ export const ActivityInspector: React.FC = () => {
       if (e.key === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
-        if (activeSessionId) {
-          setAuditEvents([]);
-          setAuditError(null);
-          setLoadingAudit(true);
-          getSessionAuditEvents(activeSessionId)
-            .then(items => setAuditEvents(items))
-            .catch(() => setAuditEvents([]))
-            .finally(() => setLoadingAudit(false));
-        }
+        useHermesStore.getState().requestAuditRefresh();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeSessionId, auditRefreshVersion]);
+  }, [activeSessionId, auditRefreshVersion, latestTask]);
 
   const showTechnicalHint = viewMode === 'summary' && (auditEvents.length > 0 || inspectorEvents.length > 0);
 

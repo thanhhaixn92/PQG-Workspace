@@ -1,0 +1,10 @@
+{
+  "task_id": "cp5-final-checkpoint",
+  "state": "CP5_COMPLETE",
+  "next_agent": "human",
+  "lock": null,
+  "last_agent": "codex",
+  "last_result": "CP5 Frontend Migration is complete and verified. Backend tests passed, frontend type-check/lint/tests/build passed, and CP6 has not started.",
+  "human_approval_required": true,
+  "risk_level": "low"
+}

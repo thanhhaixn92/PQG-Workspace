@@ -51,12 +51,12 @@ Each checkpoint is complete only when:
 
 ## CP5 Frontend Migration
 
-- [ ] Task creation and streaming UI work through Task API.
-- [ ] Approval UI works through approval IDs.
-- [ ] Task cancel is available from UI.
-- [ ] Session history still displays.
-- [ ] Frontend tests pass.
-- [ ] `VITE_USE_TASK_API=false` fallback works.
+- [x] Task creation and streaming UI work through Task API.
+- [x] Approval UI works through approval IDs.
+- [x] Task cancel is available from UI.
+- [x] Session history still displays.
+- [x] Frontend tests pass.
+- [x] `VITE_USE_TASK_API=false` fallback works.
 
 ## CP6 Outbox Dispatcher
 

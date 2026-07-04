@@ -105,4 +105,17 @@ describe('useHermesStore', () => {
     expect(state.sessionStartedAtById['session-a']).toBeUndefined();
     expect(state.sessionStartedAtById['session-b']).toBe(67890);
   });
+
+  it('lưu latestTaskBySession và hỗ trợ trạng thái succeeded', () => {
+    const store = useHermesStore.getState();
+    const task = {
+      id: 'task-123',
+      session_id: 'session-1',
+      status: 'succeeded' as const,
+      started_at: 1000,
+      retry_count: 0,
+    };
+    store.setLatestTask('session-1', task);
+    expect(useHermesStore.getState().latestTaskBySession['session-1']).toEqual(task);
+  });
 });

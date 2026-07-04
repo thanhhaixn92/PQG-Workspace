@@ -3,13 +3,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatPanel } from './ChatPanel';
 import { useHermesStore } from '../store/store';
 import * as sessionsApi from '../api/sessions';
+import * as tasksApi from '../api/tasks';
+import * as eventsApi from '../api/events';
+
+let mockUseTaskApi = false;
+vi.mock('../api/client', async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    get VITE_USE_TASK_API() {
+      return mockUseTaskApi;
+    }
+  };
+});
 
 vi.mock('../api/sessions', () => ({
   submitPrompt: vi.fn(),
 }));
 
+vi.mock('../api/tasks', () => ({
+  createTask: vi.fn(),
+  startTask: vi.fn(),
+  cancelTask: vi.fn(),
+  decideTaskAction: vi.fn(),
+}));
+
 vi.mock('../api/events', () => ({
   subscribeToSessionEvents: vi.fn(),
+  subscribeToTaskEvents: vi.fn(),
 }));
 
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -27,6 +48,7 @@ const queuedTask = {
 describe('ChatPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseTaskApi = false;
     useHermesStore.setState({
       activeSessionId: null,
       events: {},
@@ -200,5 +222,81 @@ describe('ChatPanel', () => {
     await waitFor(() => {
       expect(sessionsApi.submitPrompt).toHaveBeenCalledWith('session-1', 'Retry me');
     });
+  });
+
+  it('khi VITE_USE_TASK_API=true gửi prompt qua public Task API và hiển thị warning banner', async () => {
+    mockUseTaskApi = true;
+    const mockCreatedTask = { id: 'task-new', status: 'queued' as const, created_at: 100, task_type: 'prompt', duplicate: false, updated_at: 100 };
+    const mockStartedTask = { id: 'task-new', status: 'running' as const, created_at: 100, task_type: 'prompt', duplicate: false, updated_at: 100 };
+
+    vi.mocked(tasksApi.createTask).mockResolvedValueOnce(mockCreatedTask);
+    vi.mocked(tasksApi.startTask).mockResolvedValueOnce(mockStartedTask);
+
+    useHermesStore.setState({
+      activeSessionId: 'session-1',
+      sessionStatusById: { 'session-1': 'idle' },
+    });
+
+    render(<ChatPanel />);
+
+    const input = screen.getByRole('textbox');
+    const submitBtn = screen.getByTitle('Gửi tin nhắn');
+
+    fireEvent.change(input, { target: { value: 'Run task prompt' } });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(tasksApi.createTask).toHaveBeenCalledWith({
+        session_id: 'session-1',
+        title: 'Run task prompt',
+        description: 'Run task prompt',
+        task_type: 'prompt',
+      });
+      expect(tasksApi.startTask).toHaveBeenCalledWith('task-new');
+      expect(eventsApi.subscribeToTaskEvents).toHaveBeenCalledWith('session-1', 'task-new');
+    });
+
+    expect(screen.getByText('Task API đang ở chế độ metadata, chưa thay thế Hermes chat runtime.')).toBeDefined();
+  });
+
+  it('khi VITE_USE_TASK_API=true và task đang chạy, hiển thị nút Hủy và thực hiện hủy task', async () => {
+    mockUseTaskApi = true;
+    vi.mocked(tasksApi.cancelTask).mockResolvedValueOnce({
+      id: 'task-1',
+      status: 'cancelled' as const,
+      task_type: 'prompt',
+      created_at: 100,
+      updated_at: 200,
+      duplicate: false,
+    });
+
+    useHermesStore.setState({
+      activeSessionId: 'session-1',
+      sessionStatusById: { 'session-1': 'running' },
+      latestTaskBySession: {
+        'session-1': {
+          id: 'task-1',
+          session_id: 'session-1',
+          status: 'running',
+          started_at: 1000,
+          retry_count: 0,
+        },
+      },
+    });
+
+    render(<ChatPanel />);
+
+    const cancelBtn = screen.getByText('Hủy');
+    expect(cancelBtn).toBeDefined();
+
+    fireEvent.click(cancelBtn);
+
+    await waitFor(() => {
+      expect(tasksApi.cancelTask).toHaveBeenCalledWith('task-1');
+    });
+
+    expect(useHermesStore.getState().sessionStatusById['session-1']).toBe('idle');
+    expect(useHermesStore.getState().latestTaskBySession['session-1']?.status).toBe('cancelled');
+    expect(screen.getByText(/Lưu ý: Việc hủy chỉ cập nhật metadata/)).toBeDefined();
   });
 });

@@ -1,10 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { subscribeToSessionEvents, unsubscribeFromSessionEvents } from './events';
+import { subscribeToSessionEvents, unsubscribeFromSessionEvents, subscribeToTaskEvents } from './events';
 import { useHermesStore } from '../store/store';
 import { getLatestSessionTaskRun } from './sessions';
+import { getTask } from './tasks';
+
+let mockUseTaskApi = false;
+vi.mock('./client', async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    get VITE_USE_TASK_API() {
+      return mockUseTaskApi;
+    }
+  };
+});
 
 vi.mock('./sessions', () => ({
   getLatestSessionTaskRun: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('./tasks', () => ({
+  getTask: vi.fn(),
 }));
 
 class MockEventSource {
@@ -56,6 +72,7 @@ describe('events.ts', () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    mockUseTaskApi = false;
     vi.mocked(getLatestSessionTaskRun).mockResolvedValue(null);
     MockEventSource.instances = [];
     useHermesStore.setState({
@@ -197,5 +214,85 @@ describe('events.ts', () => {
     state = useHermesStore.getState();
     expect(state.latestTaskBySession['session-1']?.status).toBe('running');
     vi.useRealTimers();
+  });
+
+  it('subscribeToTaskEvents với VITE_USE_TASK_API=true khi EventSource đóng sẽ giải phóng UI và giữ nguyên trạng thái running nếu backend trả về running', async () => {
+    mockUseTaskApi = true;
+    vi.mocked(getTask).mockResolvedValueOnce({
+      id: 'task-1',
+      status: 'running' as const,
+      task_type: 'prompt',
+      created_at: 1000,
+      updated_at: 1000,
+      duplicate: false,
+    });
+
+    useHermesStore.setState({
+      activeSessionId: 'session-1',
+      sessionStatusById: { 'session-1': 'running' },
+      latestTaskBySession: {
+        'session-1': {
+          id: 'task-1',
+          session_id: 'session-1',
+          status: 'running',
+          started_at: 1000,
+          retry_count: 0,
+        },
+      },
+    });
+
+    subscribeToTaskEvents('session-1', 'task-1');
+
+    const es = lastEventSource();
+    es.onerror?.({} as Event);
+
+    await flushPromises();
+
+    const state = useHermesStore.getState();
+    expect(state.sessionStatusById['session-1']).toBe('idle');
+    expect(state.sessionStartedAtById['session-1']).toBeUndefined();
+    expect(state.latestTaskBySession['session-1']?.status).toBe('running');
+    expect(es.close).toHaveBeenCalled();
+    expect(getTask).toHaveBeenCalledWith('task-1');
+  });
+
+  it('subscribeToTaskEvents với VITE_USE_TASK_API=true khi EventSource đóng sẽ giải phóng UI và cập nhật trạng thái terminal từ backend', async () => {
+    mockUseTaskApi = true;
+    vi.mocked(getTask).mockResolvedValueOnce({
+      id: 'task-1',
+      status: 'succeeded' as const,
+      task_type: 'prompt',
+      created_at: 1000,
+      updated_at: 1000,
+      duplicate: false,
+    });
+
+    useHermesStore.setState({
+      activeSessionId: 'session-1',
+      sessionStatusById: { 'session-1': 'running' },
+      latestTaskBySession: {
+        'session-1': {
+          id: 'task-1',
+          session_id: 'session-1',
+          status: 'running',
+          started_at: 1000,
+          retry_count: 0,
+        },
+      },
+    });
+
+    subscribeToTaskEvents('session-1', 'task-1');
+
+    const es = lastEventSource();
+    es.onerror?.({} as Event);
+
+    await flushPromises();
+
+    const state = useHermesStore.getState();
+    expect(state.sessionStatusById['session-1']).toBe('idle');
+    expect(state.sessionStartedAtById['session-1']).toBeUndefined();
+    expect(state.latestTaskBySession['session-1']?.status).toBe('succeeded');
+    expect(es.close).toHaveBeenCalled();
+    expect(getTask).toHaveBeenCalledWith('task-1');
   });
 });

@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Loader2, RotateCcw, Send } from 'lucide-react';
-import { useHermesStore } from '../store/store';
+import { useHermesStore, type TaskRun } from '../store/store';
 import { submitPrompt } from '../api/sessions';
-import { apiFetch } from '../api/client';
+import { apiFetch, VITE_USE_TASK_API } from '../api/client';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { subscribeToSessionEvents } from '../api/events';
+import { subscribeToSessionEvents, subscribeToTaskEvents } from '../api/events';
+import { createTask, startTask, cancelTask } from '../api/tasks';
 
 function formatTime(value?: number): string {
   if (!value) return '';
@@ -134,10 +135,30 @@ export const ChatPanel: React.FC = () => {
         created_at: Math.floor(Date.now() / 1000),
       });
 
-      const task = await submitPrompt(activeSessionId, nextPrompt);
-      setLatestTask(activeSessionId, task);
-      setSessionStatus(activeSessionId, task.status === 'waiting_approval' ? 'waiting_approval' : 'queued');
-      subscribeToSessionEvents(activeSessionId);
+      if (VITE_USE_TASK_API) {
+        const createdTask = await createTask({
+          session_id: activeSessionId,
+          title: nextPrompt.slice(0, 100),
+          description: nextPrompt,
+          task_type: 'prompt',
+        });
+        const task = await startTask(createdTask.id);
+        const taskRun: TaskRun = {
+          id: task.id,
+          session_id: activeSessionId,
+          status: task.status === 'succeeded' ? 'succeeded' : task.status,
+          started_at: task.created_at || Math.floor(Date.now() / 1000),
+          retry_count: 0,
+        };
+        setLatestTask(activeSessionId, taskRun);
+        setSessionStatus(activeSessionId, task.status === 'waiting_approval' ? 'waiting_approval' : 'queued');
+        subscribeToTaskEvents(activeSessionId, task.id);
+      } else {
+        const task = await submitPrompt(activeSessionId, nextPrompt);
+        setLatestTask(activeSessionId, task);
+        setSessionStatus(activeSessionId, task.status === 'waiting_approval' ? 'waiting_approval' : 'queued');
+        subscribeToSessionEvents(activeSessionId);
+      }
       setPrompt('');
       setLastFailedPrompt('');
     } catch (err) {
@@ -175,6 +196,25 @@ export const ChatPanel: React.FC = () => {
     } catch (err) {
       console.error('Failed to request memory proposal', err);
       setCuratorMessage('Không tạo được đề xuất bộ nhớ.');
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!activeSessionId || !latestTask) return;
+    try {
+      await cancelTask(latestTask.id);
+      setLatestTask(activeSessionId, {
+        ...latestTask,
+        status: 'cancelled',
+        finished_at: Math.floor(Date.now() / 1000),
+      });
+      setSessionStatus(activeSessionId, 'idle');
+      setSessionError(activeSessionId, null);
+      setSessionStartedAt(activeSessionId, null);
+      setCuratorMessage("Đã hủy task trên metadata. Lưu ý: Việc hủy chỉ cập nhật metadata, không đảm bảo dừng tiến trình Hermes legacy đang chạy.");
+    } catch (err) {
+      console.error('Failed to cancel task', err);
+      setPromptError("Không thể hủy task: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -218,6 +258,17 @@ export const ChatPanel: React.FC = () => {
               <span>{activeRuntimeText}</span>
             </div>
           )}
+          {VITE_USE_TASK_API && activeSessionId && (status === 'queued' || status === 'running' || status === 'waiting_approval') && (
+            <button
+              type="button"
+              className="btn-danger compact-button"
+              onClick={handleCancel}
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', fontWeight: '500' }}
+              title="Việc hủy chỉ được cập nhật trên metadata, không đảm bảo dừng tiến trình Hermes legacy đang chạy."
+            >
+              Hủy
+            </button>
+          )}
           {status === 'idle' && activeSessionId && (
             <button className="btn-secondary compact-button" onClick={handleCurate}>
               Đề xuất bộ nhớ
@@ -231,6 +282,13 @@ export const ChatPanel: React.FC = () => {
           <span>Task gần nhất: {taskStatusLabel(latestTask.status)}</span>
           {latestTask.finished_at && <span>Hoàn tất lúc {formatTime(latestTask.finished_at)}</span>}
           {taskHint && <span>{taskHint}</span>}
+        </div>
+      )}
+
+      {VITE_USE_TASK_API && (
+        <div className="task-api-warning-banner" style={{ background: '#f59e0b', color: '#000', padding: '8px 12px', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
+          <AlertCircle size={16} />
+          <span>Task API đang ở chế độ metadata, chưa thay thế Hermes chat runtime.</span>
         </div>
       )}
 

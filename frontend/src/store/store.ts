@@ -54,7 +54,7 @@ export interface ApprovalRequest {
 export interface TaskRun {
   id: string;
   session_id: string;
-  status: 'queued' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancelled';
+  status: 'queued' | 'running' | 'waiting_approval' | 'completed' | 'succeeded' | 'failed' | 'cancelled';
   started_at: number;
   finished_at?: number | null;
   error?: string | null;
