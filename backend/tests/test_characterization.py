@@ -67,8 +67,16 @@ def sync_client_real_path(tmp_path) -> TestClient:
     )
     app = create_app(settings_override=settings)
     app.state.test_workspace = str(ws)
-    with TestClient(app) as c:
-        yield c
+    client = TestClient(app)
+    client.__enter__()
+    yield client
+    # Small delay so aiosqlite worker threads can deliver pending
+    # callbacks before the event loop is closed. The race is between
+    # the thread's call_soon_threadsafe and loop.close() during
+    # TestClient.__exit__ -- benign but noisy.
+    import time
+    time.sleep(0.05)
+    client.__exit__(None, None, None)
 
 
 @pytest.fixture
@@ -86,8 +94,12 @@ def sync_client_use_task_api_real_path(tmp_path) -> TestClient:
     )
     app = create_app(settings_override=settings)
     app.state.test_workspace = str(ws)
-    with TestClient(app) as c:
-        yield c
+    client = TestClient(app)
+    client.__enter__()
+    yield client
+    import time
+    time.sleep(0.05)
+    client.__exit__(None, None, None)
 
 
 # =========================================================================
@@ -192,7 +204,6 @@ class TestPromptSubmission:
         assert data["session_id"] == s["id"]
         assert "id" in data
 
-    @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
     def test_submit_prompt_completes_and_streams_events(self, sync_client_real_path: TestClient) -> None:
         s = sync_client_real_path.post("/api/sessions", json={"title": "P2", "workspace_path": "/tmp"}).json()
         resp = sync_client_real_path.post(f"/api/sessions/{s['id']}/prompt", json={"prompt": "Hello"})
@@ -867,7 +878,6 @@ class TestTaskApiAdapter:
         s = Settings()
         assert s.use_task_api is False
 
-    @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
     def test_flag_off_no_task_artifacts(
         self, sync_client_real_path: TestClient
     ) -> None:
@@ -1159,7 +1169,6 @@ class TestTaskApiAdapter:
 
         asyncio.run(_test())
 
-    @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
     def test_flag_true_sse_format_compatible(
         self, sync_client_use_task_api_real_path: TestClient
     ) -> None:
@@ -1188,7 +1197,6 @@ class TestTaskApiAdapter:
             parsed = json.loads(ev)
             assert "type" in parsed
 
-    @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
     def test_flag_true_adapter_error_audit_json(
         self, sync_client_use_task_api_real_path: TestClient, monkeypatch
     ) -> None:
