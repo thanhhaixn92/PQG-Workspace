@@ -4,47 +4,47 @@ Last updated: 2026-07-04
 
 ## Checkpoint
 
-CP5 - Frontend Migration.
+CP6 - Outbox Dispatcher.
 
 ## Status
 
-CP5 Frontend Migration is complete and verified:
+CP5 Frontend Migration is complete and verified. CP6 Outbox Dispatcher is now approved for automation:
 
-- Frontend API client wrapped all public Tasks API endpoints.
-- Zustand store supports the legacy session path and the Task API path under `VITE_USE_TASK_API`.
-- ChatPanel and Activity Timeline integrate with the Task API conditionally behind the feature flag.
-- Warning banners for metadata execution mode and cancellation side effects are present.
-- `VITE_USE_TASK_API=false` remains the safe default.
-- CP6 is not started.
+- Task and outbox writes must be atomic.
+- Pending rows must be safe after restart.
+- Duplicate sends must be prevented with idempotency keys.
+- Dead letter behavior must exist after max attempts.
+- CP7+ scope is not approved.
 
 ## Goal
 
-Close CP5 cleanly before any CP6 work begins.
+Implement CP6 Outbox Dispatcher cleanly without widening scope.
 
 ## Context
 
-CP5 migrates the frontend to optionally use the public Task API while preserving the legacy session route fallback. The next checkpoint, CP6 Outbox Dispatcher, must not begin until the user explicitly approves CP6 planning.
+CP6 implements backend-owned transactional outbox dispatching per ADR-004. Existing outbox schema/repository code may already exist; reuse it where appropriate.
 
 ## Constraints
 
-- Do not implement CP6 in this checkpoint.
+- Do not implement CP7 or Telegram channel behavior.
 - Keep existing legacy session routes working.
 - Keep `VITE_USE_TASK_API=false` fallback intact.
 - Do not add Telegram, model fallback, auth, deployment, vector search, or CP7+ scope.
 
 ## Required Implementation Shape
 
-- CP5 changes remain behind the feature flag.
-- Product code should not be changed unless a CP5 blocker is found.
-- Project state and handoff documents must say CP5 is complete and CP6 is pending user approval.
+- Keep FastAPI as the policy boundary.
+- Keep n8n behind backend-owned dispatching; n8n must not poll SQLite.
+- Add focused backend tests for CP6 acceptance criteria.
+- Update project/AI state after implementation and verification.
 
 ## Done When
 
-- CP5 checklist is complete.
+- CP6 checklist is complete.
 - Backend test suite passes.
-- Frontend type-check, tests, and build pass.
-- Project state does not instruct agents to start CP6 automatically.
+- Frontend checks are only required if frontend code is touched.
+- Project state documents the CP6 outcome.
 
 ## Review Gate
 
-Human approval is required before opening CP6 planning or implementation.
+Human review is required before closing CP6.

@@ -3,17 +3,19 @@
 ## Current State
 
 - CP5 is complete and preserved as the current closed gate.
-- CP6 is not approved.
-- Current state: CP5_COMPLETE.
-- Next agent: human.
-- Human approval required: yes.
-- Automation infrastructure has been created for future use.
+- CP6 Outbox Dispatcher is approved and opened for automation.
+- Current state: READY.
+- Next agent: codex.
+- Human approval required: no for this approved CP6 implementation task.
+- Automation infrastructure is ready for use.
 
 ## Boundary
 
-- No product code changes are allowed for the automation task.
-- No CP6 planning or implementation is allowed.
-- If human later approves CP6, a new explicit task must be written into `AI_TASK.md` and `AI_STATE.json` must be changed intentionally.
+- Product code changes are allowed only for CP6 Outbox Dispatcher.
+- Do not implement Telegram, CP7+, model fallback, auth, deployment, vector search, or Excalidraw.
+- Reuse existing `notification_outbox` schema/repository where possible.
+- Preserve FastAPI as the policy/audit boundary and do not let n8n poll SQLite.
+- Keep legacy session routes and `USE_TASK_API=false` fallback intact.
 - Antigravity CLI may be unavailable; GUI fallback must be supported.
 - Bash may be unavailable in Windows PowerShell.
 - PowerShell scripts are the primary Windows entrypoints.
@@ -24,25 +26,11 @@
 - Agent loops must stop when no state transition occurs.
 - Do not use `agy --dangerously-skip-permissions` or `codex --dangerously-bypass-approvals-and-sandbox`.
 
-## Allowed Files
+## Expected Code Areas
 
-- `AGENTS.md`
-- `AI_TASK.md`
-- `AI_STATE.json`
-- `AI_HANDOFF.md`
-- `AI_CHANGELOG.md`
-- `AI_VERIFICATION.md`
-- `AI_RISK_REGISTER.md`
-- `.agents/skills/verify-and-handoff/SKILL.md`
-- `scripts/run-codex.sh`
-- `scripts/run-antigravity.sh`
-- `scripts/agent-loop.sh`
-- `scripts/ai-auto.sh`
-- `scripts/run-codex.ps1`
-- `scripts/run-antigravity.ps1`
-- `scripts/agent-loop.ps1`
-- `scripts/ai-auto.ps1`
-- `scripts/codex-tick.ps1`
+- Backend service/repository/tests for notification outbox dispatching.
+- Existing checkpoint docs and AI coordination files.
+- Avoid frontend files unless validation proves they are required.
 
 ## Forbidden Files And Areas
 
@@ -54,11 +42,10 @@
 - billing config
 - production database settings
 - database files
-- database migrations
-- CP6 product files
-- frontend source files
-- backend source files
+- unrelated database migrations
+- CP7+ product files
+- frontend source files unless explicitly required by CP6 validation
 
 ## Next Action
 
-Human reviews the automation diff. Do not start CP6 until explicit human approval.
+Run `scripts\ai-auto.ps1`. Codex should implement CP6 only, run relevant backend tests, update AI coordination files, and return control for human/Codex review.

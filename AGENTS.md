@@ -31,9 +31,10 @@ Read only the docs needed for the current task. Do not load every file by defaul
 ## Current Gate
 
 - CP5 Frontend Migration is complete.
-- CP6 Outbox Dispatcher is not approved.
-- No CP6 planning or implementation is allowed until explicit human approval.
-- Keep `AI_STATE.json` at `state = CP5_COMPLETE`, `next_agent = human`, and `human_approval_required = true` until the user intentionally opens new work.
+- CP6 Outbox Dispatcher is approved for implementation through the automation workflow.
+- CP6 scope is limited to transactional outbox dispatcher behavior and required backend tests.
+- Do not implement Telegram, model fallback, auth, deployment, vector search, Excalidraw, or CP7+ scope.
+- Keep automation state in `AI_STATE.json`; only one agent may run at a time.
 
 ## Hard Rules
 

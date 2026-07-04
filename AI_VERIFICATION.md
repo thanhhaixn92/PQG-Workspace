@@ -25,6 +25,8 @@
 
 ## Validation
 
+- CP6 automation gate opened after explicit user request.
+- `AI_STATE.json` now points to `cp6-outbox-dispatcher`, `state = READY`, `next_agent = codex`, `human_approval_required = false`.
 - `AI_STATE.json`: valid with `python -m json.tool AI_STATE.json`.
 - `git diff --check`: passed; Git reported Windows LF/CRLF working-copy warnings only.
 - `scripts/run-codex.ps1`: stopped safely at CP5 human gate.

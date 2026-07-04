@@ -2,6 +2,9 @@
 
 ## 2026-07-04
 
+- CP6 Outbox Dispatcher opened for automation after explicit user request.
+- Updated project/checkpoint/AI state from CP5 gate to CP6 READY with `next_agent = codex`.
+- CP6 scope limited to backend-owned transactional outbox dispatcher; CP7+ remains out of scope.
 - CP5 Frontend Migration was completed and committed before automation setup.
 - Automation infrastructure created from clean/restored state after CP5.
 - CP5 gate preserved.

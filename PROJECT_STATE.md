@@ -5,9 +5,9 @@ Last updated: 2026-07-04
 ## Current Checkpoint
 
 - Active track: Hermes Local Stack V1 checkpoints.
-- Current state: CP5 Frontend Migration is verified and complete.
-- Next proposed work: wait for human approval before planning CP6 Outbox Dispatcher.
-- CP6 is not started. Do not implement CP6 until the user explicitly approves a CP6 plan.
+- Current state: CP6 Outbox Dispatcher is approved and opened for automation.
+- CP5 Frontend Migration is verified and complete.
+- Next work: implement CP6 Outbox Dispatcher only.
 
 ## Latest Gate Report
 
@@ -21,10 +21,9 @@ Latest verified by Codex:
 
 ## Current Decision
 
-CP5 frontend implementation is complete and verified. Stop at the CP5 gate until the user approves CP6 planning.
+CP6 Outbox Dispatcher is approved for implementation through the automation workflow.
 
-- Do not implement CP6 yet.
-- If the user approves CP6 later, implement only CP6 Outbox Dispatcher scope; do not implement Telegram, model fallback, or CP7+.
+- Implement only CP6 Outbox Dispatcher scope; do not implement Telegram, model fallback, or CP7+.
 - Keep existing legacy session routes working.
 - Keep `USE_TASK_API=false` and legacy UI fallback intact.
 - Every new public endpoint must have idempotency, approval, audit, and session/workspace safety tests where applicable.
@@ -32,7 +31,6 @@ CP5 frontend implementation is complete and verified. Stop at the CP5 gate until
 ## Do Not Do Now
 
 - Do not implement CP7-CP10 scope during CP6.
-- Do not plan or implement CP6 until the user explicitly asks.
 - Do not add Telegram, model fallback, auth, deployment, or vector search.
 - Do not change Hermes model/provider/timeout.
 - Do not hard-delete user data.

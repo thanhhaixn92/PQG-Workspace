@@ -1,10 +1,10 @@
 {
-  "task_id": "cp5-complete-gate",
-  "state": "CP5_COMPLETE",
-  "next_agent": "human",
+  "task_id": "cp6-outbox-dispatcher",
+  "state": "READY",
+  "next_agent": "codex",
   "lock": null,
   "last_agent": "codex",
-  "last_result": "CP5 complete gate preserved. Automation infrastructure created. Waiting for human approval before CP6.",
-  "human_approval_required": true,
-  "risk_level": "low"
+  "last_result": "CP6 Outbox Dispatcher opened for automation. Codex should implement CP6 only and return for review.",
+  "human_approval_required": false,
+  "risk_level": "medium"
 }
