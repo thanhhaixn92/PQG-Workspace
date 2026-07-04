@@ -37,18 +37,77 @@ fi
 
 PROMPT="Read .agents/skills/verify-and-handoff/SKILL.md and run /verify-and-handoff with safe checks only."
 
+block_antigravity() {
+  local message="$1"
+  MESSAGE="$message" python - <<'PY'
+import json, os
+path = "AI_STATE.json"
+with open(path, encoding="utf-8") as f:
+    data = json.load(f)
+data["state"] = "BLOCKED"
+data["next_agent"] = "human"
+data["lock"] = None
+data["last_agent"] = "automation"
+data["last_result"] = os.environ["MESSAGE"]
+data["human_approval_required"] = True
+data["risk_level"] = "medium"
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+  echo "Blocked: $message"
+}
+
+set_antigravity_lock() {
+  python - <<'PY'
+import json
+path = "AI_STATE.json"
+with open(path, encoding="utf-8") as f:
+    data = json.load(f)
+data["lock"] = "antigravity"
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+}
+
+release_antigravity_lock() {
+  python - <<'PY'
+import json
+path = "AI_STATE.json"
+with open(path, encoding="utf-8") as f:
+    data = json.load(f)
+if data.get("lock") == "antigravity":
+    data["lock"] = None
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+PY
+}
+
 if command -v antigravity >/dev/null 2>&1; then
+  set_antigravity_lock
+  trap release_antigravity_lock EXIT
   echo "Antigravity CLI detected. Safe prompt:"
   echo "$PROMPT"
-  antigravity "$PROMPT"
+  if ! antigravity "$PROMPT"; then
+    block_antigravity "Antigravity CLI execution failed."
+    exit 1
+  fi
 elif command -v ag >/dev/null 2>&1; then
+  set_antigravity_lock
+  trap release_antigravity_lock EXIT
   echo "ag CLI detected. Safe prompt:"
   echo "$PROMPT"
-  ag "$PROMPT"
+  if ! ag "$PROMPT"; then
+    block_antigravity "ag CLI execution failed."
+    exit 1
+  fi
 else
   echo "Antigravity CLI not found."
   echo "GUI fallback:"
   echo "1. Open Antigravity IDE."
   echo "2. Open this repo: $ROOT"
   echo "3. Run /verify-and-handoff."
+  block_antigravity "Antigravity CLI unavailable. Human must use GUI fallback and explicitly reset AI_STATE.json before resuming automation."
 fi

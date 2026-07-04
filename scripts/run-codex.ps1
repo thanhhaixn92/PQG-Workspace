@@ -35,7 +35,7 @@ Follow only AI_HANDOFF.md.
 Never commit, push, merge, deploy, reset, clean, delete, or modify forbidden files.
 Never start CP6 without explicit human approval.
 "@
-    codex exec --sandbox workspace-write --ask-for-approval on-request $prompt
+    codex exec --sandbox workspace-write $prompt
 }
 finally {
     $current = Read-AIState

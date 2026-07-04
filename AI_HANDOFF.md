@@ -17,6 +17,9 @@
 - Antigravity CLI may be unavailable; GUI fallback must be supported.
 - Bash may be unavailable in Windows PowerShell.
 - PowerShell scripts are the primary Windows entrypoints.
+- Codex CLI is invoked with currently supported `codex exec --sandbox workspace-write`; approval behavior must be enforced by human gate/state rules and any local Codex profile config available at runtime.
+- Antigravity wrappers must lock before CLI execution and block to human review if the CLI is unavailable or fails.
+- Agent loops must stop when no state transition occurs.
 
 ## Allowed Files
 

@@ -18,6 +18,8 @@ while ($true) {
         exit 0
     }
 
+    $before = $state | ConvertTo-Json -Depth 10
+
     switch ($state.next_agent) {
         "codex" { & (Join-Path $PSScriptRoot "run-codex.ps1") }
         "antigravity" { & (Join-Path $PSScriptRoot "run-antigravity.ps1") }
@@ -33,5 +35,12 @@ while ($true) {
             Write-Host "Stopped: unknown next_agent $($state.next_agent)."
             exit 1
         }
+    }
+
+    $afterState = Read-AIState
+    $after = $afterState | ConvertTo-Json -Depth 10
+    if ($after -eq $before) {
+        Write-Host "Stopped: agent run made no state change. Manual review required to avoid an infinite loop."
+        exit 0
     }
 }

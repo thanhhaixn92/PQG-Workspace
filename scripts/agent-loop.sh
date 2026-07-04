@@ -29,6 +29,13 @@ PY
     exit 0
   fi
 
+  BEFORE="$(python - <<'PY'
+import json
+with open("AI_STATE.json", encoding="utf-8") as f:
+    print(json.dumps(json.load(f), sort_keys=True))
+PY
+)"
+
   case "$NEXT_AGENT" in
     codex)
       scripts/run-codex.sh
@@ -45,4 +52,15 @@ PY
       exit 1
       ;;
   esac
+
+  AFTER="$(python - <<'PY'
+import json
+with open("AI_STATE.json", encoding="utf-8") as f:
+    print(json.dumps(json.load(f), sort_keys=True))
+PY
+)"
+  if [[ "$AFTER" == "$BEFORE" ]]; then
+    echo "Stopped: agent run made no state change. Manual review required to avoid an infinite loop."
+    exit 0
+  fi
 done

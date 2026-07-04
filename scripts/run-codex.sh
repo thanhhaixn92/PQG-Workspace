@@ -72,4 +72,4 @@ Never commit, push, merge, deploy, reset, clean, delete, or modify forbidden fil
 Never start CP6 without explicit human approval.
 EOF
 
-codex exec --sandbox workspace-write --ask-for-approval on-request "$(cat "$PROMPT")"
+codex exec --sandbox workspace-write "$(cat "$PROMPT")"

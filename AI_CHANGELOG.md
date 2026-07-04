@@ -7,6 +7,11 @@
 - CP5 gate preserved.
 - CP6 not started.
 - No product code modified by automation setup.
+- Automation runner fixes added after review:
+  - Removed unsupported `codex exec --ask-for-approval` flag.
+  - Added Antigravity CLI lock/release behavior.
+  - Added Antigravity missing-CLI/failure block back to human review.
+  - Added loop no-state-change protection.
 
 ## Files Created Or Updated
 
