@@ -53,34 +53,34 @@ class TaskService:
             await self._idempotency.set(idempotency_key, json.dumps(task, default=str), 200, request_hash=req_hash)
         return task, False
 
-    async def start_task(self, task_id: str) -> dict:
+    async def start_task(self, task_id: str, run_id: Optional[str] = None) -> dict:
         task = await self._task_repo.get_task(task_id)
         if task is None:
             raise ValueError(f"Task not found: {task_id}")
         TaskStateMachine.validate(task["status"], "running")
         updated = await self._task_repo.update_task_status(task_id, "running")
-        await self._task_repo.create_event(task_id, "status_change", "running", '{"msg":"task started"}')
+        await self._task_repo.create_event(task_id, "status_change", "running", '{"msg":"task started"}', run_id=run_id)
         return updated
 
-    async def complete_task(self, task_id: str, result_data: Optional[str] = None) -> dict:
+    async def complete_task(self, task_id: str, result_data: Optional[str] = None, run_id: Optional[str] = None) -> dict:
         task = await self._task_repo.get_task(task_id)
         if task is None:
             raise ValueError(f"Task not found: {task_id}")
         TaskStateMachine.validate(task["status"], "succeeded")
         updated = await self._task_repo.update_task_status(task_id, "succeeded")
         await self._task_repo.create_event(
-            task_id, "status_change", "succeeded", data_json=result_data or '{"msg":"task completed"}'
+            task_id, "status_change", "succeeded", data_json=result_data or '{"msg":"task completed"}', run_id=run_id
         )
         return updated
 
-    async def fail_task(self, task_id: str, error: str) -> dict:
+    async def fail_task(self, task_id: str, error: str, run_id: Optional[str] = None) -> dict:
         task = await self._task_repo.get_task(task_id)
         if task is None:
             raise ValueError(f"Task not found: {task_id}")
         TaskStateMachine.validate(task["status"], "failed")
         updated = await self._task_repo.update_task_status(task_id, "failed", error=error)
         await self._task_repo.create_event(
-            task_id, "status_change", "failed", data_json=json.dumps({"error": error})
+            task_id, "status_change", "failed", data_json=json.dumps({"error": error}), run_id=run_id
         )
         return updated
 

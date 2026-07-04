@@ -113,6 +113,7 @@ async def _run_prompt_task(
     task_id: str,
     prompt: str,
     db_path: Any,
+    use_task_api: bool = False,
 ) -> None:
     """Background task to send prompt and update DB task_run status and audit logs."""
     try:
@@ -167,6 +168,17 @@ async def _run_prompt_task(
                 db, session_id, "system", "task_run.completed", payload={"task_id": task_id}
             )
             await db.commit()
+            if use_task_api:
+                try:
+                    from app.services.legacy_task_adapter import LegacyTaskAdapter
+                    from app.services.task_service import TaskService
+                    awaited_adapter = LegacyTaskAdapter(TaskService(db))
+                    await awaited_adapter.update_from_task_run(db, task_id, "completed")
+                except Exception as _adapter_exc:
+                    await log_audit_event(
+                        db, session_id, "system", "task_service_adapter.error",
+                        payload={"task_id": task_id, "error": str(_adapter_exc)},
+                    )
         await event_bus.publish(session_id, SseDoneEvent())
     except Exception as e:
         async with get_db_connection(db_path) as db:
@@ -186,6 +198,14 @@ async def _run_prompt_task(
                 (now, session_id),
             )
             await db.commit()
+            if use_task_api:
+                try:
+                    from app.services.legacy_task_adapter import LegacyTaskAdapter
+                    from app.services.task_service import TaskService
+                    awaited_adapter = LegacyTaskAdapter(TaskService(db))
+                    await awaited_adapter.update_from_task_run(db, task_id, "failed", error=str(e))
+                except Exception:
+                    pass
         await event_bus.publish(session_id, SseDoneEvent())
 
 
@@ -577,6 +597,13 @@ async def submit_prompt(
         payload={"task_id": task_id},
     )
 
+    # Optional TaskService integration behind USE_TASK_API flag
+    if settings.use_task_api:
+        from app.services.legacy_task_adapter import LegacyTaskAdapter
+        from app.services.task_service import TaskService
+        adapter = LegacyTaskAdapter(TaskService(conn))
+        await adapter.on_prompt_submit(conn, session_id, task_id, request.prompt)
+
     # Spawn hermes (lazy) and send prompt in background
     # Note: We send asynchronously to avoid blocking the HTTP response.
     # In a production setup, we might use a proper background worker.
@@ -587,6 +614,7 @@ async def submit_prompt(
             task_id=task_id,
             prompt=final_prompt,
             db_path=settings.db_path_resolved,
+            use_task_api=settings.use_task_api,
         )
     )
 

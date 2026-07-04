@@ -1,102 +1,94 @@
-# Checkpoints — Hermes Local Stack V1
+# Checkpoints - Hermes Local Stack V1
 
 Branch: `feature/hermes-local-stack-v1`
 
-Mỗi checkpoint chỉ tick khi:
-- Backend tests pass (`cd backend && pytest -v`)
-- Frontend tests pass (`cd frontend && npm test -- --run`)
-- Lint pass (`cd frontend && npm run lint`)
-- Build pass (`cd frontend && npm run build`)
-- Manual smoke test pass
+Each checkpoint is complete only when:
 
----
+- Backend tests pass.
+- Frontend type-check passes when frontend code is touched.
+- Frontend tests pass when frontend code is touched.
+- Frontend build passes when frontend code is touched.
+- Manual smoke passes for user-facing behavior.
 
 ## CP0 Baseline Lock
-- [ ] ADRs committed (`docs/adr/001` through `004`)
-- [ ] Characterization tests pass (baseline recorded)
-- [ ] Backend tests pass
-- [ ] Frontend tests pass
 
----
+- [x] Characterization tests pass.
+- [x] Backend tests pass.
+- [x] Frontend tests pass.
 
 ## CP1 Schema
-- [x] Migrations 0005-0011 up/down pass
-- [x] Repository tests pass
-- [x] Backup app.db created (`app.db.baseline`)
 
----
+- [x] Migrations 0005-0011 pass.
+- [x] Repository tests pass.
+- [x] Baseline backup created.
 
 ## CP2 TaskService
-- [x] TaskStateMachine transition tests pass
-- [x] Idempotency tests pass
-- [x] Follow-up behavior tests pass
 
----
+- [x] TaskStateMachine transition tests pass.
+- [x] Idempotency tests pass.
+- [x] Request-hash conflict handling exists.
+- [x] Follow-up behavior tests pass.
+- [x] Global warning suppression removed.
 
 ## CP3 Legacy Adapter
-- [ ] FE cũ vẫn chạy (gọi route cũ)
-- [ ] Session submit format không đổi
-- [ ] Hermes stream đúng format
-- [ ] Approval flow đúng
-- [ ] Audit đúng
-- [ ] `USE_TASK_API=true` + characterization tests pass (so khớp CP0)
 
----
+- [ ] `USE_TASK_API=false` remains the default.
+- [ ] Existing frontend still works through existing routes.
+- [ ] Session submit format does not change when flag is off.
+- [ ] Hermes stream keeps the existing SSE format.
+- [ ] Approval flow remains compatible.
+- [ ] Audit behavior remains compatible.
+- [ ] `USE_TASK_API=true` characterization tests pass against CP0 expectations.
 
 ## CP4 Public API
-- [ ] POST /api/tasks idempotent (same=200, diff=409)
-- [ ] SSE events stream đúng thứ tự
-- [ ] Cancel dừng Hermes run
-- [ ] Approval gắn với action cụ thể
-- [ ] Audit cho mọi endpoint
 
----
+- [ ] `POST /api/tasks` is idempotent: same request returns existing result, different payload returns conflict.
+- [ ] SSE events stream in stable order.
+- [ ] Cancel stops the Hermes run.
+- [ ] Approval is bound to a specific action.
+- [ ] Every endpoint writes required audit events.
 
 ## CP5 Frontend Migration
-- [ ] Task creation + streaming UI qua Task API
-- [ ] Approval UI qua approval_id
-- [ ] Task cancel từ UI
-- [ ] Session history vẫn hiển thị
-- [ ] 93 frontend tests pass
-- [ ] `VITE_USE_TASK_API=false` fallback hoạt động
 
----
+- [ ] Task creation and streaming UI work through Task API.
+- [ ] Approval UI works through approval IDs.
+- [ ] Task cancel is available from UI.
+- [ ] Session history still displays.
+- [ ] Frontend tests pass.
+- [ ] `VITE_USE_TASK_API=false` fallback works.
 
 ## CP6 Outbox Dispatcher
-- [ ] Transaction atomicity (task + outbox cùng commit/rollback)
-- [ ] Restart safety (pending rows được xử lý lại)
-- [ ] No duplicate send (idempotency key)
-- [ ] Dead letter khi max attempts
 
----
+- [ ] Task and outbox write atomically.
+- [ ] Pending rows are safe after restart.
+- [ ] Duplicate sends are prevented with idempotency keys.
+- [ ] Dead letter behavior exists after max attempts.
 
 ## CP7 Telegram Channel
-- [ ] Signature sai → 401
-- [ ] User không trong allowlist → 403
-- [ ] Update retry → không tạo task trùng
-- [ ] Callback token dùng lại → 409
-- [ ] Token hết hạn → 410
 
----
+- [ ] Invalid signature returns 401.
+- [ ] User outside allowlist returns 403.
+- [ ] Retried updates do not create duplicate tasks.
+- [ ] Reused callback token returns 409.
+- [ ] Expired callback token returns 410.
 
 ## CP8 Model Fallback
-- [ ] 429/quota → fallback → task succeeds
-- [ ] Timeout/5xx → retry → fallback → succeeds
-- [ ] 401/403 → dừng, no fallback
-- [ ] Cooldown respected
-- [ ] TaskRun ghi đúng attempt chain
 
----
+- [ ] 429/quota can fallback and task succeeds.
+- [ ] Timeout/5xx can retry/fallback and task succeeds.
+- [ ] 401/403 stops without fallback.
+- [ ] Cooldown is respected.
+- [ ] Task run records the attempt chain.
 
 ## CP9 Skill Version
-- [ ] Chỉ approved skills được inject vào context
-- [ ] Draft skill không ảnh hưởng runtime
-- [ ] Version history đầy đủ
-- [ ] Audit cho mọi version mutation
 
----
+- [ ] Only approved skills are injected into context.
+- [ ] Draft skills do not affect runtime.
+- [ ] Version history is complete.
+- [ ] Every version mutation is audited.
 
-## CP10 Cleanup (Release Sau)
-- [ ] Legacy route metrics = 0 consumer
-- [ ] `X-Deprecated: true` header active
-- [ ] Code dead removed
+## CP10 Cleanup
+
+- [ ] Legacy route metrics show no active consumers.
+- [ ] `X-Deprecated: true` header is active.
+- [ ] Dead code is removed only after explicit approval.

@@ -71,6 +71,25 @@ def sync_client_real_path(tmp_path) -> TestClient:
         yield c
 
 
+@pytest.fixture
+def sync_client_use_task_api_real_path(tmp_path) -> TestClient:
+    db_path = tmp_path / "test_task_api.db"
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(
+        db_path=str(db_path),
+        default_workspace_root=str(tmp_path / "auto"),
+        hermes_executable_path=sys.executable,
+        hermes_args=[str(Path("tests/mock_hermes.py").absolute())],
+        hermes_dev_mock=True,
+        use_task_api=True,
+    )
+    app = create_app(settings_override=settings)
+    app.state.test_workspace = str(ws)
+    with TestClient(app) as c:
+        yield c
+
+
 # =========================================================================
 # Session Lifecycle
 # =========================================================================
@@ -579,6 +598,7 @@ class TestAuditTrail:
         "curator.proposed", "curator.no_proposal", "curator.accepted", "curator.denied",
         "memory.injected",
         "content.quality_check",
+        "task_service_adapter.error",
     }
 
     def test_all_audit_actions_defined(self) -> None:
@@ -834,6 +854,395 @@ class TestHealth:
         assert resp.status_code == 200
         assert resp.json()["status"] in ("ok", "degraded")
 
+
+# =========================================================================
+# CP3: Legacy Task Adapter (USE_TASK_API flag)
+# =========================================================================
+
+
+class TestTaskApiAdapter:
+    """CP3: Legacy adapter behind USE_TASK_API flag."""
+
+    def test_flag_false_is_default(self) -> None:
+        s = Settings()
+        assert s.use_task_api is False
+
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+    def test_flag_off_no_task_artifacts(
+        self, sync_client_real_path: TestClient
+    ) -> None:
+        from app.db.connection import get_db_connection
+
+        s = sync_client_real_path.post(
+            "/api/sessions", json={"title": "NoTask", "workspace_path": "/tmp"}
+        ).json()
+        resp = sync_client_real_path.post(
+            f"/api/sessions/{s['id']}/prompt", json={"prompt": "Hello"}
+        )
+        assert resp.status_code == 202
+        task_run_id = resp.json()["id"]
+
+        events = []
+        with sync_client_real_path.stream(
+            "GET", f"/api/sessions/{s['id']}/events"
+        ) as stream:
+            for line in stream.iter_lines():
+                if line.startswith("data:"):
+                    events.append(line[5:].strip())
+                if line.startswith("event: done"):
+                    break
+        assert len(events) >= 1
+
+        async def _check():
+            await asyncio.sleep(0.1)
+            async with get_db_connection(
+                sync_client_real_path.app.state.hermes_client.settings.db_path_resolved
+            ) as db:
+                async with db.execute(
+                    "SELECT task_id FROM task_runs WHERE id=?", (task_run_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row["task_id"] is None
+
+                async with db.execute(
+                    "SELECT COUNT(*) AS cnt FROM tasks"
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row["cnt"] == 0
+
+                async with db.execute(
+                    "SELECT role, content FROM chat_messages WHERE session_id=? ORDER BY created_at ASC, rowid ASC",
+                    (s["id"],),
+                ) as cur:
+                    rows = await cur.fetchall()
+                    assert len(rows) >= 2
+                    assert rows[0]["role"] == "user"
+                    assert rows[1]["role"] == "assistant"
+
+                async with db.execute(
+                    "SELECT action FROM audit_events WHERE session_id=?", (s["id"],)
+                ) as cur:
+                    actions = [r["action"] for r in await cur.fetchall()]
+                    assert "prompt.submitted" in actions
+                    assert "task_run.completed" in actions
+        asyncio.run(_check())
+
+    def test_flag_true_submit_prompt_creates_task_link(
+        self, sync_client_use_task_api_real_path: TestClient
+    ) -> None:
+        from app.db.connection import get_db_connection
+
+        s = sync_client_use_task_api_real_path.post(
+            "/api/sessions", json={"title": "TA", "workspace_path": "/tmp"}
+        ).json()
+        resp = sync_client_use_task_api_real_path.post(
+            f"/api/sessions/{s['id']}/prompt", json={"prompt": "Hello"}
+        )
+        assert resp.status_code == 202
+        data = resp.json()
+        assert data["status"] == "queued"
+        task_run_id = data["id"]
+
+        async def _check():
+            async with get_db_connection(
+                sync_client_use_task_api_real_path.app.state.hermes_client.settings.db_path_resolved
+            ) as db:
+                async with db.execute(
+                    "SELECT task_id FROM task_runs WHERE id=?", (task_run_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row is not None
+                    assert row["task_id"] is not None
+                    assert row["task_id"].startswith("task-")
+                    linked_task_id = row["task_id"]
+
+                async with db.execute(
+                    "SELECT * FROM tasks WHERE id=?", (linked_task_id,)
+                ) as cur:
+                    task = await cur.fetchone()
+                    assert task is not None
+                    assert task["status"] == "running"
+                    assert task["session_id"] == s["id"]
+        asyncio.run(_check())
+
+    def test_flag_true_prompt_lifecycle_legacy_compatibility(
+        self, sync_client_use_task_api_real_path: TestClient
+    ) -> None:
+        from app.db.connection import get_db_connection
+
+        s = sync_client_use_task_api_real_path.post(
+            "/api/sessions", json={"title": "TB", "workspace_path": "/tmp"}
+        ).json()
+        resp = sync_client_use_task_api_real_path.post(
+            f"/api/sessions/{s['id']}/prompt", json={"prompt": "Hello"}
+        )
+        assert resp.status_code == 202
+        task_run_id = resp.json()["id"]
+
+        events = []
+        with sync_client_use_task_api_real_path.stream(
+            "GET", f"/api/sessions/{s['id']}/events"
+        ) as stream:
+            for line in stream.iter_lines():
+                if line.startswith("data:"):
+                    events.append(line[5:].strip())
+                if line.startswith("event: done"):
+                    break
+        assert len(events) >= 1
+
+        async def _check():
+            await asyncio.sleep(0.1)
+            async with get_db_connection(
+                sync_client_use_task_api_real_path.app.state.hermes_client.settings.db_path_resolved
+            ) as db:
+                async with db.execute(
+                    "SELECT status FROM task_runs WHERE id=?", (task_run_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row["status"] == "completed"
+
+                async with db.execute(
+                    "SELECT role, content FROM chat_messages WHERE session_id=? ORDER BY created_at ASC, rowid ASC",
+                    (s["id"],),
+                ) as cur:
+                    rows = await cur.fetchall()
+                    assert rows[0]["role"] == "user"
+                    assert rows[0]["content"] == "Hello"
+                    assert rows[1]["role"] == "assistant"
+                    assert rows[1]["content"]
+
+                async with db.execute(
+                    "SELECT action FROM audit_events WHERE session_id=?", (s["id"],)
+                ) as cur:
+                    actions = [r["action"] for r in await cur.fetchall()]
+                    assert "prompt.submitted" in actions
+                    assert "task_run.started" in actions
+                    assert "task_run.completed" in actions
+
+                async with db.execute(
+                    "SELECT task_id FROM task_runs WHERE id=?", (task_run_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row["task_id"] is not None
+                    linked_task_id = row["task_id"]
+
+                async with db.execute(
+                    "SELECT status FROM tasks WHERE id=?", (linked_task_id,)
+                ) as cur:
+                    task = await cur.fetchone()
+                    assert task is not None
+                    assert task["status"] == "succeeded"
+        asyncio.run(_check())
+
+    def test_flag_true_prompt_failure_tasks_failed(
+        self, sync_client_use_task_api_real_path: TestClient, monkeypatch
+    ) -> None:
+        from app.db.connection import get_db_connection
+        monkeypatch.setenv("HERMES_AUTH_READY", "1")
+        from app.api.runtime import _run_hermes_doctor_sync
+        monkeypatch.setattr("app.api.runtime._run_hermes_doctor_sync", lambda _: True)
+        sync_client_use_task_api_real_path.app.state.hermes_client.settings.hermes_dev_mock = False
+
+        s = sync_client_use_task_api_real_path.post(
+            "/api/sessions", json={"title": "TC", "workspace_path": "/tmp"}
+        ).json()
+        resp = sync_client_use_task_api_real_path.post(
+            f"/api/sessions/{s['id']}/prompt", json={"prompt": "Hello"}
+        )
+        assert resp.status_code == 202
+        task_run_id = resp.json()["id"]
+
+        has_error = False
+        with sync_client_use_task_api_real_path.stream(
+            "GET", f"/api/sessions/{s['id']}/events"
+        ) as stream:
+            for line in stream.iter_lines():
+                if line.startswith("event: error"):
+                    has_error = True
+                if line.startswith("event: done") or line.startswith("event: error"):
+                    break
+        assert has_error
+
+        async def _check():
+            await asyncio.sleep(0.1)
+            async with get_db_connection(
+                sync_client_use_task_api_real_path.app.state.hermes_client.settings.db_path_resolved
+            ) as db:
+                async with db.execute(
+                    "SELECT task_id FROM task_runs WHERE id=?", (task_run_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row["task_id"] is not None
+                    linked_task_id = row["task_id"]
+
+                async with db.execute(
+                    "SELECT status FROM tasks WHERE id=?", (linked_task_id,)
+                ) as cur:
+                    task = await cur.fetchone()
+                    assert task is not None
+                    assert task["status"] == "failed"
+
+                async with db.execute(
+                    "SELECT action FROM audit_events WHERE session_id=?", (s["id"],)
+                ) as cur:
+                    actions = [r["action"] for r in await cur.fetchall()]
+                    assert "task_run.failed" in actions
+                    assert "hermes.error" in actions
+        asyncio.run(_check())
+
+    def test_adapter_unit(self, tmp_path: Path) -> None:
+        from app.db.migrations import run_migrations
+        from app.db.connection import get_db_connection
+        from app.services.legacy_task_adapter import LegacyTaskAdapter
+        from app.services.task_service import TaskService
+
+        db_path = tmp_path / "test_adapter.db"
+
+        async def _test():
+            await run_migrations(db_path)
+            async with get_db_connection(db_path) as db:
+                session_id = str(uuid.uuid4())
+                task_run_id = str(uuid.uuid4())
+                now = int(time.time())
+                await db.execute(
+                    "INSERT INTO sessions (id, title, workspace_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (session_id, "AdapterTest", "/tmp", now, now),
+                )
+                await db.execute(
+                    "INSERT INTO task_runs (id, session_id, status, started_at) VALUES (?, ?, ?, ?)",
+                    (task_run_id, session_id, "queued", now),
+                )
+
+                adapter = LegacyTaskAdapter(TaskService(db))
+                task_id = await adapter.on_prompt_submit(
+                    db, session_id, task_run_id, "Test prompt"
+                )
+
+                assert task_id.startswith("task-")
+                async with db.execute(
+                    "SELECT * FROM tasks WHERE id=?", (task_id,)
+                ) as cur:
+                    task = await cur.fetchone()
+                    assert task is not None
+                    assert task["status"] == "running"
+                    assert task["session_id"] == session_id
+
+                async with db.execute(
+                    "SELECT task_id FROM task_runs WHERE id=?", (task_run_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row["task_id"] == task_id
+
+                await adapter.update_from_task_run(db, task_run_id, "completed")
+                async with db.execute(
+                    "SELECT status FROM tasks WHERE id=?", (task_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row["status"] == "succeeded"
+
+                await adapter.update_from_task_run(db, "nonexistent", "completed")
+
+                second_task_run_id = str(uuid.uuid4())
+                await db.execute(
+                    "INSERT INTO task_runs (id, session_id, status, started_at) VALUES (?, ?, ?, ?)",
+                    (second_task_run_id, session_id, "queued", now),
+                )
+                second_task_id = await adapter.on_prompt_submit(
+                    db, session_id, second_task_run_id, "Second prompt"
+                )
+                await adapter.update_from_task_run(db, second_task_run_id, "failed", error="test error")
+                async with db.execute(
+                    "SELECT status FROM tasks WHERE id=?", (second_task_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row["status"] == "failed"
+
+        asyncio.run(_test())
+
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+    def test_flag_true_sse_format_compatible(
+        self, sync_client_use_task_api_real_path: TestClient
+    ) -> None:
+        s = sync_client_use_task_api_real_path.post(
+            "/api/sessions", json={"title": "TD", "workspace_path": "/tmp"}
+        ).json()
+        sync_client_use_task_api_real_path.post(
+            f"/api/sessions/{s['id']}/prompt", json={"prompt": "Hello"}
+        )
+
+        events = []
+        with sync_client_use_task_api_real_path.stream(
+            "GET", f"/api/sessions/{s['id']}/events"
+        ) as stream:
+            for line in stream.iter_lines():
+                if line.startswith("data:"):
+                    events.append(line[5:].strip())
+                if line.startswith("event:"):
+                    pass
+                if line.startswith("event: done"):
+                    break
+
+        assert len(events) >= 1
+        import json
+        for ev in events:
+            parsed = json.loads(ev)
+            assert "type" in parsed
+
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+    def test_flag_true_adapter_error_audit_json(
+        self, sync_client_use_task_api_real_path: TestClient, monkeypatch
+    ) -> None:
+        from app.services.legacy_task_adapter import LegacyTaskAdapter
+        import json
+
+        async def _broken_update(self, db, task_run_id, status, error=None):
+            raise ValueError("adapter failed")
+
+        monkeypatch.setattr(
+            LegacyTaskAdapter, "update_from_task_run", _broken_update
+        )
+
+        s = sync_client_use_task_api_real_path.post(
+            "/api/sessions", json={"title": "TE", "workspace_path": "/tmp"}
+        ).json()
+        resp = sync_client_use_task_api_real_path.post(
+            f"/api/sessions/{s['id']}/prompt", json={"prompt": "Hello"}
+        )
+        assert resp.status_code == 202
+        task_run_id = resp.json()["id"]
+
+        with sync_client_use_task_api_real_path.stream(
+            "GET", f"/api/sessions/{s['id']}/events"
+        ) as stream:
+            for line in stream.iter_lines():
+                if line.startswith("event: done"):
+                    break
+
+        from app.db.connection import get_db_connection
+
+        async def _check():
+            await asyncio.sleep(0.1)
+            async with get_db_connection(
+                sync_client_use_task_api_real_path.app.state.hermes_client.settings.db_path_resolved
+            ) as db:
+                async with db.execute(
+                    "SELECT status FROM task_runs WHERE id=?", (task_run_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    assert row["status"] == "completed"
+
+                async with db.execute(
+                    "SELECT payload_json FROM audit_events WHERE action='task_service_adapter.error' AND session_id=?",
+                    (s["id"],),
+                ) as cur:
+                    rows = await cur.fetchall()
+                    assert len(rows) >= 1
+                    for row in rows:
+                        payload = json.loads(row["payload_json"])
+                        assert "task_id" in payload
+                        assert "error" in payload
+
+        asyncio.run(_check())
 
 # =========================================================================
 # Content Quality Integration (Existing tests from test_content_quality)

@@ -49,13 +49,15 @@ Read only the docs needed for the current task. Do not load every file by defaul
 
 ## Work Pattern
 
-1. Identify the active phase from `docs/ANTIGRAVITY_IMPLEMENTATION_PLAN.md`.
-2. Read the smallest relevant doc set.
-3. Inspect existing files before editing.
-4. Make scoped changes only.
-5. Add or update tests for behavior changed.
-6. Run relevant checks.
-7. Report commands, results, risks, and next step.
+1. Read `PROJECT_STATE.md` first for the current checkpoint, gates, and blockers.
+2. If the task is checkpoint-related, read `docs/implementation/CURRENT_CHECKPOINT.md`.
+3. Use `docs/AI_AGENT_ROUTING.md` to choose the smallest relevant doc/code set.
+4. Do not treat long-term roadmap docs as active scope unless the current checkpoint says so.
+5. Inspect existing files before editing.
+6. Make scoped changes only.
+7. Add or update tests for behavior changed.
+8. Run relevant checks.
+9. Report commands, results, risks, and next step.
 
 ## Review Pattern
 
@@ -72,4 +74,3 @@ When reviewing Antigravity output:
 - Put long procedures in `docs/` or future skills, not here.
 - Use `CODEGRAPH.md` to navigate code once implementation exists.
 - Use `HEADROOM.md` to decide what to load, summarize, or ignore.
-
