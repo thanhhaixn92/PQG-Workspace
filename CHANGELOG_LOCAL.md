@@ -4,6 +4,13 @@ This file records local implementation and review checkpoints. Keep entries shor
 
 ## 2026-07-04
 
+### CP3 merge and CP3.1 cleanup
+
+- CP3 Legacy Adapter merged to `main` at `37e6f37`.
+- CP3.1 cleanup committed at `647f40b`.
+- Backend validation after CP3.1: 197 passed, only pre-existing Starlette warning remains.
+- Next checkpoint: CP4 Public Task API.
+
 ### CP2 review hardening
 
 - OpenCode reported CP2 gates green after blocker fixes.
@@ -18,4 +25,3 @@ This file records local implementation and review checkpoints. Keep entries shor
 
 - Added short state and routing docs so AI agents do not need to reread the whole roadmap.
 - Updated `AGENTS.md` to load `PROJECT_STATE.md` and `docs/implementation/CURRENT_CHECKPOINT.md` first.
-

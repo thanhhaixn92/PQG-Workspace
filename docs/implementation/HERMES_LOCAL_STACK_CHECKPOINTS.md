@@ -32,13 +32,14 @@ Each checkpoint is complete only when:
 
 ## CP3 Legacy Adapter
 
-- [ ] `USE_TASK_API=false` remains the default.
-- [ ] Existing frontend still works through existing routes.
-- [ ] Session submit format does not change when flag is off.
-- [ ] Hermes stream keeps the existing SSE format.
-- [ ] Approval flow remains compatible.
-- [ ] Audit behavior remains compatible.
-- [ ] `USE_TASK_API=true` characterization tests pass against CP0 expectations.
+- [x] `USE_TASK_API=false` remains the default.
+- [x] Existing frontend still works through existing routes.
+- [x] Session submit format does not change when flag is off.
+- [x] Hermes stream keeps the existing SSE format.
+- [x] Approval flow remains compatible.
+- [x] Audit behavior remains compatible.
+- [x] `USE_TASK_API=true` characterization tests pass against CP0 expectations.
+- [x] CP3.1 removes aiosqlite lifecycle warning from characterization tests.
 
 ## CP4 Public API
 
