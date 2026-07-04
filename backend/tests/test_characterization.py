@@ -173,6 +173,7 @@ class TestPromptSubmission:
         assert data["session_id"] == s["id"]
         assert "id" in data
 
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
     def test_submit_prompt_completes_and_streams_events(self, sync_client_real_path: TestClient) -> None:
         s = sync_client_real_path.post("/api/sessions", json={"title": "P2", "workspace_path": "/tmp"}).json()
         resp = sync_client_real_path.post(f"/api/sessions/{s['id']}/prompt", json={"prompt": "Hello"})

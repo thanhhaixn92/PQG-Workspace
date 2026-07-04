@@ -101,6 +101,33 @@ class TestIdempotencyService:
         finally:
             await conn.close()
 
+    @pytest.mark.asyncio
+    async def test_idempotency_service_request_hash_mismatch(self, migrated_db_path):
+        conn = await open_db(migrated_db_path)
+        try:
+            svc = IdempotencyService(conn)
+            call_count = 0
+
+            async def op_a():
+                nonlocal call_count
+                call_count += 1
+                return {"data": "a"}
+
+            async def op_b():
+                nonlocal call_count
+                call_count += 1
+                return {"data": "b"}
+
+            await svc.execute_idempotent("k", op_a, request_hash="hash-a")
+
+            from app.repositories.idempotency_repository import IdempotencyConflict
+            with pytest.raises(IdempotencyConflict):
+                await svc.execute_idempotent("k", op_b, request_hash="hash-b")
+
+            assert call_count == 1
+        finally:
+            await conn.close()
+
 
 # =========================================================================
 # TaskService
