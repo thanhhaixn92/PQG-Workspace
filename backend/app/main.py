@@ -29,6 +29,7 @@ from app.api.memory import router as memory_router
 from app.api.runtime import router as runtime_router
 from app.api.local_data import router as local_data_router
 from app.api.n8n import router as n8n_router
+from app.api.tasks import router as tasks_router
 from app.db.migrations import run_migrations
 from app.dependencies import get_db, get_settings
 from app.services.hermes_client import HermesClientManager
@@ -95,6 +96,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     app.include_router(runtime_router)
     app.include_router(local_data_router)
     app.include_router(n8n_router)
+    app.include_router(tasks_router)
 
     # MCP Integration
     setup_mcp(app)

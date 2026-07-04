@@ -87,6 +87,61 @@ class ApprovalDecisionResponse(BaseModel):
     audit_action: str
 
 
+class PublicTaskCreateRequest(BaseModel):
+    session_id: str | None = None
+    title: str | None = None
+    description: str | None = None
+    task_type: str = "prompt"
+    parent_task_id: str | None = None
+
+
+class PublicTaskResponse(BaseModel):
+    id: str
+    session_id: str | None = None
+    parent_task_id: str | None = None
+    title: str | None = None
+    description: str | None = None
+    status: Literal["queued", "running", "waiting_approval", "succeeded", "failed", "cancelled"]
+    task_type: str
+    created_at: int
+    updated_at: int
+    duplicate: bool = False
+
+
+class PublicTaskEventResponse(BaseModel):
+    id: str
+    task_id: str
+    run_id: str | None = None
+    type: str
+    status: str
+    data_json: str | None = None
+    created_at: int
+
+
+class PublicTaskActionCreateRequest(BaseModel):
+    tool_name: str
+    description: str
+    risk_level: Literal["read", "write_internal", "external_or_destructive"] = "write_internal"
+
+
+class PublicTaskActionDecisionRequest(BaseModel):
+    approved: bool
+    output_json: str | None = None
+
+
+class PublicTaskActionResponse(BaseModel):
+    id: str
+    task_id: str
+    tool_name: str
+    risk_level: str
+    status: str
+    description: str | None = None
+    input_json: str | None = None
+    output_json: str | None = None
+    created_at: int
+    resolved_at: int | None = None
+
+
 # -----------------------------------------------------------------------------
 # SSE Event Payloads
 # -----------------------------------------------------------------------------

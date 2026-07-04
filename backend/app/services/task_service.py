@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import hashlib
 import json
 from typing import Optional
@@ -11,8 +9,24 @@ from app.repositories.task_repository import TaskRepository
 from app.services.state_machine import TaskStateMachine
 
 
-def _request_hash(session_id: Optional[str], title: Optional[str], task_type: str, parent_task_id: Optional[str]) -> str:
-    raw = json.dumps({"session_id": session_id, "title": title, "task_type": task_type, "parent_task_id": parent_task_id}, sort_keys=True, default=str)
+def _request_hash(
+    session_id: Optional[str],
+    title: Optional[str],
+    description: Optional[str],
+    task_type: str,
+    parent_task_id: Optional[str],
+) -> str:
+    raw = json.dumps(
+        {
+            "session_id": session_id,
+            "title": title,
+            "description": description,
+            "task_type": task_type,
+            "parent_task_id": parent_task_id,
+        },
+        sort_keys=True,
+        default=str,
+    )
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -32,12 +46,13 @@ class TaskService:
         self,
         session_id: Optional[str] = None,
         title: Optional[str] = None,
+        description: Optional[str] = None,
         task_type: str = "prompt",
         parent_task_id: Optional[str] = None,
         idempotency_key: Optional[str] = None,
     ) -> tuple[dict, bool]:
         if idempotency_key:
-            req_hash = _request_hash(session_id, title, task_type, parent_task_id)
+            req_hash = _request_hash(session_id, title, description, task_type, parent_task_id)
             existing = await self._idempotency.check_key(idempotency_key, request_hash=req_hash)
             if existing is not None:
                 return json.loads(existing["response_json"]), True
@@ -45,11 +60,12 @@ class TaskService:
         task = await self._task_repo.create_task(
             session_id=session_id,
             title=title,
+            description=description,
             task_type=task_type,
             parent_task_id=parent_task_id,
         )
         if idempotency_key:
-            req_hash = _request_hash(session_id, title, task_type, parent_task_id)
+            req_hash = _request_hash(session_id, title, description, task_type, parent_task_id)
             await self._idempotency.set(idempotency_key, json.dumps(task, default=str), 200, request_hash=req_hash)
         return task, False
 

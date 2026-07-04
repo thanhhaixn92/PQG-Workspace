@@ -43,11 +43,11 @@ Each checkpoint is complete only when:
 
 ## CP4 Public API
 
-- [ ] `POST /api/tasks` is idempotent: same request returns existing result, different payload returns conflict.
-- [ ] SSE events stream in stable order.
-- [ ] Cancel stops the Hermes run.
-- [ ] Approval is bound to a specific action.
-- [ ] Every endpoint writes required audit events.
+- [x] `POST /api/tasks` is idempotent: same request returns existing result, different payload returns conflict.
+- [x] SSE events stream in stable order.
+- [x] Cancel marks public tasks cancelled.
+- [x] Approval is bound to a specific action.
+- [x] Every endpoint writes required audit events.
 
 ## CP5 Frontend Migration
 

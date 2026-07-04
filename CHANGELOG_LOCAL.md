@@ -4,6 +4,14 @@ This file records local implementation and review checkpoints. Keep entries shor
 
 ## 2026-07-04
 
+### CP4 Public Task API
+
+- Added backend public Task API at `/api/tasks`.
+- Added idempotent task creation, task event list/stream, cancel, and task action decision routes.
+- Added CP4 backend tests for idempotency, streaming order, cancel conflict, approval/action binding, audit, and legacy safety.
+- Backend validation: 203 passed, only pre-existing Starlette warning remains.
+- Next checkpoint: CP5 Frontend Migration behind `VITE_USE_TASK_API`.
+
 ### CP3 merge and CP3.1 cleanup
 
 - CP3 Legacy Adapter merged to `main` at `37e6f37`.

@@ -4,69 +4,68 @@ Last updated: 2026-07-04
 
 ## Checkpoint
 
-CP4 - Public Task API.
+CP5 - Frontend Migration.
 
 ## Status
 
-CP3 and CP3.1 are complete on `main`:
+CP4 backend implementation is complete locally:
 
-- `USE_TASK_API=false` remains the default.
-- Legacy route behavior is preserved when the flag is off.
-- `USE_TASK_API=true` links legacy task runs to TaskService.
-- Adapter errors no longer corrupt legacy task status.
-- Aiosqlite lifecycle warning cleanup is complete.
+- Public Task API route is mounted at `/api/tasks`.
+- `POST /api/tasks` supports idempotency replay and conflict.
+- Task event listing and SSE stream endpoints exist.
+- Task cancel endpoint marks tasks cancelled.
+- Task action approval request/decision endpoints bind decisions to `task_actions`.
+- Backend validation: 203 passed, 1 pre-existing Starlette warning.
 
 ## Goal
 
-Expose the first public Task API surface on top of the TaskService foundation without breaking existing legacy session/chat behavior.
+Migrate frontend task creation/streaming to the public Task API behind a frontend flag, while preserving the existing legacy fallback.
 
 ## Context
 
-The app currently has legacy session routes and a TaskService-backed adapter behind `USE_TASK_API`. CP4 adds public task endpoints for programmatic task creation, streaming, cancellation, and action-bound approvals. Existing UI behavior must remain unchanged.
+The backend now exposes a public Task API, while the existing frontend still uses legacy session/chat routes. CP5 should add a frontend integration path behind `VITE_USE_TASK_API`, without removing the legacy UI path.
 
 ## Constraints
 
 - Keep legacy session/chat routes working.
 - Keep `USE_TASK_API=false` as the default.
-- Do not migrate frontend to Task API in CP4.
+- Keep `VITE_USE_TASK_API=false` as the frontend default.
 - Do not remove legacy route code.
 - Do not add outbox, Telegram, model fallback, or later checkpoint work.
 - Preserve approval, audit, workspace sandbox, and history invariants.
-- Treat public Task API input as untrusted.
-- Idempotency conflicts must return a clear conflict response.
+- Frontend must still call FastAPI only.
+- Do not call Hermes/MCP/n8n/filesystem directly from frontend.
 
 ## Required Implementation Shape
 
-Implement CP4 in small slices:
+Implement CP5 in small slices:
 
-1. Define schemas and route skeleton for public task API.
-2. Add `POST /api/tasks` with idempotency:
-   - same idempotency key and same payload returns existing result;
-   - same key and different payload returns 409.
-3. Add task detail/list endpoints only if needed for acceptance tests.
-4. Add SSE task event stream with stable ordering.
-5. Add cancel endpoint that marks the task cancelled and stops a running Hermes run where supported.
-6. Bind approvals to concrete task actions.
-7. Audit every public endpoint and policy decision.
+1. Add frontend API client methods for `/api/tasks`.
+2. Add `VITE_USE_TASK_API` feature flag, default false.
+3. When flag is false, keep current session prompt flow unchanged.
+4. When flag is true, route task creation/streaming through Task API where backend support exists.
+5. Keep approval UI compatible with existing approval flow.
+6. Add cancel UI only if backend semantics are clear and tested.
+7. Preserve session history display.
 
-Do not implement CP5 frontend migration here.
+Do not implement CP6 outbox here.
 
 ## Done When
 
 - Backend full tests pass.
-- Frontend type-check/tests/build pass if frontend files are touched.
-- Public Task API tests pass for idempotency, streaming order, cancel, approvals, and audit.
+- Frontend type-check/tests/build pass.
+- `VITE_USE_TASK_API=false` fallback remains working.
+- Task API path has targeted frontend tests.
 - Legacy session route characterization tests still pass.
 - Manual smoke can still create a session, submit a prompt, stream response, approve actions, and refresh history.
 
 ## Review Gate
 
-Codex should not approve CP4 if:
+Codex should not approve CP5 if:
 
 - Existing UI flows require the new public Task API.
 - Legacy route behavior changes.
 - Approval/audit behavior becomes weaker.
 - Frontend starts calling TaskService/Hermes/MCP/n8n directly.
-- Later checkpoint scope is mixed into CP4.
-- Idempotency accepts key reuse with different payloads.
-- Cancel leaves tasks in an ambiguous non-terminal state.
+- Later checkpoint scope is mixed into CP5.
+- `VITE_USE_TASK_API=false` fallback breaks.
