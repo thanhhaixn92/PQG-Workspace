@@ -153,3 +153,74 @@ async def test_migration_is_idempotent(temp_db_path):
 
     await run_migrations(temp_db_path)
     await run_migrations(temp_db_path)  # second run must be a no-op
+
+
+@pytest.mark.asyncio
+async def test_migration_0014_partial_schema_is_recovered(temp_db_path):
+    """If skills has status but NOT version/skill_versions, 0014 must still complete.
+
+    This guards against a scenario where the old ``executescript`` caught
+    a *second* ``duplicate column name`` and recorded the migration before
+    the remaining statements (version column + skill_versions table) executed.
+    """
+    from app.db.migrations import MIGRATIONS, run_migrations
+
+    # Build a real pre-0014 schema. This keeps skills.status/version and
+    # skill_versions absent before we simulate the partial migration state.
+    conn = await open_db(temp_db_path)
+    try:
+        for version, step in MIGRATIONS:
+            if version == "0014_skill_versions":
+                break
+            if isinstance(step, str):
+                try:
+                    await conn.executescript(step)
+                except Exception as exc:
+                    if "duplicate column name" not in str(exc).lower():
+                        raise
+            else:
+                await step(conn)
+            await conn.execute(
+                "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+                (version, 1),
+            )
+            await conn.commit()
+
+        async with conn.execute("PRAGMA table_info(skills)") as cur:
+            cols = {row[1] async for row in cur}
+        assert "status" not in cols
+        assert "version" not in cols
+
+        await conn.execute(
+            "ALTER TABLE skills ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'"
+        )
+        await conn.commit()
+    finally:
+        await conn.close()
+
+    # Now 0014 is pending again.  Running migrations should:
+    # 1. See status column already exists -> skip ALTER
+    # 2. See version column missing -> add it
+    # 3. Create skill_versions table + index
+    # 4. Record migration
+    await run_migrations(temp_db_path)
+
+    # Verify the full schema is now present.
+    conn3 = await open_db(temp_db_path)
+    try:
+        async with conn3.execute("PRAGMA table_info(skills)") as cur:
+            cols = {row[1] async for row in cur}
+        assert "status" in cols, "status column missing after 0014"
+        assert "version" in cols, "version column missing after 0014"
+
+        async with conn3.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='skill_versions'"
+        ) as cur:
+            assert await cur.fetchone() is not None, "skill_versions table missing"
+
+        async with conn3.execute(
+            "SELECT version FROM schema_migrations WHERE version = '0014_skill_versions'"
+        ) as cur:
+            assert await cur.fetchone() is not None, "0014_skill_versions not recorded"
+    finally:
+        await conn3.close()

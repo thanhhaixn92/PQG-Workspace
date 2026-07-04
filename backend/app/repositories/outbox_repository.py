@@ -18,8 +18,9 @@ class OutboxRepository:
         event_type: str,
         payload_json: str,
         max_attempts: int = 5,
+        outbox_id: Optional[str] = None,
     ) -> str:
-        outbox_id = f"out-{uuid.uuid4().hex[:12]}"
+        outbox_id = outbox_id or f"out-{uuid.uuid4().hex[:12]}"
         now = int(time.time())
         await self._db.execute(
             """INSERT INTO notification_outbox (id, channel, event_type, payload_json, status, max_attempts, created_at, updated_at)
@@ -28,23 +29,56 @@ class OutboxRepository:
         )
         return outbox_id
 
+    async def insert_once(
+        self,
+        outbox_id: str,
+        channel: str,
+        event_type: str,
+        payload_json: str,
+        max_attempts: int = 5,
+    ) -> tuple[str, bool]:
+        now = int(time.time())
+        async with self._db.execute(
+            """INSERT OR IGNORE INTO notification_outbox
+               (id, channel, event_type, payload_json, status, max_attempts, created_at, updated_at)
+               VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)""",
+            (outbox_id, channel, event_type, payload_json, max_attempts, now, now),
+        ) as cur:
+            inserted = cur.rowcount == 1
+        return outbox_id, inserted
+
     async def claim_pending(
         self, worker_id: str, batch_size: int = 10, lease_seconds: int = 30
     ) -> list[dict]:
-        now = int(time.time())
-        lock_deadline = now - lease_seconds
+        now = time.time_ns()
+        lock_deadline = now - (lease_seconds * 1_000_000_000)
+        async with self._db.execute(
+            """SELECT id FROM notification_outbox
+               WHERE status IN ('pending', 'retrying')
+                 AND attempt_count < max_attempts
+                 AND (locked_at IS NULL OR locked_at < ?)
+               ORDER BY created_at ASC
+               LIMIT ?""",
+            (lock_deadline, batch_size),
+        ) as cur:
+            ids = [row["id"] for row in await cur.fetchall()]
+
+        if not ids:
+            return []
+
+        placeholders = ",".join("?" for _ in ids)
         await self._db.execute(
-            """UPDATE notification_outbox SET locked_at = ?, locked_by = ?
-               WHERE id IN (
-                   SELECT id FROM notification_outbox
-                   WHERE status = 'pending' AND (locked_at IS NULL OR locked_at < ?)
-                   LIMIT ?
-               )""",
-            (now, worker_id, lock_deadline, batch_size),
+            f"""UPDATE notification_outbox SET locked_at = ?, locked_by = ?
+                WHERE id IN ({placeholders})
+                  AND status IN ('pending', 'retrying')
+                  AND attempt_count < max_attempts
+                  AND (locked_at IS NULL OR locked_at < ?)""",
+            (now, worker_id, *ids, lock_deadline),
         )
         async with self._db.execute(
-            "SELECT * FROM notification_outbox WHERE locked_by = ? AND locked_at = ?",
-            (worker_id, now),
+            f"""SELECT * FROM notification_outbox
+                WHERE id IN ({placeholders}) AND locked_by = ? AND locked_at = ?""",
+            (*ids, worker_id, now),
         ) as cur:
             rows = await cur.fetchall()
         return [dict(r) for r in rows]
@@ -52,7 +86,7 @@ class OutboxRepository:
     async def mark_sent(self, outbox_id: str) -> None:
         now = int(time.time())
         await self._db.execute(
-            "UPDATE notification_outbox SET status = 'sent', updated_at = ? WHERE id = ?",
+            "UPDATE notification_outbox SET status = 'sent', locked_at = NULL, locked_by = NULL, updated_at = ? WHERE id = ?",
             (now, outbox_id),
         )
 
@@ -89,3 +123,11 @@ class OutboxRepository:
         ) as cur:
             row = await cur.fetchone()
         return row[0]
+
+    async def get_status(self, outbox_id: str) -> Optional[str]:
+        async with self._db.execute(
+            "SELECT status FROM notification_outbox WHERE id = ?",
+            (outbox_id,),
+        ) as cur:
+            row = await cur.fetchone()
+        return row["status"] if row else None

@@ -212,12 +212,14 @@ class SkillCreate(BaseModel):
     description: Optional[str] = None
     content: str = Field(..., description="Skill instructions/content")
     enabled: bool = True
+    status: str = "draft"
 
 class SkillUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
     enabled: Optional[bool] = None
+    status: Optional[str] = None
 
 class Skill(BaseModel):
     id: str
@@ -225,7 +227,22 @@ class Skill(BaseModel):
     description: Optional[str] = None
     content: str
     enabled: bool
+    status: str
+    version: int
     updated_at: int
+
+class SkillVersion(BaseModel):
+    id: str
+    skill_id: str
+    version_number: int
+    name: str
+    description: Optional[str] = None
+    content: str
+    status: str
+    updated_at: int
+
+class SkillStatusChange(BaseModel):
+    status: str = Field(..., pattern=r"^(draft|approved)$")
 
 class MemoryKind(str, Enum):
     preference = "preference"
@@ -256,3 +273,32 @@ class MemoryEntry(BaseModel):
     importance_score: float
     last_accessed_at: Optional[int] = None
     created_at: int
+
+
+# -----------------------------------------------------------------------------
+# CP7: Telegram Channel (Webhook & Callback)
+# -----------------------------------------------------------------------------
+
+class TelegramWebhookRequest(BaseModel):
+    update_id: int
+    message_id: str | None = None
+    from_id: int | str | None = None
+    text: str | None = None
+    await_callback: bool = False
+
+
+class TelegramCallbackRequest(BaseModel):
+    token: str
+
+
+class TelegramWebhookResponse(BaseModel):
+    status: str
+    task_id: str
+    duplicate: bool = False
+    callback_token: str | None = None
+
+
+class TelegramCallbackResponse(BaseModel):
+    status: str
+    action: str
+    task_id: str

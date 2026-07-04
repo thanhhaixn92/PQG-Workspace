@@ -194,6 +194,51 @@ class TestTaskService:
             await conn.close()
 
     @pytest.mark.asyncio
+    async def test_complete_task_enqueues_outbox_atomically(self, migrated_db_path):
+        conn = await open_db(migrated_db_path)
+        try:
+            svc = TaskService(conn)
+            task, _ = await svc.create_task(title="Atomic")
+            await svc.start_task(task["id"])
+            done = await svc.complete_task(task["id"], result_data='{"ok": true}')
+
+            async with conn.execute(
+                "SELECT * FROM notification_outbox WHERE id = ?",
+                (f"out-{task['id']}-task-succeeded",),
+            ) as cur:
+                row = await cur.fetchone()
+
+            assert done["status"] == "succeeded"
+            assert row is not None
+            assert row["status"] == "pending"
+            assert row["event_type"] == "task.succeeded"
+        finally:
+            await conn.close()
+
+    @pytest.mark.asyncio
+    async def test_task_and_outbox_rollback_together(self, migrated_db_path):
+        conn = await open_db(migrated_db_path)
+        try:
+            svc = TaskService(conn)
+            task, _ = await svc.create_task(title="Rollback")
+            await svc.start_task(task["id"])
+            await svc.complete_task(task["id"])
+            await conn.rollback()
+
+            async with conn.execute("SELECT COUNT(*) FROM tasks WHERE id = ?", (task["id"],)) as cur:
+                task_count = (await cur.fetchone())[0]
+            async with conn.execute(
+                "SELECT COUNT(*) FROM notification_outbox WHERE id = ?",
+                (f"out-{task['id']}-task-succeeded",),
+            ) as cur:
+                outbox_count = (await cur.fetchone())[0]
+
+            assert task_count == 0
+            assert outbox_count == 0
+        finally:
+            await conn.close()
+
+    @pytest.mark.asyncio
     async def test_task_fail(self, migrated_db_path):
         conn = await open_db(migrated_db_path)
         try:
@@ -323,5 +368,27 @@ class TestTaskService:
             result = await svc.get_task_with_events(task["id"])
             events = result["events"]
             assert events[-1]["status"] == "cancelled"
+        finally:
+            await conn.close()
+
+    @pytest.mark.asyncio
+    async def test_cancel_task_enqueues_outbox_atomically(self, migrated_db_path):
+        conn = await open_db(migrated_db_path)
+        try:
+            svc = TaskService(conn)
+            task, _ = await svc.create_task(title="Cancel Outbox Test")
+            await svc.start_task(task["id"])
+            done = await svc.cancel_task(task["id"])
+
+            async with conn.execute(
+                "SELECT * FROM notification_outbox WHERE id = ?",
+                (f"out-{task['id']}-task-cancelled",),
+            ) as cur:
+                row = await cur.fetchone()
+
+            assert done["status"] == "cancelled"
+            assert row is not None
+            assert row["status"] == "pending"
+            assert row["event_type"] == "task.cancelled"
         finally:
             await conn.close()

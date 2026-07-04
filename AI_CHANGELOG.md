@@ -2,6 +2,36 @@
 
 ## 2026-07-04
 
+- Completed and verified CP10 Cleanup implementation. All 269 backend tests pass successfully.
+- Verified that `X-Deprecated: true` header is returned on legacy routes (`/task-runs/latest`, `/task-runs/{id}`, `/curate`) and metrics endpoint (`GET /api/metrics/deprecated`) works.
+- Made the decision to retain the deprecated route handlers for frontend legacy fallback compatibility, cleaning up no dead code without human approval.
+- Closed checkpoint CP10 Cleanup and set state to `CP10_COMPLETE` in all coordination files. All checkpoints of Hermes Local Stack V1 are now complete.
+- Opened checkpoint CP10 Cleanup following explicit human approval ("CP10 CLEANUP").
+- Opened checkpoint CP8 Model Fallback following explicit human approval ("tiếp tục").
+- Updated project/checkpoint/AI coordination files from CP7 closed gate to CP8 IN_PROGRESS / manual editing via OpenCode (Writer) and Antigravity (Checker).
+- Set scope strictly to CP8 Model Fallback (retry, fallback, cooldown, immediate error aborts).
+- Completed CP7 Telegram Channel implementation via OpenCode (Writer) and verified by Antigravity (Checker).
+- Verified 12/12 CP7 specific backend tests pass, covering HMAC verification, allowlist, idempotency, and callback token lifecycle. Total backend tests pass: 224/224.
+- Closed checkpoint CP7 and set state to `CP7_COMPLETE` with `human_approval_required = true` before CP8.
+- Opened checkpoint CP7 Telegram Channel following explicit human approval ("Mở checkpoint mới").
+- Updated project/checkpoint/AI coordination files from CP6 closed gate to CP7 IN_PROGRESS / manual editing via OpenCode (Writer) and Antigravity (Checker).
+- Set scope strictly to CP7 Telegram webhook security and normalization per ADR-003.
+- Completed CP6 Outbox Dispatcher verification and sign-off by Antigravity (Checker) and OpenCode (Writer).
+- Added atomic outbox notification for `task.cancelled` in `TaskService` and verified 39/39 backend unit tests pass.
+- Moved user operational test file to `workspace_outputs/` to maintain 100% clean git working tree for `backend/`.
+- Received explicit Human Reviewer approval to close CP6.
+- Updated project/checkpoint/AI state from CP6 review to `CP6_COMPLETE` with `next_agent = human` and `human_approval_required = true` (stopped at gate awaiting CP7 approval).
+- Paused/suspended automation runner due to Antigravity CLI timeout.
+- Switched workflow to manual editing/review via Antigravity and OpenCode directly.
+- Updated `AI_STATE.json` to state `BLOCKED` with standard UTF-8 without BOM (fixing BOM parse errors).
+- Updated coordination files (`AI_HANDOFF.md`, `AI_TASK.md`, `AI_VERIFICATION.md`) to reflect manual execution mode.
+- Verified that all 38 CP6-related backend tests pass successfully.
+- CP6 Outbox Dispatcher implemented by Codex:
+  - Added retry-aware outbox claiming with lease recovery and duplicate active-lock protection.
+  - Added deterministic outbox `insert_once` for stable idempotency keys.
+  - Added `OutboxDispatcher` service with injected sender, idempotency key forwarding, retry/dead-letter handling, and audit events for dispatch sent/error outcomes.
+  - Added terminal task success/failure outbox event creation in the same transaction as task status/event writes.
+  - Added focused CP6 backend tests for success, retry, restart-safe pending rows, duplicate prevention, atomic rollback, and dead letter behavior.
 - CP6 Outbox Dispatcher opened for automation after explicit user request.
 - Updated project/checkpoint/AI state from CP5 gate to CP6 READY with `next_agent = codex`.
 - CP6 scope limited to backend-owned transactional outbox dispatcher; CP7+ remains out of scope.
@@ -47,3 +77,12 @@
 - `scripts/agent-loop.ps1`
 - `scripts/ai-auto.ps1`
 - `scripts/codex-tick.ps1`
+- `PROJECT_STATE.md`
+- `docs/implementation/CURRENT_CHECKPOINT.md`
+- `docs/implementation/HERMES_LOCAL_STACK_CHECKPOINTS.md`
+- `backend/app/repositories/outbox_repository.py`
+- `backend/app/services/task_service.py`
+- `backend/app/services/outbox_dispatcher.py`
+- `backend/tests/test_repositories.py`
+- `backend/tests/test_task_service.py`
+- `backend/tests/test_outbox_dispatcher.py`

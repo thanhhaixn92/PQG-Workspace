@@ -58,38 +58,38 @@ Each checkpoint is complete only when:
 - [x] Frontend tests pass.
 - [x] `VITE_USE_TASK_API=false` fallback works.
 
-## CP6 Outbox Dispatcher
+## CP6 Outbox Dispatcher (Complete)
 
-- [ ] Task and outbox write atomically.
-- [ ] Pending rows are safe after restart.
-- [ ] Duplicate sends are prevented with idempotency keys.
-- [ ] Dead letter behavior exists after max attempts.
+- [x] Task and outbox write atomically.
+- [x] Pending rows are safe after restart.
+- [x] Duplicate sends are prevented with idempotency keys.
+- [x] Dead letter behavior exists after max attempts.
 
-## CP7 Telegram Channel
+## CP7 Telegram Channel (Complete)
 
-- [ ] Invalid signature returns 401.
-- [ ] User outside allowlist returns 403.
-- [ ] Retried updates do not create duplicate tasks.
-- [ ] Reused callback token returns 409.
-- [ ] Expired callback token returns 410.
+- [x] Invalid signature returns 401.
+- [x] User outside allowlist returns 403.
+- [x] Retried updates do not create duplicate tasks.
+- [x] Reused callback token returns 409.
+- [x] Expired callback token returns 410.
 
-## CP8 Model Fallback
+## CP8 Model Fallback (Complete)
 
-- [ ] 429/quota can fallback and task succeeds.
-- [ ] Timeout/5xx can retry/fallback and task succeeds.
-- [ ] 401/403 stops without fallback.
-- [ ] Cooldown is respected.
-- [ ] Task run records the attempt chain.
+- [x] 429/quota can fallback and task succeeds.
+- [x] Timeout/5xx can retry/fallback and task succeeds.
+- [x] 401/403 stops without fallback.
+- [x] Cooldown is respected.
+- [x] Task run records the attempt chain.
 
-## CP9 Skill Version
+## CP9 Skill Version (Complete)
 
-- [ ] Only approved skills are injected into context.
-- [ ] Draft skills do not affect runtime.
-- [ ] Version history is complete.
-- [ ] Every version mutation is audited.
+- [x] Only approved skills are injected into context.
+- [x] Draft skills do not affect runtime.
+- [x] Version history is complete.
+- [x] Every version mutation is audited.
 
-## CP10 Cleanup
+## CP10 Cleanup (Complete)
 
-- [ ] Legacy route metrics show no active consumers.
-- [ ] `X-Deprecated: true` header is active.
-- [ ] Dead code is removed only after explicit approval.
+- [x] Legacy route metrics show no active consumers.
+- [x] `X-Deprecated: true` header is active.
+- [x] Dead code is removed only after explicit approval.

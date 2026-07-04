@@ -30,10 +30,14 @@ Read only the docs needed for the current task. Do not load every file by defaul
 
 ## Current Gate
 
-- CP5 Frontend Migration is complete.
-- CP6 Outbox Dispatcher is approved for implementation through the automation workflow.
-- CP6 scope is limited to transactional outbox dispatcher behavior and required backend tests.
-- Do not implement Telegram, model fallback, auth, deployment, vector search, Excalidraw, or CP7+ scope.
+- V1 implementation is complete. State: `CP10_COMPLETE`.
+- CP5 (Frontend Migration), CP6 (Outbox Dispatcher), CP7 (Telegram Channel),
+  CP8 (Model Fallback & Resilience), CP9 (Skill Version), and CP10 (Cleanup)
+  are all verified and closed.
+- Awaiting human final sign-off before V1 packaging.
+- Do not expand to CP11, deployment, vector search, Excalidraw, auth expansion,
+  or any new feature scope without human approval and doc update.
+- Keep existing legacy session routes and `USE_TASK_API=false` fallback intact.
 - Keep automation state in `AI_STATE.json`; only one agent may run at a time.
 
 ## Hard Rules

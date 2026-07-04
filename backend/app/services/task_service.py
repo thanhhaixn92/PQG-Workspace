@@ -5,6 +5,7 @@ import json
 from typing import Optional
 
 from app.repositories.idempotency_repository import IdempotencyConflict, IdempotencyRepository
+from app.repositories.outbox_repository import OutboxRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.state_machine import TaskStateMachine
 
@@ -37,10 +38,12 @@ class TaskService:
         db,
         task_repo: Optional[TaskRepository] = None,
         idempotency_repo: Optional[IdempotencyRepository] = None,
+        outbox_repo: Optional[OutboxRepository] = None,
     ) -> None:
         self._db = db
         self._task_repo = task_repo or TaskRepository(db)
         self._idempotency = idempotency_repo or IdempotencyRepository(db)
+        self._outbox = outbox_repo or OutboxRepository(db)
 
     async def create_task(
         self,
@@ -87,6 +90,7 @@ class TaskService:
         await self._task_repo.create_event(
             task_id, "status_change", "succeeded", data_json=result_data or '{"msg":"task completed"}', run_id=run_id
         )
+        await self._enqueue_terminal_notification(updated, "task.succeeded", result_data)
         return updated
 
     async def fail_task(self, task_id: str, error: str, run_id: Optional[str] = None) -> dict:
@@ -98,6 +102,7 @@ class TaskService:
         await self._task_repo.create_event(
             task_id, "status_change", "failed", data_json=json.dumps({"error": error}), run_id=run_id
         )
+        await self._enqueue_terminal_notification(updated, "task.failed", json.dumps({"error": error}))
         return updated
 
     async def cancel_task(self, task_id: str) -> dict:
@@ -107,6 +112,7 @@ class TaskService:
         TaskStateMachine.validate(task["status"], "cancelled")
         updated = await self._task_repo.update_task_status(task_id, "cancelled")
         await self._task_repo.create_event(task_id, "status_change", "cancelled", '{"msg":"task cancelled"}')
+        await self._enqueue_terminal_notification(updated, "task.cancelled", None)
         return updated
 
     async def request_approval(self, task_id: str, tool_name: str, description: str, risk_level: str = "write_internal") -> dict:
@@ -171,3 +177,27 @@ class TaskService:
         task["events"] = events
         task["actions"] = actions
         return task
+
+    async def _enqueue_terminal_notification(
+        self,
+        task: dict,
+        event_type: str,
+        result_data: Optional[str],
+    ) -> None:
+        outbox_id = f"out-{task['id']}-{event_type.replace('.', '-')}"
+        payload = {
+            "idempotency_key": outbox_id,
+            "task_id": task["id"],
+            "session_id": task.get("session_id"),
+            "status": task["status"],
+            "event_type": event_type,
+        }
+        if result_data is not None:
+            payload["result_data"] = result_data
+
+        await self._outbox.insert_once(
+            outbox_id=outbox_id,
+            channel="n8n",
+            event_type=event_type,
+            payload_json=json.dumps(payload, sort_keys=True),
+        )

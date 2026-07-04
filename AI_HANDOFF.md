@@ -2,18 +2,18 @@
 
 ## Current State
 
-- CP5 is complete and preserved as the current closed gate.
-- CP6 Outbox Dispatcher is approved and opened for automation.
-- Current state: READY.
-- Next agent: codex.
-- Human approval required: no for this approved CP6 implementation task.
-- Automation infrastructure is ready for use.
+- CP5, CP6, CP7, CP8, CP9, and CP10 are complete and preserved as closed gates.
+- Current state: CP10_COMPLETE / manual review
+- Next execution mode: manual review.
+- Next agent: human (V1 implementation is complete).
+- Human approval required: true (final project sign-off).
+- Automation infrastructure: suspended/paused.
 
 ## Boundary
 
-- Product code changes are allowed only for CP6 Outbox Dispatcher.
-- Do not implement Telegram, CP7+, model fallback, auth, deployment, vector search, or Excalidraw.
-- Reuse existing `notification_outbox` schema/repository where possible.
+- No code changes are allowed; V1 implementation is complete.
+- Do not implement any new features or start CP11+.
+- Keep FastAPI as the policy/audit boundary.
 - Preserve FastAPI as the policy/audit boundary and do not let n8n poll SQLite.
 - Keep legacy session routes and `USE_TASK_API=false` fallback intact.
 - Antigravity CLI may be unavailable; GUI fallback must be supported.
@@ -28,9 +28,14 @@
 
 ## Expected Code Areas
 
-- Backend service/repository/tests for notification outbox dispatching.
-- Existing checkpoint docs and AI coordination files.
-- Avoid frontend files unless validation proves they are required.
+- Backend verification tests and final audit coordination files.
+
+## Codex Implementation Summary
+
+- Added backend `OutboxDispatcher` service that claims backend-owned outbox rows, dispatches via an injected sender, passes stable idempotency keys, audits sent/error outcomes, retries failures, and dead-letters rows after max attempts.
+- Updated `OutboxRepository` with deterministic `insert_once`, retry-aware lease claiming, active-lock protection, sent lock cleanup, and status lookup.
+- Updated `TaskService` so terminal task success/failure enqueues deterministic n8n outbox events in the same DB transaction as the task status/event writes.
+- Added focused backend tests for atomic task/outbox behavior, restart-safe pending/retrying rows, duplicate row/send prevention, dispatcher success, retry, and dead letter behavior.
 
 ## Forbidden Files And Areas
 
@@ -43,9 +48,11 @@
 - production database settings
 - database files
 - unrelated database migrations
-- CP7+ product files
-- frontend source files unless explicitly required by CP6 validation
+- Any code modification (V1 is frozen)
+- frontend source files
 
 ## Next Action
 
-Run `scripts\ai-auto.ps1`. Codex should implement CP6 only, run relevant backend tests, update AI coordination files, and return control for human/Codex review.
+- Final human review of the V1 local stack.
+- Check deprecation metrics and ensure headers are returned on legacy endpoints.
+- Automation runner remains suspended. No loops may be run.

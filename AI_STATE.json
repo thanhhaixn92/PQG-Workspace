@@ -1,10 +1,10 @@
 {
-  "task_id": "cp6-outbox-dispatcher",
-  "state": "READY",
-  "next_agent": "codex",
+  "task_id": "cp10-cleanup",
+  "state": "CP10_COMPLETE",
+  "next_agent": "human",
   "lock": null,
-  "last_agent": "codex",
-  "last_result": "CP6 Outbox Dispatcher opened for automation. Codex should implement CP6 only and return for review.",
-  "human_approval_required": false,
-  "risk_level": "medium"
+  "last_agent": "antigravity",
+  "last_result": "Checkpoint CP10 Cleanup verified by Antigravity (Checker). All 11 CP10 tests passed (269/269 total pass). Gate closed at CP10_COMPLETE. Decided to retain deprecated legacy session routes to keep the fallback UI working. No code removed. All V1 checkpoints are now complete.",
+  "human_approval_required": true,
+  "risk_level": "low"
 }

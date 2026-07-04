@@ -32,6 +32,15 @@ from app.services.audit import log_audit_event
 from app.services.content_quality import enrich_desktop_file_blocks
 from app.services.context import CONTEXT_VERSION_CACHE, get_context_version
 from app.services.event_bus import event_bus
+from app.services.model_resilience import (
+    ModelAuthError,
+    ModelCallable,
+    ModelRateLimitError,
+    ModelServerError,
+    ModelTimeoutError,
+    ModelResilienceService,
+    ResilienceResult,
+)
 from app.settings import Settings
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -114,8 +123,9 @@ async def _run_prompt_task(
     prompt: str,
     db_path: Any,
     use_task_api: bool = False,
+    settings: Settings | None = None,
 ) -> None:
-    """Background task to send prompt and update DB task_run status and audit logs."""
+    """Background task to send prompt with model resilience and update DB."""
     try:
         async with get_db_connection(db_path) as db:
             await db.execute(
@@ -124,7 +134,47 @@ async def _run_prompt_task(
             )
             await db.commit()
 
-        assistant_text = await client.send_prompt(session_id, prompt)
+        # Wrap Hermes client as a named model callable for resilience
+        hermes_callable = ModelCallable(
+            id="hermes-acp",
+            fn=lambda p, s: client.send_prompt(s, p),
+        )
+
+        if settings and settings.model_fallback_enabled:
+            svc = ModelResilienceService.from_settings(
+                models=[hermes_callable],
+                settings=settings,
+            )
+            result = await svc.execute_with_resilience(prompt, session_id)
+        else:
+            try:
+                text = await client.send_prompt(session_id, prompt)
+                result = ResilienceResult(success=True, response=text)
+            except Exception as exc:
+                result = ResilienceResult(success=False, error=str(exc))
+
+        # Record attempt chain into audit log
+        if result.attempt_chain:
+            async with get_db_connection(db_path) as audit_db:
+                for attempt in result.attempt_chain:
+                    await log_audit_event(
+                        audit_db,
+                        session_id,
+                        "system",
+                        "model.attempt",
+                        target=task_id,
+                        payload={
+                            "model_id": attempt.model_id,
+                            "status": attempt.status,
+                            "error": attempt.error,
+                        },
+                    )
+                await audit_db.commit()
+
+        if not result.success:
+            raise RuntimeError(result.error or "Model call failed")
+
+        assistant_text = result.response
         async with get_db_connection(db_path) as db:
             now = int(time.time())
             async with db.execute(
@@ -615,6 +665,7 @@ async def submit_prompt(
             prompt=final_prompt,
             db_path=settings.db_path_resolved,
             use_task_api=settings.use_task_api,
+            settings=settings,
         )
     )
 

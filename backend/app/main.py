@@ -12,6 +12,7 @@ Architecture notes
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -30,9 +31,12 @@ from app.api.runtime import router as runtime_router
 from app.api.local_data import router as local_data_router
 from app.api.n8n import router as n8n_router
 from app.api.tasks import router as tasks_router
+from app.api.telegram import router as telegram_router
 from app.db.migrations import run_migrations
 from app.dependencies import get_db, get_settings
+from app.services.deprecation import DeprecationMiddleware, metrics
 from app.services.hermes_client import HermesClientManager
+from app.services.outbox_dispatcher import run_outbox_dispatcher_loop
 from app.services.task_recovery import recover_stale_task_runs
 from app.settings import Settings, get_settings as _get_settings
 from app.mcp.server import setup_mcp, mcp_session_id_var
@@ -63,8 +67,25 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         client_manager = HermesClientManager(settings)
         app.state.hermes_client = client_manager
 
+        # Outbox dispatcher background worker (if enabled)
+        outbox_dispatcher_stop: asyncio.Event | None = None
+        outbox_dispatcher_task: asyncio.Task[None] | None = None
+        if settings.outbox_dispatcher_enabled:
+            outbox_dispatcher_stop = asyncio.Event()
+            outbox_dispatcher_task = asyncio.create_task(
+                run_outbox_dispatcher_loop(settings, outbox_dispatcher_stop)
+            )
+            logger.info("Outbox dispatcher background task started (poll interval %.1fs).",
+                        settings.outbox_dispatcher_poll_seconds)
+
         yield  # Application runs here.
 
+        # Shutdown: stop outbox dispatcher first, then Hermes client.
+        if outbox_dispatcher_stop is not None:
+            outbox_dispatcher_stop.set()
+        if outbox_dispatcher_task is not None:
+            await outbox_dispatcher_task
+            logger.info("Outbox dispatcher stopped.")
         await client_manager.stop()
         logger.info("Shutting down Hermes Local Stack backend.")
 
@@ -87,6 +108,9 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Deprecation header injection for legacy routes.
+    app.add_middleware(DeprecationMiddleware)
+
     # Include API Routers
     app.include_router(sessions_router)
     app.include_router(files_router)
@@ -97,6 +121,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     app.include_router(local_data_router)
     app.include_router(n8n_router)
     app.include_router(tasks_router)
+    app.include_router(telegram_router)
 
     # MCP Integration
     setup_mcp(app)
@@ -153,6 +178,17 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     # ------------------------------------------------------------------ #
     # Routes - Phase 0
     # ------------------------------------------------------------------ #
+
+    @app.get("/api/metrics/deprecated", tags=["meta"])
+    async def deprecated_route_metrics() -> dict:
+        """Return hit-count metrics for deprecated legacy routes.
+
+        Returns a dict keyed by route pattern, where each value contains
+        ``hits`` (total requests) and ``last_accessed`` (Unix timestamp).
+        Useful for verifying that legacy consumers have migrated before
+        removing deprecated endpoints.
+        """
+        return metrics.snapshot()
 
     @app.get("/health", tags=["meta"])
     async def health(

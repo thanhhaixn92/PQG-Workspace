@@ -66,7 +66,21 @@ function Get-UsableAntigravityCli {
         }
         $helpText = ""
         try {
-            $helpText = (& $candidate.Source --help 2>&1 | Out-String)
+            $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = $candidate.Source
+            $startInfo.Arguments = "--help"
+            $startInfo.RedirectStandardOutput = $true
+            $startInfo.RedirectStandardError = $true
+            $startInfo.UseShellExecute = $false
+            $process = [System.Diagnostics.Process]::Start($startInfo)
+            $stdout = $process.StandardOutput.ReadToEnd()
+            $stderr = $process.StandardError.ReadToEnd()
+            $process.WaitForExit()
+            $helpText = "$stdout`n$stderr"
+            if ($process.ExitCode -ne 0 -and [string]::IsNullOrWhiteSpace($helpText)) {
+                Write-Host "Skipping $($candidate.Name): --help failed with exit code $($process.ExitCode)."
+                continue
+            }
         }
         catch {
             Write-Host "Skipping $($candidate.Name): --help failed: $($_.Exception.Message)"

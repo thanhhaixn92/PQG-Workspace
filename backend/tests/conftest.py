@@ -47,6 +47,7 @@ async def test_app(migrated_db_path):
         cors_origins=["http://localhost:5173"],
         hermes_dev_mock=False,
         log_level="WARNING",
+        outbox_dispatcher_enabled=False,
     )
 
     application = create_app(settings_override=test_settings)

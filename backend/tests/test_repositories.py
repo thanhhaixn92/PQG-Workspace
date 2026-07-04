@@ -151,6 +151,34 @@ async def test_outbox_insert_and_claim(migrated_db_path):
 
 
 @pytest.mark.asyncio
+async def test_outbox_insert_once_prevents_duplicate_rows(migrated_db_path):
+    conn = await open_db(migrated_db_path)
+    try:
+        repo = OutboxRepository(conn)
+        oid, inserted = await repo.insert_once(
+            "out-stable-key",
+            "n8n",
+            "task.succeeded",
+            '{"idempotency_key":"out-stable-key"}',
+        )
+        oid2, inserted2 = await repo.insert_once(
+            "out-stable-key",
+            "n8n",
+            "task.succeeded",
+            '{"idempotency_key":"out-stable-key"}',
+        )
+
+        assert oid == oid2 == "out-stable-key"
+        assert inserted
+        assert not inserted2
+
+        claimed = await repo.claim_pending("worker-1")
+        assert [row["id"] for row in claimed] == ["out-stable-key"]
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
 async def test_outbox_mark_sent(migrated_db_path):
     conn = await open_db(migrated_db_path)
     try:
@@ -162,6 +190,65 @@ async def test_outbox_mark_sent(migrated_db_path):
         await repo.mark_sent(oid)
         pending = await repo.get_pending_count()
         assert pending == 0
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_outbox_retrying_rows_are_reclaimed_after_failure(migrated_db_path):
+    conn = await open_db(migrated_db_path)
+    try:
+        repo = OutboxRepository(conn)
+        oid = await repo.insert("webapp", "task.failed", '{}')
+
+        claimed = await repo.claim_pending("w1")
+        assert len(claimed) == 1
+        await repo.mark_retry(oid, "temporary")
+
+        claimed2 = await repo.claim_pending("w2")
+        assert len(claimed2) == 1
+        assert claimed2[0]["id"] == oid
+        assert claimed2[0]["locked_by"] == "w2"
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_outbox_locked_rows_are_reclaimed_after_lease(migrated_db_path):
+    conn = await open_db(migrated_db_path)
+    try:
+        repo = OutboxRepository(conn)
+        oid = await repo.insert("webapp", "task.succeeded", '{}')
+
+        claimed = await repo.claim_pending("old-worker", lease_seconds=30)
+        assert len(claimed) == 1
+
+        claimed_too_soon = await repo.claim_pending("new-worker", lease_seconds=30)
+        assert claimed_too_soon == []
+
+        await conn.execute(
+            "UPDATE notification_outbox SET locked_at = 0 WHERE id = ?",
+            (oid,),
+        )
+        claimed_after_lease = await repo.claim_pending("new-worker", lease_seconds=30)
+        assert len(claimed_after_lease) == 1
+        assert claimed_after_lease[0]["id"] == oid
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_outbox_same_worker_does_not_reclaim_active_lock(migrated_db_path):
+    conn = await open_db(migrated_db_path)
+    try:
+        repo = OutboxRepository(conn)
+        await repo.insert("webapp", "task.succeeded", '{}')
+
+        claimed = await repo.claim_pending("worker", lease_seconds=30)
+        claimed_again = await repo.claim_pending("worker", lease_seconds=30)
+
+        assert len(claimed) == 1
+        assert claimed_again == []
     finally:
         await conn.close()
 

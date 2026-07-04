@@ -17,7 +17,7 @@ CONTEXT_VERSION_CACHE: dict[str, int] = {}
 async def get_context_version(db: Connection) -> int:
     """Return the latest modification timestamp across skills and memories."""
     async with db.execute(
-        "SELECT COALESCE(MAX(updated_at), 0) FROM skills WHERE enabled = 1"
+        "SELECT COALESCE(MAX(updated_at), 0) FROM skills WHERE enabled = 1 AND status = 'approved'"
     ) as cur:
         skills_ts = (await cur.fetchone())[0] or 0
     async with db.execute(
@@ -44,10 +44,9 @@ async def build_context(db: Connection, session_id: str) -> str:
     return "\n\n".join(parts)
 
 async def _get_skills_context(db: Connection) -> str:
-    # Fetch enabled skills
-    # Ordered by name to ensure determinism
+    # Fetch enabled + approved skills only (CP9)
     cursor = await db.execute(
-        "SELECT id, name, description, content FROM skills WHERE enabled = 1 ORDER BY name ASC"
+        "SELECT id, name, description, content FROM skills WHERE enabled = 1 AND status = 'approved' ORDER BY name ASC"
     )
     rows = await cursor.fetchall()
     

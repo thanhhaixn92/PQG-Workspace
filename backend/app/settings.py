@@ -102,9 +102,29 @@ class Settings(BaseSettings):
         return v  # type: ignore[return-value]
 
     # -----------------------------------------------------------------
+    # Telegram Channel (CP7)
+    # -----------------------------------------------------------------
+    telegram_webhook_secret: str = ""
+    telegram_allowlist: str = ""
+    telegram_callback_token_ttl_seconds: int = 3600
+
+    # -----------------------------------------------------------------
+    # Model Fallback & Resilience (CP8)
+    # -----------------------------------------------------------------
+    model_fallback_enabled: bool = False
+    model_fallback_max_retries: int = 2
+    model_fallback_base_backoff_seconds: float = 2.0
+    model_fallback_max_backoff_seconds: float = 30.0
+    model_fallback_cooldown_seconds: float = 5.0
+
+    # -----------------------------------------------------------------
     # Feature Flags
     # -----------------------------------------------------------------
     use_task_api: bool = False
+    outbox_dispatcher_enabled: bool = True
+
+    # Outbox dispatcher poll interval in seconds.
+    outbox_dispatcher_poll_seconds: float = 5.0
 
     # -----------------------------------------------------------------
     # Logging

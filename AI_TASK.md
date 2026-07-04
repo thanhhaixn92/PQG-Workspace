@@ -2,30 +2,29 @@
 
 ## Task
 
-Implement CP6 Outbox Dispatcher through the automation workflow.
+Perform CP10 Cleanup of deprecated legacy APIs and establish deprecation headers.
 
 ## Current Checkpoint
 
-- Current checkpoint: CP6 Outbox Dispatcher.
-- State: READY.
-- CP5 Frontend Migration is complete and preserved.
+- Current checkpoint: CP10 Cleanup (Complete).
+- State: CP10_COMPLETE / V1 complete / awaiting final human review
+- CP5, CP6, CP7, CP8, CP9, and CP10 are complete and preserved.
 
 ## Constraints
 
-- Implement only CP6 Outbox Dispatcher.
-- Do not implement Telegram, CP7+, model fallback, auth, deployment, vector search, or Excalidraw.
-- Prefer backend-only changes; do not touch frontend unless CP6 validation requires it.
+- Implement strictly CP10 Cleanup scope.
+- Do not implement CP11+, auth expansion, deployment, vector search, or Excalidraw.
+- Prefer backend-only changes; do not touch frontend unless CP10 validation requires it.
 - Do not modify secrets, deployment config, billing config, production database settings, database files, or migrations.
 - Do not auto commit, push, merge, deploy, reset, clean, or run destructive commands.
 - Do not use dangerous automation flags.
 
 ## Done When
 
-- Task and outbox write atomically where CP6 dispatch events are created.
-- Pending outbox rows remain safe after restart and can be claimed by a dispatcher.
-- Duplicate sends are prevented with idempotency keys.
-- Dead letter behavior exists after max attempts.
-- Focused backend tests cover dispatcher success, retry, restart-safe pending rows, duplicate-send prevention, and dead letter behavior.
+- Verify legacy route metrics show no active consumers (or write tests to check behavior).
+- Add `X-Deprecated: true` response header to deprecated HTTP endpoints (e.g. legacy session routes).
+- Dead code is removed only after explicit human approval.
+- Focused backend tests cover all CP10 acceptance criteria.
 - `AI_STATE.json` is valid JSON.
 - Relevant backend tests pass.
 - AI handoff/verification/changelog/risk files are updated.
