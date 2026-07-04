@@ -27,9 +27,9 @@ Mỗi checkpoint chỉ tick khi:
 ---
 
 ## CP2 TaskService
-- [ ] TaskStateMachine transition tests pass
-- [ ] Idempotency tests pass
-- [ ] Follow-up behavior tests pass
+- [x] TaskStateMachine transition tests pass
+- [x] Idempotency tests pass
+- [x] Follow-up behavior tests pass
 
 ---
 
