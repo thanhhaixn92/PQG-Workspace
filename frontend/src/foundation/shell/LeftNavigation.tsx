@@ -1,31 +1,38 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
+  Brain,
   BriefcaseBusiness,
   ClipboardCheck,
+  Database,
   FileChartColumn,
+  FileText,
   History,
   LayoutDashboard,
   Library,
   Menu,
+  Search,
   Settings,
   type LucideIcon,
 } from 'lucide-react';
-import { getPrimaryModuleDefinitions, type ModuleId } from '../modules/registry';
+import {
+  getModuleDefinitionById,
+  getPrimaryModuleDefinitions,
+  type ModuleId,
+} from '../modules/registry';
+import { useModuleProjectionStore } from '../modules/store';
 import type { SidebarTab } from '../../store/store';
 import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from '../../branding';
 
 const iconByModule: Partial<Record<ModuleId, LucideIcon>> = {
   work: BriefcaseBusiness,
+  documents: FileText,
   knowledge: Library,
   review: ClipboardCheck,
   reports: FileChartColumn,
-};
-
-const titleByTab: Partial<Record<SidebarTab, string>> = {
-  sessions: 'Công việc',
-  skills: 'Thư viện tri thức',
-  review: 'Hộp duyệt',
-  reports: 'Báo cáo',
+  memory: Brain,
+  'memory-hub': Brain,
+  'local-data': Database,
+  research: Search,
 };
 
 export interface LeftNavigationProps {
@@ -49,7 +56,25 @@ export function LeftNavigation({
   onCloseMobileMenu,
   onOpenActivity,
 }: LeftNavigationProps) {
-  const primaryModules = getPrimaryModuleDefinitions();
+  const moduleInstances = useModuleProjectionStore(state => state.instances);
+  const moduleProjectionStatus = useModuleProjectionStore(state => state.status);
+
+  const navigationModules = useMemo(() => {
+    if (moduleProjectionStatus !== 'ready') {
+      return getPrimaryModuleDefinitions().map(definition => ({
+        definition,
+        label: definition.defaultLabel,
+      }));
+    }
+
+    return moduleInstances
+      .filter(instance => instance.attached)
+      .sort((left, right) => left.sort_order - right.sort_order || left.module_id.localeCompare(right.module_id))
+      .flatMap(instance => {
+        const definition = getModuleDefinitionById(instance.module_id);
+        return definition ? [{ definition, label: instance.display_name }] : [];
+      });
+  }, [moduleInstances, moduleProjectionStatus]);
 
   return (
     <nav className={`panel sidebar-panel foundation-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Điều hướng PQG Workspace">
@@ -66,17 +91,17 @@ export function LeftNavigation({
           <LayoutDashboard aria-hidden="true" /><span className="nav-label">Tổng quan</span>
         </button>
 
-        {primaryModules.map(module => {
-          const Icon = iconByModule[module.id] ?? LayoutDashboard;
-          const advancedClass = module.tab === 'review' || module.tab === 'reports' ? ' advanced-tab' : '';
+        {navigationModules.map(({ definition, label }) => {
+          const Icon = iconByModule[definition.id] ?? LayoutDashboard;
+          const advancedClass = definition.tab === 'review' || definition.tab === 'reports' ? ' advanced-tab' : '';
           return (
             <button
-              key={module.id}
-              className={`sidebar-tab${advancedClass} ${activeTab === module.tab ? 'active' : ''}`.trim()}
-              onClick={() => onSelectTab(module.tab)}
-              title={titleByTab[module.tab] ?? module.defaultLabel}
+              key={definition.id}
+              className={`sidebar-tab${advancedClass} ${activeTab === definition.tab ? 'active' : ''}`.trim()}
+              onClick={() => onSelectTab(definition.tab)}
+              title={label}
             >
-              <Icon aria-hidden="true" /><span className="nav-label">{module.defaultLabel}</span>
+              <Icon aria-hidden="true" /><span className="nav-label">{label}</span>
             </button>
           );
         })}
