@@ -39,6 +39,7 @@ from app.api.schemas import (
     SseDoneEvent,
     SseErrorEvent,
 )
+from app.db.connection import get_db_connection
 from app.dependencies import get_db, get_settings, get_trusted_actor
 from app.services.assistant_runs import (
     AssistantRunClaim,
@@ -123,9 +124,7 @@ async def execute_assistant_run_claim(
     """Execute one claimed run while durable run state remains authoritative."""
     channel = f"assistant:{claim.thread_id}"
     try:
-        async with __import__("app.db.connection", fromlist=["get_db_connection"]).get_db_connection(
-            settings.db_path_resolved
-        ) as conn:
+        async with get_db_connection(settings.db_path_resolved) as conn:
             prompt, attachment_ids = await _stored_prompt_and_attachments(conn, claim.user_turn_id)
             await _validated_attachments(conn, claim.work_id, attachment_ids)
             context = await _turn_context(conn, claim.user_turn_id) if claim.user_turn_id else {
@@ -712,10 +711,6 @@ async def cancel_turn(
         "assistant.run.cancel_compute",
         target=requested["id"],
         payload={"outcome": cancel_outcome, "remote_compute_stop_proven": False},
-    )
-    await event_bus.publish(
-        f"assistant:{requested['thread_id']}",
-        SseDoneEvent(assistant_turn_id=turn_id, thread_id=requested["thread_id"]),
     )
     async with conn.execute("SELECT * FROM assistant_turns WHERE id = ?", (turn_id,)) as cur:
         turn_row = await cur.fetchone()
