@@ -7,8 +7,10 @@ on:
   push:
     branches:
       - pqg-workspace
-      - foundation-v2-r1-durable-agent-run-20260823
-      - remediation-r1-ci-module-failclosed-20260824
+      - 'work/**'
+      - 'security/**'
+      - 'maintenance/**'
+      - 'integration/**'
   workflow_dispatch:
 
 env:
