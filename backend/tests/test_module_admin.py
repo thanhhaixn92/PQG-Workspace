@@ -78,6 +78,63 @@ async def test_read_projection_does_not_require_admin_origin(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("stored_config", ["{invalid", "[]", "null"])
+async def test_read_projection_fails_visible_on_invalid_config_json(
+    client,
+    migrated_db_path,
+    stored_config,
+):
+    conn = await open_db(migrated_db_path)
+    try:
+        await conn.execute(
+            "UPDATE module_instances SET config_json = ? WHERE module_id = 'work'",
+            (stored_config,),
+        )
+        await conn.commit()
+    finally:
+        await conn.close()
+
+    response = await client.get("/api/modules")
+    assert response.status_code == 500
+    assert response.json()["detail"] == {
+        "code": "MODULE_CONFIG_INVALID",
+        "message": "Stored Module config is invalid; repair local Module state before continuing",
+    }
+
+
+@pytest.mark.asyncio
+async def test_admin_mutation_rejects_corrupt_config_before_write(client, migrated_db_path):
+    work = await _module(client, "work")
+    conn = await open_db(migrated_db_path)
+    try:
+        await conn.execute(
+            "UPDATE module_instances SET config_json = ? WHERE module_id = 'work'",
+            ("{invalid",),
+        )
+        await conn.commit()
+    finally:
+        await conn.close()
+
+    response = await client.post(
+        "/api/admin/modules/work/detach",
+        json={"expected_revision": work["revision"]},
+        headers=ADMIN_HEADERS,
+    )
+    assert response.status_code == 500
+    assert response.json()["detail"]["code"] == "MODULE_CONFIG_INVALID"
+
+    conn = await open_db(migrated_db_path)
+    try:
+        async with conn.execute(
+            "SELECT attached, revision, config_json FROM module_instances WHERE module_id = 'work'"
+        ) as cur:
+            row = await cur.fetchone()
+        assert tuple(row) == (1, work["revision"], "{invalid")
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
 async def test_admin_mutation_requires_interactive_browser_origin(client):
     work = await _module(client, "work")
     response = await client.post(
