@@ -11,6 +11,13 @@
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Nếu chỉ biết thời điểm ghi nhận, dùng timestamp ghi nhận và đánh dấu `recorded_at`/`imported_at`; không bịa thời gian xảy ra sự kiện.
 - [2026-08-23 23:53:22 UTC+07:00][recorded_at] Memory-maintenance writes whose sole purpose is synchronizing `PROJECT_MEMORY.md`/`PROJECT_CHANGELOG.md` do not recursively require another memory entry; record the underlying project event and relevant commit/evidence when known.
 
+## Environment-specific preflight governance
+
+- [2026-08-24 03:06:08 UTC+07:00][recorded_at] Preflight execution is environment-specific: on a local checkout/local machine, run `powershell -ExecutionPolicy Bypass -File scripts/agent-preflight.ps1` from the repository root.
+- [2026-08-24 03:06:08 UTC+07:00][recorded_at] In ChatGPT Project/GitHub-connected environments without a writable local repository shell, do not attempt or claim the local PowerShell command ran; instead run GitHub Actions workflow `Agent Preflight` (`.github/workflows/agent-preflight.yml`) on the exact target branch/ref and verify a fresh successful run before implementation writes.
+- [2026-08-24 03:06:08 UTC+07:00][recorded_at] A preflight from another branch/ref, an unrelated older HEAD, or `pqg/smoke` is not a substitute for the required `Agent Preflight` receipt. If connected tooling cannot dispatch `workflow_dispatch`, the user must trigger the GitHub workflow and the agent must verify its evidence before implementation writes.
+- [2026-08-24 03:06:08 UTC+07:00][recorded_at] A narrow explicit bootstrap approval may establish or repair the GitHub preflight path or governance documents before a new receipt exists; it does not authorize application/runtime/schema/security/feature implementation edits, which still require a fresh successful preflight.
+
 ## Project identity
 
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Product: **PQG Workspace**; user-facing assistant: **Trợ lý GYO**.
