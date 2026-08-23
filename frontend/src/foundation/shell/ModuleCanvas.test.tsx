@@ -35,6 +35,8 @@ const documentsInstance = (attached: boolean): ModuleInstance => ({
   updated_at: 1,
 });
 
+const unavailableProjectionStatuses = ['idle', 'loading', 'error'] as const;
+
 describe('ModuleCanvas', () => {
   beforeEach(() => {
     useHermesStore.setState({ activeFile: null, openFiles: [], sidebarTab: 'overview' });
@@ -51,7 +53,27 @@ describe('ModuleCanvas', () => {
     expect(screen.getByText('GYO focus')).toBeDefined();
   });
 
-  it('keeps document editing guarded by Work and open-file state when projection fallback is active', () => {
+  it.each(unavailableProjectionStatuses)('fails closed for business Modules while projection is %s', (status) => {
+    useModuleProjectionStore.setState({
+      instances: [documentsInstance(true)],
+      status,
+      error: status === 'error' ? 'projection unavailable' : null,
+    });
+
+    render(<ModuleCanvas activeTab="files" activeWorkId="work-1" assistantFocusRoute={false} />);
+
+    expect(screen.getByText('Chưa thể xác minh trạng thái Module')).toBeDefined();
+    expect(screen.queryByText('File explorer')).toBeNull();
+    expect(screen.queryByText('Editor content')).toBeNull();
+  });
+
+  it('keeps document editing guarded by Work and open-file state after projection is verified', () => {
+    useModuleProjectionStore.setState({
+      instances: [documentsInstance(true)],
+      status: 'ready',
+      error: null,
+    });
+
     const { rerender } = render(<ModuleCanvas activeTab="files" activeWorkId={null} assistantFocusRoute={false} />);
     expect(screen.getByText('Chọn một Công việc để quản lý tài liệu.')).toBeDefined();
 
