@@ -17,9 +17,9 @@ function hermesLabel(status: RuntimeStatus['hermes']['status']): string {
     case 'not_configured':
       return 'Cần cấu hình';
     case 'auth_unknown':
-      return 'Cần đăng nhập Hermes';
+      return 'Runtime tương thích cần đăng nhập';
     case 'auth_expired':
-      return 'Cần đăng nhập lại Hermes';
+      return 'Runtime tương thích cần đăng nhập lại';
   }
 }
 
@@ -58,21 +58,21 @@ function checkedAt(timestamp?: number): string {
 
 function hermesFix(status: RuntimeStatus): string {
   if (status.hermes.status === 'ready') {
-    return 'Có thể gửi prompt thật cho Hermes. Nếu phản hồi lâu hơn 30 giây, thường là do model/provider chậm, phiên dài hoặc Hermes đang chờ phê duyệt quyền.';
+    return 'Runtime tương thích đã sẵn sàng. Nếu phản hồi lâu hơn 30 giây, thường là do model/provider chậm, phiên dài hoặc đang chờ phê duyệt quyền.';
   }
   if (status.hermes.status === 'mock') {
-    return 'Đang chạy mock để thử UI. Khi muốn dùng Hermes thật, tắt HERMES_DEV_MOCK và đặt HERMES_EXECUTABLE_PATH.';
+    return 'Đang chạy mock để thử UI. Khi cần kiểm tra runtime tương thích thật, tắt HERMES_DEV_MOCK và đặt HERMES_EXECUTABLE_PATH.';
   }
   if (status.hermes.status === 'missing') {
-    return 'Kiểm tra lại đường dẫn HERMES_EXECUTABLE_PATH trong backend/.env hoặc chạy lại hermes setup.';
+    return 'Không tìm thấy runtime tương thích. Kiểm tra HERMES_EXECUTABLE_PATH trong backend/.env hoặc chạy lại hermes setup.';
   }
   if (status.hermes.status === 'auth_unknown') {
-    return 'Chạy hermes auth hoặc hermes doctor trong PowerShell. Nếu Hermes đã đăng nhập nhưng app vẫn chưa nhận ra, đặt HERMES_AUTH_READY=1 trong backend/.env.';
+    return 'Chạy hermes auth hoặc hermes doctor trong PowerShell. Nếu runtime tương thích đã đăng nhập nhưng app vẫn chưa nhận ra, đặt HERMES_AUTH_READY=1 trong backend/.env.';
   }
   if (status.hermes.status === 'auth_expired') {
-    return 'Token Hermes không còn hợp lệ. Chạy hermes auth trong PowerShell để đăng nhập lại.';
+    return 'Credential runtime tương thích không còn hợp lệ. Chạy hermes auth trong PowerShell để đăng nhập lại.';
   }
-  return 'Tạo backend/.env từ .env.example, sau đó cấu hình HERMES_EXECUTABLE_PATH hoặc bật HERMES_DEV_MOCK=1 để thử trước.';
+  return 'Tạo backend/.env từ .env.example, sau đó cấu hình runtime tương thích qua HERMES_EXECUTABLE_PATH hoặc bật HERMES_DEV_MOCK=1 để thử trước.';
 }
 
 export const RuntimeStatusPanel: React.FC = () => {

@@ -106,7 +106,7 @@ export const SessionList: React.FC = () => {
     setIsCreating(true);
     setError(null);
     setNotice(null);
-    setTitle('Công việc dùng thử Hermes');
+    setTitle('Công việc dùng thử GYO');
     setWorkspace(DEFAULT_DEMO_WORKSPACE);
   };
 
@@ -250,7 +250,7 @@ export const SessionList: React.FC = () => {
         {sessions.length === 0 && !isCreating && (
           <div className="empty-state">
             <div className="empty-state-title">Bắt đầu Công việc đầu tiên</div>
-            <div className="empty-state-text">Đặt tên, ghi mục tiêu rồi gửi yêu cầu đầu tiên cho Hermes.</div>
+            <div className="empty-state-text">Đặt tên, ghi mục tiêu rồi gửi yêu cầu đầu tiên cho Trợ lý GYO.</div>
             <button className="btn-primary" onClick={startDemoSession}>
               <PlayCircle size={14} /> Dùng Công việc mẫu
             </button>
@@ -274,8 +274,8 @@ export const SessionList: React.FC = () => {
               rows={2}
             />
             <label className="session-data-scope">
-              <span>Phạm vi dữ liệu Hermes được dùng</span>
-              <select aria-label="Phạm vi dữ liệu Hermes được dùng" value={dataScope} onChange={event => setDataScope(event.target.value as 'work_only' | 'approved_library')}>
+              <span>Phạm vi dữ liệu dùng cho Trợ lý GYO</span>
+              <select aria-label="Phạm vi dữ liệu dùng cho Trợ lý GYO" value={dataScope} onChange={event => setDataScope(event.target.value as 'work_only' | 'approved_library')}>
                 <option value="work_only">Chỉ tài liệu và trao đổi của Công việc này</option>
                 <option value="approved_library">Công việc này và tri thức đã duyệt</option>
               </select>

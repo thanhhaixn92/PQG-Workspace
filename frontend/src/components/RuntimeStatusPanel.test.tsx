@@ -87,6 +87,7 @@ describe('RuntimeStatusPanel', () => {
     render(<RuntimeStatusPanel />);
 
     expect(await screen.findByText(/model\/provider chậm/)).toBeDefined();
+    expect(screen.getByText(/Runtime tương thích đã sẵn sàng/)).toBeDefined();
   });
 
   it('chạy kiểm tra nhanh và hiển thị từng trạng thái', async () => {

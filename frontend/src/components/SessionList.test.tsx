@@ -36,7 +36,7 @@ describe('SessionList', () => {
     expect(screen.getByText('Bắt đầu Công việc đầu tiên')).toBeDefined();
 
     fireEvent.click(screen.getByText('Dùng Công việc mẫu'));
-    expect(screen.getByPlaceholderText('Tên Công việc')).toHaveProperty('value', 'Công việc dùng thử Hermes');
+    expect(screen.getByPlaceholderText('Tên Công việc')).toHaveProperty('value', 'Công việc dùng thử GYO');
     expect(screen.queryByPlaceholderText('Vị trí lưu trữ tùy chọn')).toBeNull();
     fireEvent.click(screen.getByText('Tùy chọn nâng cao'));
     expect(screen.getByPlaceholderText('Vị trí lưu trữ tùy chọn')).toHaveProperty('value', '');
@@ -262,7 +262,7 @@ describe('SessionList', () => {
     render(<SessionList />);
     fireEvent.click(screen.getByTitle('Tạo Công việc mới'));
     fireEvent.change(screen.getByPlaceholderText('Tên Công việc'), { target: { value: 'New Session' } });
-    fireEvent.change(screen.getByLabelText('Phạm vi dữ liệu Hermes được dùng'), { target: { value: 'approved_library' } });
+    fireEvent.change(screen.getByLabelText('Phạm vi dữ liệu dùng cho Trợ lý GYO'), { target: { value: 'approved_library' } });
     fireEvent.click(screen.getByText('Tạo'));
     await waitFor(() => expect(sessionsApi.createSession).toHaveBeenCalledWith('New Session', '', '', 'approved_library'));
   });
