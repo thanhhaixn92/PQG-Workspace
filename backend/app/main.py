@@ -44,6 +44,7 @@ from app.api.model_config import router as model_config_router
 from app.api.knowledge_summary import router as knowledge_summary_router
 from app.api.gyo_learning import router as gyo_learning_router
 from app.api.workspace import router as workspace_router
+from app.api.modules import router as modules_router
 from app.db.migrations import run_migrations
 from app.dependencies import get_db, get_settings
 from app.services.deprecation import DeprecationMiddleware, metrics
@@ -176,6 +177,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     app.include_router(context_preview_router)
     app.include_router(works_router)
     app.include_router(workspace_router)
+    app.include_router(modules_router)
     app.include_router(assistant_router)
     app.include_router(action_packages_router)
     app.include_router(marketplace_router)
@@ -219,7 +221,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
                 ) as cursor:
                     if await cursor.fetchone():
                         is_active = True
-                        
+                
             if not is_active:
                 from fastapi.responses import JSONResponse
                 return JSONResponse(status_code=403, content={"detail": "Session is not active or does not exist"})
