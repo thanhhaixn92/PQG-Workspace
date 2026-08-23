@@ -1,3 +1,23 @@
 @import './tokens.css';
 @import './motion.css';
 @import './accessibility.css';
+
+.foundation-sidebar-footer {
+  margin-top: auto;
+  padding: var(--pqg-space-2);
+  border-top: 1px solid var(--pqg-color-border-subtle);
+}
+
+.foundation-sidebar-footer .foundation-settings-tab {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .foundation-sidebar:not(.mobile-open) .foundation-sidebar-footer {
+    display: none;
+  }
+
+  .foundation-sidebar.mobile-open .foundation-sidebar-footer {
+    display: block;
+  }
+}
