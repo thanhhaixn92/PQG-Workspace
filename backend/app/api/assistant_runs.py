@@ -31,6 +31,7 @@ from app.api.assistant import (
     _validated_attachments,
     _write_assistant_parts,
     _write_run_metadata,
+    cancel_turn as _legacy_cancel_turn,
 )
 from app.api.schemas import (
     AssistantRetryRequest,
@@ -577,59 +578,15 @@ async def retry_turn(
         await conn.rollback()
         raise
 
-    await _execute_inline_if_no_worker(http_request, settings, assistant_id)
+    # Preserve the legacy 202 response snapshot: callers see the newly queued
+    # Assistant turn as running even when an isolated ASGI test executes it
+    # inline before the request returns. Durable DB state may already be
+    # terminal by the time the next read occurs.
     async with conn.execute("SELECT * FROM assistant_turns WHERE id = ?", (assistant_id,)) as cur:
         created = await cur.fetchone()
-    return await _turn(conn, created)
-
-
-async def _legacy_cancel(
-    turn_id: str,
-    http_request: Request,
-    actor: str,
-    conn: aiosqlite.Connection,
-) -> dict[str, Any]:
-    async with conn.execute("SELECT * FROM assistant_turns WHERE id = ?", (turn_id,)) as cur:
-        running_turn = await cur.fetchone()
-    if running_turn is None:
-        raise HTTPException(status_code=404, detail="Assistant turn not found")
-    if running_turn["role"] != "assistant" or running_turn["status"] != "running":
-        raise HTTPException(status_code=409, detail="Only a running Assistant response can be cancelled")
-    now = int(time.time())
-    message = "Bạn đã hủy phản hồi này. Nội dung đến muộn sẽ không được lưu hoặc hiển thị."
-    updated = await conn.execute(
-        "UPDATE assistant_turns SET status = 'cancelled', completed_at = ?, error = ? WHERE id = ? AND status = 'running'",
-        (now, message, turn_id),
-    )
-    if updated.rowcount != 1:
-        raise HTTPException(status_code=409, detail="Assistant response is no longer running")
-    await _write_assistant_parts(
-        conn,
-        assistant_id=turn_id,
-        part_type="error",
-        text=message,
-        source_parts=[],
-        structured_parts=[],
-        now=now,
-    )
-    await conn.execute("UPDATE assistant_threads SET updated_at = ? WHERE id = ?", (now, running_turn["thread_id"]))
-    await log_audit_event(
-        conn,
-        running_turn["work_id"],
-        actor,
-        "assistant.turn.cancelled",
-        target=turn_id,
-        payload={"thread_id": running_turn["thread_id"], "legacy": True},
-        commit=False,
-    )
-    await conn.commit()
-    await event_bus.publish(
-        f"assistant:{running_turn['thread_id']}",
-        SseDoneEvent(assistant_turn_id=turn_id, thread_id=running_turn["thread_id"]),
-    )
-    async with conn.execute("SELECT * FROM assistant_turns WHERE id = ?", (turn_id,)) as cur:
-        cancelled = await cur.fetchone()
-    return (await _turn(conn, cancelled)).model_dump()
+    created_response = await _turn(conn, created)
+    await _execute_inline_if_no_worker(http_request, settings, assistant_id)
+    return created_response
 
 
 @router.post("/turns/{turn_id}/cancel")
@@ -641,7 +598,12 @@ async def cancel_turn(
 ) -> dict[str, Any]:
     run = await get_assistant_run(conn, assistant_turn_id=turn_id)
     if run is None:
-        return await _legacy_cancel(turn_id, http_request, actor, conn)
+        # Manually-created/legacy running turns are outside the 0038 durable
+        # queue. Delegate to the frozen pre-R1 implementation so its audited
+        # best-effort compute cancellation and routing provenance remain byte-
+        # compatible while all newly-created runs use the durable lifecycle.
+        legacy = await _legacy_cancel_turn(turn_id, http_request, conn)
+        return legacy.model_dump()
     if run["status"] in {"completed", "failed", "cancelled"}:
         raise HTTPException(status_code=409, detail="Assistant run is already terminal")
 
