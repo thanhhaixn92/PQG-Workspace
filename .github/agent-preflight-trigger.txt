@@ -2,5 +2,5 @@ PQG Workspace GitHub Agent Preflight trigger.
 
 This file is intentionally updated by ChatGPT Project / GitHub-connected agents when a fresh Agent Preflight receipt is required and workflow_dispatch is not exposed by the connector.
 
-Last trigger: 2026-08-24 04:10:27 UTC+07:00
-Reason: fresh pre-code receipt for explicitly approved F7 Resource Catalog + Context Broker implementation on pqg-workspace; F9 remains closed.
+Last trigger: 2026-08-24 04:32:25 UTC+07:00
+Reason: fresh exact-head pre-code receipt for F7 closure review fixes on context-manifest broker authorization and conversation trust classification; F9 remains closed.
