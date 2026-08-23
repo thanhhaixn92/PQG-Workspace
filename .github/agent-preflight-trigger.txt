@@ -2,5 +2,5 @@ PQG Workspace GitHub Agent Preflight trigger.
 
 This file is intentionally updated by ChatGPT Project / GitHub-connected agents when a fresh Agent Preflight receipt is required and workflow_dispatch is not exposed by the connector.
 
-Last trigger: 2026-08-24 03:33:00 UTC+07:00
-Reason: establish assistant-operated GitHub preflight path after explicit user instruction.
+Last trigger: 2026-08-24 03:35:25 UTC+07:00
+Reason: refresh exact-head preflight after assistant-operated preflight governance update.
