@@ -65,7 +65,10 @@ async def get_module_projection(
     mutations so GYO/Foundation may understand which Modules are attached
     without receiving any administrative capability.
     """
-    return [ModuleInstanceResponse(**item) for item in await list_module_instances(conn)]
+    try:
+        return [ModuleInstanceResponse(**item) for item in await list_module_instances(conn)]
+    except ModuleAdminError as exc:
+        _raise_admin_error(exc)
 
 
 @router.post("/api/admin/modules/{module_id}/attach", response_model=ModuleInstanceResponse)
