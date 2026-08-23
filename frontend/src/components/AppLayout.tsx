@@ -3,7 +3,7 @@ import { BriefcaseBusiness, ClipboardCheck, FileChartColumn, History, LayoutDash
 import { useHermesStore } from '../store/store';
 import { getLatestSessionTaskRun, getSessionMessages, getSessions } from '../api/sessions';
 import { fetchHealth } from '../api/health';
-import { isTestWork } from './SessionList';
+import { isTestWork } from './workTestVisibility';
 import { ApprovalModal } from './ApprovalModal';
 import { FileExplorer } from './FileExplorer';
 import { EditorPanel } from './EditorPanel';

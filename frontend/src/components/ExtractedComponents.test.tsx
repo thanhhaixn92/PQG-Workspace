@@ -24,7 +24,7 @@ describe('extracted Work and Review components', () => {
   });
 
   it('keeps approval decisions explicit and source-bound', () => {
-    const item: ReviewProjection = { id: 'pkg-1', source: 'Trợ lý', title: 'Cập nhật Work', status: 'Chờ bạn duyệt', category: 'pending', scope: 'Công việc hiện tại', risk: 'Local', before: 'Chưa đổi', after: 'Sẽ đổi', rollback: 'Có thể hoàn tác', destination: 'hermes' };
+    const item: ReviewProjection = { id: 'pkg-1', source: 'Trợ lý', title: 'Cập nhật Work', status: 'Chờ bạn duyệt', category: 'pending', scope: 'Công việc hiện tại', risk: 'Local', before: 'Chưa đổi', after: 'Sẽ đổi', rollback: 'Có thể hoàn tác', destination: 'hermes', actionPackageBinding: { expectedRevision: 1, expectedPayloadHash: 'payload-hash' } };
     const onDecide = vi.fn();
     render(<ApprovalItem item={item} expanded={false} busy={false} onToggle={vi.fn()} onDecide={onDecide} onOpen={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Duyệt gói đề xuất' }));

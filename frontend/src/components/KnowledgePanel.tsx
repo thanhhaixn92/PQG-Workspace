@@ -65,7 +65,7 @@ export const KnowledgePanel: React.FC = () => {
     </div>
     <div className="grouped-panel-body">
       {section === 'overview' && <section className="knowledge-overview" aria-labelledby="knowledge-overview-title">
-        <header><div><p className="eyebrow">Thư viện tri thức</p><h1 id="knowledge-overview-title">Tri thức dùng lại cho Hermes</h1><p>Quản lý kỹ năng, bộ nhớ và tri thức có bằng chứng. Chỉ những mục được cho phép mới có thể xuất hiện trong ngữ cảnh chat.</p></div></header>
+        <header><div><p className="eyebrow">Thư viện tri thức</p><h1 id="knowledge-overview-title">Tri thức dùng lại cho Trợ lý GYO</h1><p>Quản lý kỹ năng, bộ nhớ và tri thức có bằng chứng. Chỉ những mục được cho phép mới có thể xuất hiện trong ngữ cảnh chat.</p></div></header>
         {summaryError && <div className="inline-error" role="status">{summaryError}</div>}
         {!skills || !memory ? <LoadingSummary /> : <div className="knowledge-summary-grid">
           <button onClick={() => setSection('skills')}><strong>{approvedSkillCount ?? 0}</strong><span>Kỹ năng đang được phép dùng</span><small>Nháp và mục chờ duyệt không được đưa vào chat.</small></button>

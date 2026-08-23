@@ -32,7 +32,6 @@ vi.mock('../components/assistant/TurnPartRenderer', () => ({
   TurnPartRenderer: () => null,
   AssistantTurnCard: () => null,
 }))
-vi.mock('../components/HermesAssistantPanel', () => ({ TurnPartRenderer: () => null }))
 vi.mock('../components/FileExplorer', () => ({ FileExplorer: () => null }))
 vi.mock('../components/EditorPanel', () => ({ EditorPanel: () => null }))
 vi.mock('../components/ReportsPanel', () => ({ ReportsPanel: () => null }))

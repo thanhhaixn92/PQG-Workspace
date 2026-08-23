@@ -26,7 +26,7 @@ vi.mock('../api/events', () => ({
   unsubscribeFromSessionEvents: vi.fn(),
 }));
 
-vi.mock('./SessionList', () => ({
+vi.mock('./workTestVisibility', () => ({
   SessionList: () => <div>Danh sách phiên</div>,
   isTestWork: () => false,
 }));

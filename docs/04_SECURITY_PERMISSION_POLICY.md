@@ -2,12 +2,12 @@
 
 ## 1. Security Model
 
-Hermes, MCP tools, and model-generated strings are untrusted at the backend boundary. Backend services must validate every action before execution.
+GYO/provider output, MCP tools, and model-generated strings are untrusted at the backend boundary. Backend services must validate every action before execution.
 
 Trust boundaries:
 
 - User UI is not trusted for permission enforcement.
-- Hermes output is not trusted.
+- GYO/provider output is not trusted.
 - MCP tool input is not trusted.
 - n8n webhook payloads are not trusted.
 - FastAPI service layer is the enforcement point.

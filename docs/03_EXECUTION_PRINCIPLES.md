@@ -6,7 +6,7 @@
 - Keep changes scoped to current phase.
 - Prefer simple service boundaries over broad abstractions.
 - FastAPI owns policy and validation.
-- Frontend never bypasses backend to access file system, Hermes, n8n, or MCP tools.
+- Frontend never bypasses backend to access file system, the GYO provider/runtime boundary, n8n, or MCP tools.
 - Do not introduce cloud dependencies for MVP.
 - Do not add vector DB, graph DB, or auth system before MVP acceptance.
 
@@ -22,11 +22,11 @@
 
 ## 3. Backend Rules
 
-- Use FastAPI lifespan to create/teardown Hermes client.
-- Do not use scattered module-level global Hermes client imports.
+- Use FastAPI lifespan to create/teardown app-managed GYO provider services.
+- Do not use scattered module-level global provider client imports.
 - Dependency injection should return app-managed services.
-- Hermes stderr goes to structured logs, not user-visible raw stream by default.
-- Timeouts and retry/backoff required for Hermes process calls.
+- Provider diagnostics go to structured logs, not user-visible raw stream by default.
+- Timeouts and retry/backoff are required for provider calls.
 - API errors should be typed and user-readable.
 
 ## 4. Frontend Rules
@@ -40,7 +40,7 @@
 
 ## 5. MCP/FastMCP Rules
 
-- Hermes MCP exposes exactly the nine allowlisted tools named in PRD v2.2 and `app/mcp/server.py`. Adding or removing a tool requires a PRD/security review and a matching regression update.
+- The MCP layer exposes only the allowlisted tools named in the current code and canon. Adding or removing a tool requires a PRD/security review and a matching regression update.
 - Do not expose all CRUD endpoints as tools.
 - MCP tools call backend/service policy layer, not raw filesystem.
 - Tool parameters must use clear descriptions and validation constraints.
@@ -79,7 +79,7 @@ Codex should reject work that:
 - Bypasses policy boundary.
 - Writes secrets to source.
 - Allows destructive/external actions without approval.
-- Uses fragile parsing for ACP/SSE.
+- Uses fragile parsing for provider events/SSE.
 - Accesses files outside workspace.
 - Expands scope without plan update.
 

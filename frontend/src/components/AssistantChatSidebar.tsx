@@ -23,7 +23,7 @@ import { getWorkDashboard, type WorkDashboard } from '../api/works';
 import { subscribeThreadStream } from '../assistant/threadStreamRegistry';
 import { createApprovalIdempotencyRegistry } from '../assistant/approvalIdempotency';
 import { ApiError } from '../api/client';
-import { isTestWork } from './SessionList';
+import { isTestWork } from './workTestVisibility';
 import { parseGyoAssistantLocation, navigateToGyoAssistant, buildGyoAssistantUrl } from '../navigation';
 import { readGyoDraft, writeGyoDraft, clearAllGyoDrafts, clearGyoDraftsByWork, removeGyoDraft, type GYODraftScope } from '../assistant/draftStorage';
 import { getRuntimeIdentityScope, type RuntimeIdentityScope } from '../api/runtime';
@@ -299,7 +299,7 @@ export const AssistantChatSidebar: React.FC<AssistantChatSidebarProps> = ({ surf
     await loadThreads();
     void loadActionPackages(selectedWork.id);
     if (bootstrapGeneration === bootstrapGenerationRef.current) setLoading(false);
-  }, [selectedWork, loadThreads, loadArtifacts, loadModelConfig, loadDashboard]);
+  }, [selectedWork, loadThreads, loadArtifacts, loadModelConfig, loadDashboard, loadActionPackages]);
 
   // Load threads when sidebar becomes visible (even without a work selected)
   useEffect(() => {
@@ -396,7 +396,7 @@ export const AssistantChatSidebar: React.FC<AssistantChatSidebarProps> = ({ surf
       .then(setManifest)
       .catch(error => { if ((error as Error).name !== 'AbortError') setManifest(null); });
     return () => controller.abort();
-  }, [activeSessionId, conversationId, selectedConversation?.id]);
+  }, [activeSessionId, conversations.length, selectedConversation?.id, selectedConversation?.session_id]);
 
   // Action packages sync
   useEffect(() => { void loadActionPackages(activeSessionId); }, [activeSessionId, loadActionPackages]);

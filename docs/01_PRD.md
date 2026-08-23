@@ -2,21 +2,23 @@
 
 > Hieu luc tu 2026-08-14. Tai lieu nay thay the cac dinh nghia session-centric va n8n-bat-buoc truoc day. `sessions` chi la entity tuong thich dai dien cho Work.
 
+> **Ghi chu runtime hien hanh (2026-08-23):** `PROJECT_STATE.md`, `AI_STATE.json`, checkpoint hien hanh va code route co uu tien cao hon mo ta lich su trong PRD nay. Tro ly trong web la **Trợ lý GYO**, chay qua `GyoOrchestrator` sau FastAPI va giao tiep voi browser bang REST/SSE. Cac nhac den Hermes/ACP ben duoi chi la compatibility/historical context, khong la fallback cua runtime hien hanh.
+
 ## 1. Tom Tat San Pham
 
-PQG Workspace la khong gian lam viec AI ca nhan chay local. Hermes la agent/runtime ho tro ben trong. Mo hinh san pham chinh la `Work -> plan -> conversations -> Assistant turns -> documents/artifacts -> knowledge -> approvals/action packages`.
+PQG Workspace la khong gian lam viec AI ca nhan chay local. Trợ lý GYO la agent/runtime ho tro ben trong, qua `GyoOrchestrator`. Mo hinh san pham chinh la `Work -> plan -> conversations -> Assistant turns -> documents/artifacts -> knowledge -> approvals/action packages`.
 
 MVP khong nham lam he thong multi-user production. Muc tieu la mot local workstation assistant co the quan sat, ghi audit, va kiem soat hanh dong cua agent.
 
 ## 2. Nguoi Dung Chinh
 
 - Mot nguoi dung ca nhan tren may local.
-- User muon Hermes doc/sua file trong workspace, ho tro lap ke hoach, tao tai lieu, chay tac vu co kiem soat.
+- User muon Trợ lý GYO ho tro lap ke hoach, tao tai lieu va de xuat tac vu co kiem soat trong workspace.
 - User muon Antigravity trien khai va Codex review thay cho viec tu kiem tra tung chi tiet ky thuat.
 
 ## 3. Van De Can Giai Quyet
 
-- Chat voi Hermes can streaming ro rang, co activity cua tool/terminal/file diff.
+- Chat voi Trợ lý GYO can streaming ro rang, co activity cua tool/terminal/file diff.
 - File operations cua agent can gioi han trong workspace, tranh truy cap nham ra ngoai.
 - Memory/skills can co quan ly ro, khong dua toan bo lich su hoi thoai vao context.
 - Approval can phan biet hanh dong doc, ghi noi bo, va destructive/external.
@@ -25,7 +27,7 @@ MVP khong nham lam he thong multi-user production. Muc tieu la mot local worksta
 
 ## 4. Goals
 
-- Tao UI chat voi Hermes qua ACP.
+- Tao UI chat voi Trợ lý GYO qua `GyoOrchestrator` sau FastAPI, bang REST/SSE.
 - Stream token va events realtime bang typed SSE.
 - Quan ly Work, plan, conversations, Assistant turns, documents/artifacts, knowledge, approvals va skills.
 - Thuc thi approval policy va audit log.
@@ -41,7 +43,7 @@ MVP khong nham lam he thong multi-user production. Muc tieu la mot local worksta
 - Agent tu tao tool moi khong qua review.
 - Vector DB/graph DB trong MVP.
 - Fine-tune model.
-- Dong bo hoac sua truc tiep Hermes `state.db`; `app.db` la source of truth cho lich su Work nguoi dung nhin thay.
+- Dong bo hoac sua truc tiep legacy Hermes `state.db`; `app.db` la source of truth cho lich su Work nguoi dung nhin thay.
 
 ## 6. User Stories MVP
 
@@ -76,7 +78,7 @@ MVP khong nham lam he thong multi-user production. Muc tieu la mot local worksta
 ### Automation tuy chon
 
 - La user, toi cau hinh n8n webhook local.
-- La user, toi yeu cau Hermes kich hoat workflow n8n va phai phe duyet neu co data ra ngoai.
+- La user, toi yeu cau Trợ lý GYO de xuat kich hoat workflow n8n va phai phe duyet neu co data ra ngoai.
 
 ## 7. Functional Requirements
 
@@ -95,7 +97,7 @@ MVP khong nham lam he thong multi-user production. Muc tieu la mot local worksta
 ## 8. Non-Functional Requirements
 
 - Local-first, offline-capable tru cac integration external.
-- Startup backend khong crash neu Hermes chua cau hinh; phai tra error ro.
+- Startup backend khong crash neu provider cua GYO chua cau hinh; phai tra error ro.
 - SSE events la JSON hop le.
 - Moi file path phai duoc resolve va validate.
 - Test co the chay local bang command documented.
@@ -106,14 +108,14 @@ MVP khong nham lam he thong multi-user production. Muc tieu la mot local worksta
 
 MVP dat khi:
 
-- Tao session va chat voi Hermes duoc qua UI.
+- Tao Work/conversation va chat voi Trợ lý GYO duoc qua UI.
 - Token stream qua typed SSE.
 - Approval flow hoat dong.
 - File editor doc/ghi trong workspace an toan.
 - Skills/memory CRUD co audit.
 - Permission model duoc enforce.
 - n8n neu cau hinh thi goi qua backend co approval; khi khong cau hinh thi bao unavailable ro rang va khong chan v2.2.
-- MCP Hermes expose dung 9 tool; `propose_work_update` chi phat proposal marker, khong ghi DB.
+- MCP layer chi expose allowlist da cau hinh; proposal khong ghi DB ma khong qua Action Package, approval va idempotent executor.
 - Persistent summary thuoc `write_internal` va chi ghi sau approval.
 - Fidelity ledger dat gate va usability test co it nhat 4/5 nguoi dat.
 - Codex review va approve cac phase theo checklist.

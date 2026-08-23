@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileExplorer } from './FileExplorer';
 import { useHermesStore } from '../store/store';
 import * as filesApi from '../api/files';
-import { filterTestDataNodes } from './FileExplorer';
+import { filterTestDataNodes } from './fileTreeFilters';
 
 vi.mock('../api/files', () => ({
   fetchFileTree: vi.fn(),

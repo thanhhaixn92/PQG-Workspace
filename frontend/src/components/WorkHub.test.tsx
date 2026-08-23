@@ -16,7 +16,7 @@ vi.mock('./EditorPanel', () => ({ EditorPanel: () => null }));
 vi.mock('./ReportsPanel', () => ({ ReportsPanel: () => null }));
 vi.mock('./KnowledgePanel', () => ({ KnowledgePanel: () => null }));
 vi.mock('./ActionPackagesPanel', () => ({ ActionPackagesPanel: () => null }));
-vi.mock('./HermesAssistantPanel', () => ({ TurnPartRenderer: ({ part }: { part: { content: Record<string, unknown> } }) => <p>{String(part.content.text ?? '')}</p> }));
+vi.mock('./assistant/TurnPartRenderer', () => ({ TurnPartRenderer: ({ part }: { part: { content: Record<string, unknown> } }) => <p>{String(part.content.text ?? '')}</p> }));
 vi.mock('./PhaseCard', () => ({ PhaseCard: () => null }));
 
 import { ConversationWorkspace } from './WorkHub';

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Clock3, FileOutput, ShieldCheck } from 'lucide-react';
 import { getOverview, type Overview } from '../api/overview';
 import { useHermesStore } from '../store/store';
-import { isTestWork } from './SessionList';
+import { isTestWork } from './workTestVisibility';
 import { PRODUCT_NAME } from '../branding';
 
 const dateLabel = (timestamp: number | null) => timestamp

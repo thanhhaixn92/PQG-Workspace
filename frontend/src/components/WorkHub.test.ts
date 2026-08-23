@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readWorkDraft, workDraftKey, writeWorkDraft } from '../api/works';
-import { filterAvailableSkills, OPEN_WORK_CONVERSATIONS_EVENT } from './WorkHub';
+import { filterAvailableSkills, OPEN_WORK_CONVERSATIONS_EVENT } from './workHubUtils';
 
 describe('filterAvailableSkills', () => {
   it('only exposes approved and enabled skills as available', () => {

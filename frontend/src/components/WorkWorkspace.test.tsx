@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useHermesStore } from '../store/store';
-import { parseWorkspaceTaskInput, WorkWorkspace } from './WorkWorkspace';
+import { WorkWorkspace } from './WorkWorkspace';
+import { parseWorkspaceTaskInput } from './workspaceTaskInput';
 
 const api = vi.hoisted(() => ({ getWorkspaceToday: vi.fn(), getWorkspaceUpcoming: vi.fn(), getWorkspaceHistory: vi.fn(), getWorkspaceAiJobs: vi.fn(), createWorkspaceTask: vi.fn(), deleteWorkspaceTask: vi.fn(), createWorkspaceAiJob: vi.fn(), updateWorkspaceTask: vi.fn() }));
 const sessionsApi = vi.hoisted(() => ({ createSession: vi.fn() }));

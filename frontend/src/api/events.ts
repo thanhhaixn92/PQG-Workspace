@@ -15,15 +15,15 @@ function toVietnameseRuntimeError(message?: string): string {
   }
 
   if (message.includes('Timed out waiting for Hermes process to start')) {
-    return 'Hermes chưa khởi động được. Hãy kiểm tra HERMES_EXECUTABLE_PATH trong backend/.env hoặc cài Hermes trước khi gửi yêu cầu.';
+    return 'Trợ lý chưa sẵn sàng. Hãy kiểm tra cấu hình runtime local rồi thử lại.';
   }
 
   if (message.includes('No such file') || message.includes('does-not-exist')) {
-    return 'Không tìm thấy chương trình Hermes. Hãy kiểm tra đường dẫn Hermes trong backend/.env.';
+    return 'Không tìm thấy runtime trợ lý. Hãy kiểm tra cấu hình local rồi thử lại.';
   }
 
   if (message.includes('503') || message.includes('capacity limits') || message.includes('temporarily unavailable')) {
-    return 'Model Hermes hoặc Nous đang quá tải hoặc tạm thời chưa sẵn sàng. Hãy thử lại sau hoặc đổi sang model nhanh hơn.';
+    return 'Model đang quá tải hoặc tạm thời chưa sẵn sàng. Hãy thử lại sau hoặc chọn model khác trong Cài đặt.';
   }
 
   return message;

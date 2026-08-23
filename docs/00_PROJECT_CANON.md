@@ -1,6 +1,6 @@
 # PQG Workspace - Project Canon v2.2
 
-File nay la muc luc va nguon tham chieu chinh cho Antigravity va Codex trong qua trinh xay dung PQG Workspace. Hermes la agent/runtime ben trong san pham.
+File nay la muc luc va nguon tham chieu chinh cho Antigravity va Codex trong qua trinh xay dung PQG Workspace. Runtime tro ly hien hanh la GYO qua `GyoOrchestrator`; Hermes/ACP chi con la identifier ky thuat hoac compatibility/historical path, khong phai fallback cua runtime hien hanh.
 
 ## Bo Tai Lieu Chuan
 
@@ -38,10 +38,10 @@ Neu cac tai lieu co noi dung xung dot, ap dung thu tu sau:
 
 - Local-first.
 - FastAPI la policy boundary.
-- Hermes ACP la agent runtime boundary.
+- `GyoOrchestrator` provider-neutral la runtime boundary cua Tro ly GYO sau FastAPI.
 - SQLite `app.db` so huu Work, conversation va Assistant turns hien thi cho nguoi dung.
-- Hermes state chi so huu ACP session, reasoning va runtime noi bo; app khong doc/sua truc tiep `state.db`.
-- MCP Hermes la exact allowlist 9 tool; mutation Work chi qua Action Package sau user approval.
+- Legacy Hermes/ACP state, neu con ton tai tu cai dat cu, khong duoc GYO doc, sua, dong bo hoac dung lam fallback.
+- Lop MCP chi dung allowlist da cau hinh; mutation Work chi qua Action Package sau user approval.
 - n8n la sidecar loopback tuy chon, khong chan checkpoint v2.2.
 - Moi thao tac write/external/destructive phai co audit.
 - External/destructive actions luon can human approval.

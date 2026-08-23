@@ -8,7 +8,7 @@ user-facing assistant surface, backed by the provider-neutral GyoOrchestrator.
 ```text
 React/Zustand UI
   -> FastAPI REST + typed SSE
-  -> Hermes ACP process
+  -> GyoOrchestrator provider boundary
   -> workspace sandbox
 
 FastAPI
@@ -22,7 +22,7 @@ FastAPI
 - FastAPI owns validation, permissions, audit, and process boundaries.
 - UI owns presentation and interaction state only.
 - `app.db` owns Work conversations and Assistant turns visible to the user.
-- Hermes owns ACP sessions, reasoning and internal runtime state only; the app never edits Hermes `state.db`.
+- GyoOrchestrator owns provider routing and internal runtime state; legacy Hermes/ACP data, if present, is compatibility-only and the app never reads, edits, synchronizes, or uses it as a fallback.
 - n8n owns optional workflow automation and credentials when configured.
 
 ## Core Flows
@@ -32,14 +32,14 @@ FastAPI
 1. User creates or opens a Work and selects a conversation.
 2. Frontend posts prompt to backend.
 3. Backend persists the user-visible turn/run in `app.db`.
-4. Backend sends prompt to Hermes ACP.
+4. Backend sends the prompt to GyoOrchestrator.
 5. Backend emits typed SSE events.
 6. Frontend routes events into Zustand reducers.
 7. Backend writes audit events for key actions.
 
 ### Approval
 
-1. Hermes/tool requests risky action.
+1. GYO/tool requests risky action.
 2. Backend classifies risk.
 3. Backend emits `approval_required`.
 4. User/Codex reviewer chooses allowed option.
@@ -58,11 +58,11 @@ FastAPI
 
 - No direct frontend-to-filesystem access.
 - No direct frontend-to-n8n access.
-- No direct frontend-to-Hermes process access.
+- No direct frontend-to-GYO provider/runtime access.
 - No MCP tool bypassing backend policy.
-- No direct read, write or synchronization against Hermes `state.db`.
-- No Work mutation from an MCP call: Hermes emits `DIRAP_ACTION_PROPOSAL:`, the user creates an Action Package, then approval/executor applies it once.
-- Hermes MCP exposes exactly the nine tools documented in PRD v2.2.
+- No direct read, write or synchronization against legacy Hermes `state.db`.
+- No Work mutation from an MCP call: GYO may propose an Action Package, then explicit approval and the idempotent executor apply it once.
+- The MCP layer exposes only its configured allowlist; changing that allowlist requires a PRD/security review and matching regression coverage.
 - Memory Hub is never auto-injected and Review remains a projection over source lifecycles.
 
 ## Primary References

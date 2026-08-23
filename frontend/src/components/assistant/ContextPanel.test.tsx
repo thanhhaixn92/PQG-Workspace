@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ContextPanel, resolveSafeUri } from './ContextPanel';
+import { ContextPanel } from './ContextPanel';
+import { resolveSafeUri } from './contextUri';
 import type { AssistantContextManifest } from '../../api/assistant';
 
 // Mock MarkdownRenderer for ContextPanel tests

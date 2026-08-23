@@ -107,7 +107,7 @@ describe('ChatPanel', () => {
     expect(screen.getByTitle('Gửi tin nhắn')).toHaveProperty('disabled', true);
   });
 
-  it('hiển thị trạng thái Hermes đang xử lý cho phiên đang running', () => {
+  it('hiển thị trạng thái Trợ lý GYO đang xử lý cho phiên đang running', () => {
     useHermesStore.setState({
       activeSessionId: 'session-1',
       sessionStatusById: { 'session-1': 'running' },
@@ -115,10 +115,10 @@ describe('ChatPanel', () => {
     });
 
     render(<ChatPanel />);
-    expect(screen.getByText(/Hermes đang xử lý/)).toBeDefined();
+    expect(screen.getByText(/Trợ lý GYO đang xử lý/)).toBeDefined();
   });
 
-  it('hiển thị cảnh báo khi Hermes phản hồi chậm sau 30 giây', () => {
+  it('hiển thị cảnh báo khi Trợ lý GYO phản hồi chậm sau 30 giây', () => {
     useHermesStore.setState({
       activeSessionId: 'session-1',
       sessionStatusById: { 'session-1': 'running' },
@@ -126,7 +126,7 @@ describe('ChatPanel', () => {
     });
 
     render(<ChatPanel />);
-    expect(screen.getByText(/Hermes đang cần thêm thời gian/)).toBeDefined();
+    expect(screen.getByText(/Trợ lý GYO đang cần thêm thời gian/)).toBeDefined();
     expect(screen.getByText(/đang chờ bạn duyệt quyền/)).toBeDefined();
   });
 
@@ -166,7 +166,7 @@ describe('ChatPanel', () => {
     expect(screen.getByText('Bạn')).toBeDefined();
   });
 
-  it('hiển thị lịch sử với bong bóng Bạn và Hermes', () => {
+  it('hiển thị lịch sử với bong bóng Bạn và Trợ lý GYO', () => {
     useHermesStore.setState({
       activeSessionId: 'session-1',
       sessionStatusById: { 'session-1': 'idle' },
@@ -180,7 +180,7 @@ describe('ChatPanel', () => {
 
     render(<ChatPanel />);
     expect(screen.getByText('Bạn')).toBeDefined();
-    expect(screen.getByText('Hermes')).toBeDefined();
+    expect(screen.getByText('Trợ lý GYO')).toBeDefined();
     expect(screen.getByText('Xin chào')).toBeDefined();
     expect(screen.getByText('Chào bạn')).toBeDefined();
   });
@@ -315,6 +315,6 @@ describe('ChatPanel', () => {
 
     expect(useHermesStore.getState().sessionStatusById['session-1']).toBe('idle');
     expect(useHermesStore.getState().latestTaskBySession['session-1']?.status).toBe('cancelled');
-    expect(screen.getByText(/Lưu ý: Việc hủy chỉ cập nhật metadata/)).toBeDefined();
+    expect(screen.getByText(/Lưu ý: việc hủy chỉ cập nhật metadata/)).toBeDefined();
   });
 });

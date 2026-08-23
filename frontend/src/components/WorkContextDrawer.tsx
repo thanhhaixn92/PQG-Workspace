@@ -3,7 +3,7 @@ import { Clock3, FileText, ListChecks, Settings2 } from 'lucide-react';
 import { useHermesStore } from '../store/store';
 import { getWorkDashboard, type WorkDashboard } from '../api/works';
 import { ActivityInspector } from './ActivityInspector';
-import { OPEN_WORK_CONVERSATIONS_EVENT } from './WorkHub';
+import { OPEN_WORK_CONVERSATIONS_EVENT } from './workHubUtils';
 
 type DrawerTab = 'history' | 'context' | 'system';
 
@@ -54,8 +54,8 @@ export const WorkContextDrawer: React.FC = () => {
             <small>Cập nhật {formatDate(data.context_summary.created_at)}. Phạm vi tin nhắn được ghi nhận cùng bản tóm tắt.</small>
           </> : <>
             <h4>Chưa có tóm tắt ngữ cảnh</h4>
-            <p>Hermes chưa tạo tóm tắt cho Công việc này. Nội dung chat không tự động được đưa vào ngữ cảnh ngầm.</p>
-            <button className="btn-secondary compact-button" onClick={() => window.dispatchEvent(new Event(OPEN_WORK_CONVERSATIONS_EVENT))}>Mở Trao đổi để yêu cầu Hermes tóm tắt</button>
+            <p>GYO chưa tạo tóm tắt cho Công việc này. Nội dung chat không tự động được đưa vào ngữ cảnh ngầm.</p>
+            <button className="btn-secondary compact-button" onClick={() => window.dispatchEvent(new Event(OPEN_WORK_CONVERSATIONS_EVENT))}>Mở Trao đổi để yêu cầu GYO tóm tắt</button>
             {data?.next_step && <div className="context-fact"><ListChecks size={16} /><span>Việc đang tiếp theo: {data.next_step.title}</span></div>}
             {data?.artifacts.slice(0, 3).map(item => <div className="context-fact" key={item.id}><FileText size={16} /><span>{item.relative_path}</span></div>)}
           </>}

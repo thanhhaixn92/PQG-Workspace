@@ -229,10 +229,12 @@ export const RuntimeStatusPanel: React.FC = () => {
           <div className="runtime-guidance">Cơ sở dữ liệu cục bộ đang được kiểm tra.</div>
 
           <div className="runtime-row">
-            <span>Hermes</span>
+            <span>Runtime tương thích (Hermes/ACP)</span>
             <span className={statusClass(hermesKind)}>{hermesLabel(status.hermes.status)}</span>
           </div>
           <div className="runtime-guidance">
+            Runtime hiện hành của Trợ lý GYO dùng GyoOrchestrator; thông tin này chỉ chẩn đoán cài đặt tương thích cũ.
+            <br />
             {status.hermes.guidance}
             <br />
             {hermesFix(status)}

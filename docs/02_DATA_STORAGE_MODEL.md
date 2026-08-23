@@ -3,7 +3,8 @@
 ## 1. Nguyen Tac Luu Tru
 
 - App SQLite `app.db` la owner cua Work, conversation va Assistant turns hien thi cho nguoi dung cung business metadata.
-- Hermes state la owner cua ACP session, reasoning va runtime noi bo; ung dung khong doc/sua truc tiep `state.db`.
+- GYO chay qua `GyoOrchestrator` sau FastAPI; browser chi giao tiep REST/SSE va khong doc/sua state provider/runtime noi bo.
+- Hermes/ACP state, neu con ton tai tu cai dat cu, la compatibility/historical data; GYO khong doc, sua, dong bo hoac dung lam fallback.
 - Moi data co kha nang thay doi hanh vi dai han cua agent phai co audit.
 - Moi secret nam ngoai source code, trong `.env` hoac store rieng.
 
@@ -11,7 +12,7 @@
 
 | Storage | Owner | Noi dung | Ghi chu |
 |---|---|---|---|
-| Hermes state.db | Hermes | ACP sessions, reasoning, internal runtime/recall | Khong doc, sua hoac dong bo truc tiep tu app |
+| Legacy Hermes state.db (neu co) | Legacy external runtime | ACP sessions, reasoning, internal runtime/recall cu | Khong thuoc runtime GYO; khong doc, sua hoac dong bo tu app |
 | app.db | PQG Workspace | Work, plan, conversations, Assistant turns/parts, task runs, approvals/action packages, knowledge, memory, skills, audit | SQLite WAL |
 | workspace files | User/project | source docs, output files, editor content | Chi truy cap trong workspace path |
 | n8n data volume | n8n | workflows, credentials, settings neu sidecar duoc cau hinh | Tuy chon, loopback-only |
@@ -21,7 +22,7 @@
 
 ### sessions
 
-Entity tuong thich dai dien cho Work; khong phai owner cua Hermes reasoning.
+Entity tuong thich dai dien cho Work. `acp_session_id` duoc giu de tuong thich schema cu, khong la owner cua GYO reasoning/runtime.
 
 Fields bat buoc:
 
@@ -156,7 +157,7 @@ Fields bat buoc:
 ## 4. Data Ownership Rules
 
 - User-visible Work conversations, Assistant turns va parts: app owns.
-- ACP reasoning/runtime state: Hermes owns.
+- GYO provider/runtime state: chi backend/provider boundary quan ly; browser khong doc hoac sua truc tiep.
 - Session title/workspace/archive: app owns.
 - Skills: app owns.
 - Memory entries: app owns.

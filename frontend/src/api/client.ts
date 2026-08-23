@@ -3,7 +3,7 @@
  *
  * Rules:
  * - All backend calls must go through this client (never bypass to direct
- *   Hermes, n8n, MCP, or filesystem access from the frontend).
+ *   the GYO provider/runtime boundary, n8n, MCP, or filesystem access from the frontend).
  * - BASE_URL is read from the Vite env variable VITE_API_BASE_URL so it
  *   can be changed without modifying source code.
  */

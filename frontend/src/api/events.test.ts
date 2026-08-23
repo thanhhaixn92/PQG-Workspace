@@ -161,7 +161,7 @@ describe('events.ts', () => {
     await flushPromises();
 
     const stateAfterEvent = useHermesStore.getState();
-    expect(stateAfterEvent.sessionErrorById['session-1']).toContain('Hermes chưa khởi động được');
+    expect(stateAfterEvent.sessionErrorById['session-1']).toContain('Trợ lý chưa sẵn sàng');
     expect(stateAfterEvent.sessionStartedAtById['session-1']).toBeUndefined();
     expect(stateAfterEvent.appError).toBeNull();
   });

@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, FileText, Link, Search, X, ExternalLink, AlertC
 import type { AssistantContextManifest } from '../../api/assistant';
 import type { Artifact } from '../../api/artifacts';
 import { ASSISTANT_NAME } from '../../branding';
+import { openSafeUri, resolveSafeUri } from './contextUri';
 
 export type ContextGroupKey = 'accessible' | 'retrieved' | 'used' | 'targeted' | 'excluded';
 
@@ -11,82 +12,6 @@ interface ContextItem {
   label: string;
   uri: string;
   kind?: string;
-}
-
-/**
- * Allow-listed internal route prefixes. Only these prefixes are considered
- * safe internal navigation targets. Any other path-like URI is blocked.
- */
-const INTERNAL_ROUTE_PREFIXES: ReadonlyArray<string> = ['/work/', '/artifacts/'];
-
-/**
- * Determine whether a URI is safe to open and how.
- *
- * Security rules:
- * - Internal routes: ONLY paths starting with /work/ or /artifacts/ are allowed.
- *   This prevents protocol-relative bypass (//evil.example → https://evil.example),
- *   backslash traversal (\\evil.example), control-character injection, etc.
- * - External: only http: and https: schemes are allowed.
- * - Everything else (javascript:, data:, file:, blob:, empty, //, /\,
- *   backslash, control characters, non-allowlisted internal paths) → BLOCKED.
- */
-export function resolveSafeUri(uri: string): { safe: true; external: boolean; target: string } | { safe: false } {
-  // Do NOT trim before checking for control characters — trim() removes whitespace
-  // which could mask control-char injection.
-  const raw = uri || '';
-
-  // Reject empty or whitespace-only
-  if (!raw || !raw.trim()) return { safe: false };
-
-  // Reject control characters (C0 controls + backspace + C1 controls)
-  if (/[\x00-\x1f\x7f-\x9f]/.test(raw)) return { safe: false };
-
-  const trimmed = raw.trim();
-
-  // Reject protocol-relative URLs (//evil.example) and backslash variants (\\evil)
-  if (trimmed.startsWith('//') || trimmed.startsWith('\\\\')) return { safe: false };
-
-  // Reject backslashes entirely (could be used for filesystem traversal)
-  if (trimmed.includes('\\')) return { safe: false };
-
-  // Check against internal route allow-list (exact prefix match)
-  for (const prefix of INTERNAL_ROUTE_PREFIXES) {
-    if (trimmed.startsWith(prefix)) {
-      return { safe: true, external: false, target: trimmed };
-    }
-  }
-
-  // For non-path URIs, parse as URL and check scheme
-  try {
-    const parsed = new URL(trimmed);
-    const scheme = parsed.protocol.toLowerCase();
-    if (scheme === 'http:' || scheme === 'https:') {
-      return { safe: true, external: true, target: trimmed };
-    }
-  } catch {
-    // Not a valid URL and not an allow-listed internal route → blocked
-    return { safe: false };
-  }
-
-  // javascript:, data:, file:, blob:, and any other scheme → blocked
-  return { safe: false };
-}
-
-/**
- * Open a URI safely, enforcing the resolveSafeUri allow-list.
- * - Internal routes: navigate via window.location.href
- * - External http/https: open with noopener,noreferrer to prevent reverse tabnabbing
- * - Unsafe URIs: silently blocked
- */
-export function openSafeUri(uri: string): void {
-  const resolved = resolveSafeUri(uri);
-  if (!resolved.safe) return;
-
-  if (resolved.external) {
-    window.open(resolved.target, '_blank', 'noopener,noreferrer');
-  } else {
-    window.location.href = resolved.target;
-  }
 }
 
 interface ContextPanelProps {

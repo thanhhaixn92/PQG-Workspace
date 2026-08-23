@@ -7,7 +7,7 @@ import {
 import { getOverview, type Overview } from '../api/overview';
 import { approveActionPackage, createActionPackage, createActionPackageIdempotencyKey, denyActionPackage, getActionPackageDecisionBinding, getWorkActionPackages, type ActionPackage, type ActionPackageProposal } from '../api/actionPackages';
 import { useHermesStore } from '../store/store';
-import { isTestWork } from './SessionList';
+import { isTestWork } from './workTestVisibility';
 import { ASSISTANT_LABEL, ASSISTANT_NAME } from '../branding';
 import { listArtifacts, type Artifact } from '../api/artifacts';
 import { useReviewTarget } from '../hooks/useReviewTarget';

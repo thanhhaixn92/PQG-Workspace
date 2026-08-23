@@ -37,11 +37,11 @@ function taskStatusLabel(status?: string): string {
 function taskStatusHint(status?: string): string {
   switch (status) {
     case 'queued':
-      return 'Yêu cầu đã được ghi nhận và đang chờ Hermes xử lý.';
+      return 'Yêu cầu đã được ghi nhận và đang chờ Trợ lý GYO xử lý.';
     case 'running':
-      return 'Hermes đang xử lý. Nếu mất hơn 30 giây, Công việc có thể dài hoặc đang chờ bạn duyệt quyền.';
+      return 'Trợ lý GYO đang xử lý. Nếu mất hơn 30 giây, Công việc có thể dài hoặc đang chờ bạn duyệt quyền.';
     case 'waiting_approval':
-      return 'Hermes đang chờ bạn phê duyệt một hành động trong hộp thoại hoặc nhật ký bên phải.';
+      return 'Trợ lý GYO đang chờ bạn phê duyệt một hành động trong hộp thoại hoặc nhật ký bên phải.';
     case 'completed':
       return 'Yêu cầu gần nhất đã xử lý xong.';
     case 'failed':
@@ -54,13 +54,13 @@ function taskStatusHint(status?: string): string {
 function runtimeStatusText(status: string, elapsedSeconds: number, isSubmitting: boolean): string | null {
   if (isSubmitting) return 'Đang gửi yêu cầu...';
   if (status === 'waiting_approval') {
-    return 'Đang chờ phê duyệt. Hãy xử lý hộp phê duyệt để Hermes tiếp tục.';
+    return 'Đang chờ phê duyệt. Hãy xử lý hộp phê duyệt để Trợ lý GYO tiếp tục.';
   }
   if (status === 'queued' || status === 'running') {
     if (elapsedSeconds >= 30) {
-      return `Hermes đang cần thêm thời gian (${elapsedSeconds}s). Công việc có thể dài hoặc đang chờ bạn duyệt quyền.`;
+      return `Trợ lý GYO đang cần thêm thời gian (${elapsedSeconds}s). Công việc có thể dài hoặc đang chờ bạn duyệt quyền.`;
     }
-    return `Hermes đang xử lý... (${elapsedSeconds}s)`;
+    return `Trợ lý GYO đang xử lý... (${elapsedSeconds}s)`;
   }
   return null;
 }
@@ -211,7 +211,7 @@ export const ChatPanel: React.FC = () => {
     } catch (err) {
       console.error('Failed to submit prompt', err);
       removeEvent(sessionId, optimisticEventId);
-      const message = 'Không gửi được yêu cầu. Hãy kiểm tra backend đang chạy và Hermes đã được cấu hình trong backend/.env.';
+      const message = 'Không gửi được yêu cầu. Hãy kiểm tra backend đang chạy và cấu hình model của Trợ lý GYO trong Cài đặt.';
       setPromptError(message);
       setSessionError(sessionId, message);
       setLastFailedPrompt(nextPrompt);
@@ -259,7 +259,7 @@ export const ChatPanel: React.FC = () => {
       setSessionStatus(activeSessionId, 'idle');
       setSessionError(activeSessionId, null);
       setSessionStartedAt(activeSessionId, null);
-      setCuratorMessage("Đã hủy task trên metadata. Lưu ý: Việc hủy chỉ cập nhật metadata, không đảm bảo dừng tiến trình Hermes legacy đang chạy.");
+      setCuratorMessage("Đã hủy task trên metadata. Lưu ý: việc hủy chỉ cập nhật metadata, không đảm bảo dừng ngay xử lý đang chạy ở provider.");
     } catch (err) {
       console.error('Failed to cancel task', err);
       setPromptError("Không thể hủy task: " + (err instanceof Error ? err.message : String(err)));
@@ -294,7 +294,7 @@ export const ChatPanel: React.FC = () => {
           <h2>Trò chuyện</h2>
           <p>
             {activeSessionId
-              ? 'Gửi yêu cầu cho Hermes và mở Hoạt động khi bạn cần xem tiến độ.'
+              ? 'Gửi yêu cầu cho Trợ lý GYO và mở Hoạt động khi bạn cần xem tiến độ.'
               : 'Tạo hoặc chọn một Công việc để bắt đầu.'}
           </p>
         </div>
@@ -312,7 +312,7 @@ export const ChatPanel: React.FC = () => {
               className="btn-danger compact-button"
               onClick={handleCancel}
               style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', fontWeight: '500' }}
-              title="Yêu cầu dừng có thể cần một lúc để Hermes hoàn tất bước hiện tại."
+              title="Yêu cầu dừng có thể cần một lúc để Trợ lý GYO hoàn tất bước hiện tại."
             >
               Hủy
             </button>
@@ -336,7 +336,7 @@ export const ChatPanel: React.FC = () => {
       {VITE_USE_TASK_API && (
         <div className="task-api-warning-banner" style={{ background: '#f59e0b', color: '#000', padding: '8px 12px', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
           <AlertCircle size={16} />
-          <span>Chế độ tương thích đang bật; trạng thái dừng có thể cập nhật chậm hơn phản hồi của Hermes.</span>
+          <span>Chế độ tương thích đang bật; trạng thái dừng có thể cập nhật chậm hơn phản hồi của Trợ lý GYO.</span>
         </div>
       )}
 
@@ -364,7 +364,7 @@ export const ChatPanel: React.FC = () => {
                   className={`message-bubble ${isUser ? 'message-user' : 'message-agent markdown-body'}`}
                 >
                   <div className="message-meta">
-                    <span>{isUser ? 'Bạn' : 'Hermes'}</span>
+                    <span>{isUser ? 'Bạn' : 'Trợ lý GYO'}</span>
                     {event.created_at && <time>{formatTime(event.created_at)}</time>}
                   </div>
                   <MarkdownRenderer content={event.text || ''} />
