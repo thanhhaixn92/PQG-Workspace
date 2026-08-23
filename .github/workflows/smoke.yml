@@ -8,6 +8,7 @@ on:
       - main
       - develop
       - foundation-v2-f6-capability-registry-20260823
+      - foundation-v2-r1-durable-agent-run-20260823
   workflow_dispatch:
 
 env:
