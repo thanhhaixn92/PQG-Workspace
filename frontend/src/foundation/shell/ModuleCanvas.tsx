@@ -1,4 +1,3 @@
-import React from 'react';
 import type { SidebarTab } from '../../store/store';
 import { useHermesStore } from '../../store/store';
 import { AssistantChatSidebar } from '../../components/AssistantChatSidebar';

@@ -23,10 +23,36 @@ for _name in dir(_legacy):
     if not _name.startswith("__"):
         globals()[_name] = getattr(_legacy, _name)
 
+# Preserve the historical monkeypatch seam used by migration rollback tests.
+# Migration 0022 resolves ``_migration_audit`` from the module where its
+# function was defined. After the F5 ledger split that module is ``_legacy``,
+# while existing callers/tests still patch ``app.db.migrations._migration_audit``.
+# Bridge only this migration at execution time so the frozen 0001-0036 source
+# remains byte-for-byte unchanged.
+_migration_audit = _legacy._migration_audit
+
+
+async def _apply_migration_0022_security_integrity(conn) -> None:
+    original_audit = _legacy._migration_audit
+    _legacy._migration_audit = _migration_audit
+    try:
+        await _legacy._apply_migration_0022_security_integrity(conn)
+    finally:
+        _legacy._migration_audit = original_audit
+
+
 MIGRATIONS: list[tuple[str, MigrationStep]] = [
-    *_legacy.MIGRATIONS,
-    ("0037_foundation_module_instances", apply_0037_foundation_module_instances),
+    (
+        version,
+        _apply_migration_0022_security_integrity
+        if version == "0022_security_integrity"
+        else step,
+    )
+    for version, step in _legacy.MIGRATIONS
 ]
+MIGRATIONS.append(
+    ("0037_foundation_module_instances", apply_0037_foundation_module_instances)
+)
 
 
 async def run_migrations(db_path: Path) -> None:

@@ -4,22 +4,32 @@ import type { ModuleInstance } from '../../api/modules';
 import { useModuleProjectionStore } from '../modules/store';
 import { LeftNavigation } from './LeftNavigation';
 
-const projected = (overrides: Partial<ModuleInstance> & Pick<ModuleInstance, 'module_id' | 'display_name'>): ModuleInstance => ({
-  id: `builtin:${overrides.module_id}`,
-  module_id: overrides.module_id,
-  source_kind: 'builtin',
-  package_id: null,
-  display_name: overrides.display_name,
-  attached: true,
-  sort_order: 10,
-  config: {},
-  config_version: 1,
-  health_state: 'ready',
-  revision: 1,
-  created_at: 1,
-  updated_at: 1,
-  ...overrides,
-});
+const projected = (
+  overrides: Partial<ModuleInstance> & Pick<ModuleInstance, 'module_id' | 'display_name'>,
+): ModuleInstance => {
+  const {
+    module_id,
+    display_name,
+    id = `builtin:${overrides.module_id}`,
+    ...rest
+  } = overrides;
+  return {
+    id,
+    module_id,
+    source_kind: 'builtin',
+    package_id: null,
+    display_name,
+    attached: true,
+    sort_order: 10,
+    config: {},
+    config_version: 1,
+    health_state: 'ready',
+    revision: 1,
+    created_at: 1,
+    updated_at: 1,
+    ...rest,
+  };
+};
 
 describe('LeftNavigation', () => {
   beforeEach(() => {

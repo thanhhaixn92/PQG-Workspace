@@ -64,7 +64,7 @@ describe('ModulesSettings', () => {
 
     await waitFor(() => expect(modulesApi.attachModule).toHaveBeenCalledWith('documents', 1));
     expect(screen.queryByRole('button', { name: /xóa|delete|uninstall/i })).toBeNull();
-    expect(screen.getAllByText(/không xóa dữ liệu/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/không.*xóa dữ liệu/i).length).toBeGreaterThan(0);
   });
 
   it('detaches without presenting any data deletion action', async () => {

@@ -221,11 +221,11 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
                 ) as cursor:
                     if await cursor.fetchone():
                         is_active = True
-                
+
             if not is_active:
                 from fastapi.responses import JSONResponse
                 return JSONResponse(status_code=403, content={"detail": "Session is not active or does not exist"})
-                
+
             # 4. Bind session_id securely
             token = mcp_session_id_var.set(session_id)
             try:
