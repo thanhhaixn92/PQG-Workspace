@@ -1,0 +1,13 @@
+/* Foundation accessibility compatibility layer. Keep selectors broad enough to
+   protect legacy controls while the shell is refactored in small steps. */
+
+:where(button, input, select, textarea, a, [role="button"]):focus-visible {
+  outline: 3px solid var(--pqg-color-accent);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  :where(button, input, select, textarea, a, [role="button"]):focus-visible {
+    outline: 2px solid CanvasText;
+  }
+}
