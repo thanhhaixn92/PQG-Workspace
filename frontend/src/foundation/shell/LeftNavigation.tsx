@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import {
   getModuleDefinitionById,
-  getPrimaryModuleDefinitions,
   type ModuleId,
 } from '../modules/registry';
 import { useModuleProjectionStore } from '../modules/store';
@@ -61,10 +60,7 @@ export function LeftNavigation({
 
   const navigationModules = useMemo(() => {
     if (moduleProjectionStatus !== 'ready') {
-      return getPrimaryModuleDefinitions().map(definition => ({
-        definition,
-        label: definition.defaultLabel,
-      }));
+      return [];
     }
 
     return moduleInstances
