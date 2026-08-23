@@ -8,16 +8,36 @@ scope. It applies to Codex, Hermes Desktop and any delegated coding agent.
 
 ## Mandatory pre-code receipt
 
-Before the first edit, an agent must:
+Before the first implementation edit, an agent must:
 
-1. Run `scripts/agent-preflight.ps1` from the repository root.
+1. Obtain a fresh preflight receipt for the exact target branch/ref using the
+   execution mode defined by root `AGENTS.md`:
+   - local checkout/local machine: run
+     `powershell -ExecutionPolicy Bypass -File scripts/agent-preflight.ps1`
+     from the repository root;
+   - ChatGPT Project/GitHub-connected environment without a writable local repo
+     shell: run GitHub Actions **Agent Preflight** on the exact target ref and
+     verify the workflow/job result is `success` plus `pqg/preflight=success`
+     when that status is published.
+   A preflight from another branch/ref, an unrelated older HEAD, or `pqg/smoke`
+   does not satisfy this receipt. If connected tooling cannot dispatch the
+   workflow, the user must trigger `workflow_dispatch` in GitHub and the agent
+   must verify the resulting evidence before implementation writes.
 2. Read `PROJECT_STATE.md`, `AI_STATE.json`, the active checkpoint and
    `CODEGRAPH.md`.
 3. Read the route-selected canon/security document and the target source,
    contract and focused tests.
-4. Inspect `git status --short` and the focused diff to preserve existing work.
+4. Inspect `git status --short` and the focused diff when a local checkout is
+   available; for connector-only work, inspect the exact target ref and final
+   GitHub diff instead and report local-only checks that were not runnable.
 5. State in its first update: active gate, requested scope, files read, planned
    validation and any approval blocker.
+
+A narrow user-approved bootstrap change whose sole purpose is to establish or
+repair the preflight execution path or its governance documentation may occur
+before a new preflight receipt. That exception does not authorize application,
+runtime, schema, security or feature implementation edits. A fresh successful
+preflight is still required before those edits begin.
 
 No agent may present an implementation plan, a historical handoff, or a passing
 test from another revision as permission to edit outside this task.
@@ -77,7 +97,10 @@ active gate, and request a documentation-reconciliation scope when needed.
 - Focused regression tests prove both success and relevant fail-closed path.
 - Type/build/runtime checks are run in proportion to shared impact; unrun checks
   remain `NOT RUN`.
-- `git diff --check` and a final scoped diff review have run.
+- `git diff --check` and a final scoped diff review have run when a writable
+  checkout is available. For connector-only work, `git diff --check` may remain
+  `NOT RUN`, but the exact GitHub diff must be reviewed and the limitation must
+  be reported rather than silently replaced by another check.
 - The handoff says what changed, evidence actually executed, warnings/limits,
   and the next gate. State/checkpoint files change only when their gate is met.
 
