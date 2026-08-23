@@ -9,6 +9,7 @@
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Mọi nội dung mới hoặc bị sửa trong Project Memory phải có timestamp riêng chính xác đến giây theo format `[YYYY-MM-DD HH:MM:SS UTC±HH:MM] Nội dung cập nhật`.
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Correction/supersession phải có timestamp mới; không sửa timestamp lịch sử để làm sự kiện trông mới hơn.
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Nếu chỉ biết thời điểm ghi nhận, dùng timestamp ghi nhận và đánh dấu `recorded_at`/`imported_at`; không bịa thời gian xảy ra sự kiện.
+- [2026-08-23 23:53:22 UTC+07:00][recorded_at] Memory-maintenance writes whose sole purpose is synchronizing `PROJECT_MEMORY.md`/`PROJECT_CHANGELOG.md` do not recursively require another memory entry; record the underlying project event and relevant commit/evidence when known.
 
 ## Project identity
 
