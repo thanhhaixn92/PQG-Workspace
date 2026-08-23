@@ -20,7 +20,7 @@ describe('LeftNavigation', () => {
 
     expect(screen.getByRole('button', { name: 'Tổng quan' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Công việc' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Thư viện tri thức' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Thư viện' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Hộp duyệt' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Báo cáo' })).toBeDefined();
 
