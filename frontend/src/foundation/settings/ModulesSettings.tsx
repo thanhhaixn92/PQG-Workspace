@@ -35,6 +35,7 @@ export function ModulesSettings() {
 
   const ordered = useMemo(() => sortInstances(instances), [instances]);
   const attached = useMemo(() => ordered.filter(item => item.attached), [ordered]);
+  const adminBusy = Boolean(busy);
 
   const run = async (key: string, action: () => Promise<void>, success: string) => {
     setBusy(key);
@@ -103,7 +104,7 @@ export function ModulesSettings() {
     <section className="model-settings-panel" aria-labelledby="module-settings-title">
       <header>
         <h2 id="module-settings-title">Modules</h2>
-        <p>Chỉ bạn quản trị việc gắn, tháo, đổi tên hiển thị và sắp xếp Module. Trợ lý GYO không có các capability quản trị này.</p>
+        <p>Chỉ bạn quản trị việc gắn, tháo, đổi tên hiển thị và sắp xếp Module. Trợ lý GYO không có các quyền quản trị này.</p>
       </header>
 
       {message && (
@@ -125,7 +126,6 @@ export function ModulesSettings() {
           const definition = getModuleDefinitionById(item.module_id);
           if (!definition) return null;
           const attachedIndex = attached.findIndex(candidate => candidate.module_id === item.module_id);
-          const itemBusy = busy?.endsWith(item.module_id) ?? false;
           return (
             <article key={item.module_id}>
               <header>
@@ -146,7 +146,7 @@ export function ModulesSettings() {
                 <button
                   className="btn-secondary compact-button"
                   type="button"
-                  disabled={itemBusy || !(draftNames[item.module_id] ?? '').trim() || (draftNames[item.module_id] ?? '').trim() === item.display_name}
+                  disabled={adminBusy || !(draftNames[item.module_id] ?? '').trim() || (draftNames[item.module_id] ?? '').trim() === item.display_name}
                   onClick={() => void saveName(item)}
                 >
                   Lưu tên
@@ -154,19 +154,19 @@ export function ModulesSettings() {
                 <button
                   className="btn-secondary compact-button"
                   type="button"
-                  disabled={itemBusy}
+                  disabled={adminBusy}
                   onClick={() => void changeAttachment(item)}
                 >
                   {item.attached ? 'Tháo khỏi điều hướng' : 'Gắn vào điều hướng'}
                 </button>
                 {item.attached && (
                   <>
-                    <button className="btn-secondary compact-button" type="button" disabled={Boolean(busy) || attachedIndex <= 0} onClick={() => void moveAttached(item, -1)}>Lên</button>
-                    <button className="btn-secondary compact-button" type="button" disabled={Boolean(busy) || attachedIndex < 0 || attachedIndex >= attached.length - 1} onClick={() => void moveAttached(item, 1)}>Xuống</button>
+                    <button className="btn-secondary compact-button" type="button" disabled={adminBusy || attachedIndex <= 0} onClick={() => void moveAttached(item, -1)}>Lên</button>
+                    <button className="btn-secondary compact-button" type="button" disabled={adminBusy || attachedIndex < 0 || attachedIndex >= attached.length - 1} onClick={() => void moveAttached(item, 1)}>Xuống</button>
                   </>
                 )}
               </div>
-              <p className="muted-copy">Tháo Module chỉ ẩn khỏi điều hướng; không xóa dữ liệu. F5 không cung cấp thao tác xóa dữ liệu Module.</p>
+              <p className="muted-copy">Tháo Module chỉ ẩn khỏi điều hướng; dữ liệu vẫn được giữ nguyên. Khu vực này không cung cấp thao tác xóa dữ liệu Module.</p>
             </article>
           );
         })}
