@@ -93,7 +93,9 @@ export function LeftNavigation({
 
         {navigationModules.map(({ definition, label }) => {
           const Icon = iconByModule[definition.id] ?? LayoutDashboard;
-          const advancedClass = definition.tab === 'review' || definition.tab === 'reports' ? ' advanced-tab' : '';
+          const advancedClass = !definition.showInPrimaryNavigation || definition.tab === 'review' || definition.tab === 'reports'
+            ? ' advanced-tab'
+            : '';
           return (
             <button
               key={definition.id}
