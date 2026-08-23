@@ -13,9 +13,12 @@ from pathlib import Path
 from app.db import migrations_0001_0036 as _legacy
 from app.db.module_migrations import apply_0037_foundation_module_instances
 
-# Preserve the public/private import surface used by existing tests and code.
-# Dunder names are intentionally excluded; every historical migration helper,
-# constant and type remains available from app.db.migrations.
+# Explicit bindings keep static analysis honest while the compatibility export
+# below preserves historical private/public imports used by tests and code.
+MigrationStep = _legacy.MigrationStep
+open_db = _legacy.open_db
+logger = _legacy.logger
+
 for _name in dir(_legacy):
     if not _name.startswith("__"):
         globals()[_name] = getattr(_legacy, _name)
