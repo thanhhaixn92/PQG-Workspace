@@ -26,6 +26,10 @@ def test_offline_restore_script_validates_manifest_previews_and_swaps_atomically
         pytest.skip("PowerShell is required to validate restore-local-data.ps1")
 
     repo_root = Path(__file__).resolve().parents[2]
+    backend_python = repo_root / "backend" / ".venv" / "Scripts" / "python.exe"
+    if not backend_python.is_file():
+        pytest.skip("restore-local-data.ps1 requires the Windows backend .venv Python environment")
+
     script = repo_root / "restore-local-data.ps1"
     target = tmp_path / "target.db"
     backup = tmp_path / "backup.db"
