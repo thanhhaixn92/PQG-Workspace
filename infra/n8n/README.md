@@ -1,6 +1,6 @@
 # n8n Automation Sidecar
 
-This directory contains the infrastructure configuration for running n8n locally as part of the Hermes Local Stack.
+This directory contains the infrastructure configuration for running n8n locally as part of DIRAP Local Workbench.
 
 ## Setup Instructions
 

@@ -19,6 +19,7 @@ vi.mock('../api/client', async (importOriginal) => {
 
 vi.mock('../api/sessions', () => ({
   submitPrompt: vi.fn(),
+  getSessionMessagePage: vi.fn(),
 }));
 
 vi.mock('../api/tasks', () => ({
@@ -61,8 +62,25 @@ describe('ChatPanel', () => {
 
   it('hiển thị hướng dẫn chọn phiên khi chưa có phiên active', () => {
     render(<ChatPanel />);
-    expect(screen.getByText('Tạo phiên để bắt đầu')).toBeDefined();
+    expect(screen.getByText('Tạo Công việc để bắt đầu')).toBeDefined();
     expect(screen.getByRole('textbox')).toHaveProperty('disabled', true);
+  });
+
+  it('tải và chèn trang tin nhắn cũ hơn theo cursor', async () => {
+    useHermesStore.setState({
+      activeSessionId: 'session-1',
+      events: { 'session-1': [{ id: 'new-1', type: 'user_message', text: 'Mới', created_at: 2 }] },
+      sessionStatusById: { 'session-1': 'idle' },
+    });
+    vi.mocked(sessionsApi.getSessionMessagePage).mockResolvedValue({
+      messages: [{ id: 'old-1', session_id: 'session-1', role: 'assistant', content: 'Cũ', created_at: 1 }],
+      has_more: false,
+    });
+    render(<ChatPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Tải tin nhắn trước' }));
+    await waitFor(() => expect(sessionsApi.getSessionMessagePage).toHaveBeenCalledWith('session-1', 100, 'new-1'));
+    expect(screen.getByText('Cũ')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Tải tin nhắn trước' })).toBeNull();
   });
 
   it('khóa input theo trạng thái của từng phiên', () => {
@@ -108,8 +126,8 @@ describe('ChatPanel', () => {
     });
 
     render(<ChatPanel />);
-    expect(screen.getByText(/Hermes phản hồi chậm/)).toBeDefined();
-    expect(screen.getByText(/model\/provider/)).toBeDefined();
+    expect(screen.getByText(/Hermes đang cần thêm thời gian/)).toBeDefined();
+    expect(screen.getByText(/đang chờ bạn duyệt quyền/)).toBeDefined();
   });
 
   it('ưu tiên nhắc xử lý phê duyệt khi session đang chờ quyền', () => {
@@ -256,7 +274,7 @@ describe('ChatPanel', () => {
       expect(eventsApi.subscribeToTaskEvents).toHaveBeenCalledWith('session-1', 'task-new');
     });
 
-    expect(screen.getByText('Task API đang ở chế độ metadata, chưa thay thế Hermes chat runtime.')).toBeDefined();
+    expect(screen.getByText(/Chế độ tương thích đang bật/)).toBeDefined();
   });
 
   it('khi VITE_USE_TASK_API=true và task đang chạy, hiển thị nút Hủy và thực hiện hủy task', async () => {

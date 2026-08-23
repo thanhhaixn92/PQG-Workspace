@@ -11,6 +11,15 @@ from app.services.audit import log_audit_event
 
 router = APIRouter()
 
+
+async def _require_active_session(db: Connection, session_id: str) -> None:
+    async with db.execute("SELECT archived FROM sessions WHERE id = ?", (session_id,)) as cur:
+        row = await cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if row[0]:
+        raise HTTPException(status_code=409, detail="Session is archived")
+
 @router.get("", response_model=List[MemoryEntry])
 async def list_global_memory(db: Connection = Depends(get_db)):
     """List all global memory entries."""
@@ -37,6 +46,8 @@ async def list_global_memory(db: Connection = Depends(get_db)):
 @router.post("", response_model=MemoryEntry)
 async def create_memory(entry_in: MemoryEntryCreate, db: Connection = Depends(get_db)):
     """Create a new memory entry."""
+    if entry_in.session_id:
+        await _require_active_session(db, entry_in.session_id)
     entry_id = f"mem-{uuid.uuid4().hex[:12]}"
     now = int(time.time())
     

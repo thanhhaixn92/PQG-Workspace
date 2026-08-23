@@ -1,0 +1,17 @@
+command: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run-v22-fidelity.ps1 -Batch WorkTabs -EvidenceRoot evidence/gate1/browser-launcher
+exit_code: 1
+status: NOT RUN
+redaction: repository path replaced with [REPO]
+
+PowerShell parser error before launcher initialization; no temporary DB/workspace/browser profile was created and no browser action ran.
+
+At [REPO]/scripts/run-v22-fidelity.ps1:168 char:151
+Unexpected token in a quoted selector string due to malformed/garbled text.
+
+Additional parser diagnostics:
+- The hash literal was incomplete.
+- The string is missing the terminator.
+- Missing closing ')' in subexpression.
+- Missing closing '}' in statement block or type definition.
+- The Try statement is missing its Catch or Finally block.
+- FullyQualifiedErrorId: UnexpectedToken

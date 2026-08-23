@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Annotated, List
+from urllib.parse import urlparse
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Central configuration object for the Hermes Local Stack backend."""
+    """Central configuration object for the DIRAP Local Workbench backend."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -55,15 +56,52 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v  # type: ignore[return-value]
 
+    @field_validator("cors_origins")
+    @classmethod
+    def _validate_local_cors_origins(cls, origins: List[str]) -> List[str]:
+        """CORS is a local operator boundary, never a permissive fallback."""
+        normalized: list[str] = []
+        for origin in origins:
+            parsed = urlparse(origin)
+            if (
+                origin == "*"
+                or parsed.scheme != "http"
+                or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}
+                or parsed.path not in {"", "/"}
+                or parsed.params
+                or parsed.query
+                or parsed.fragment
+                or parsed.username
+                or parsed.password
+            ):
+                raise ValueError("cors_origins must contain exact HTTP loopback origins only")
+            canonical = origin.rstrip("/")
+            if canonical and canonical not in normalized:
+                normalized.append(canonical)
+        if not normalized:
+            raise ValueError("cors_origins must contain at least one loopback origin")
+        return normalized
+
     # -----------------------------------------------------------------
     # Hermes Agent
     # -----------------------------------------------------------------
     hermes_executable_path: str = "hermes"
     hermes_args: Annotated[list[str], NoDecode] = ["acp"]
     hermes_dev_mock: bool = False
+    # Non-secret operator acknowledgement after a local OAuth flow succeeds.
+    # Credentials remain in Hermes' own auth store.
+    hermes_auth_ready: bool = False
     hermes_startup_timeout_seconds: int = 15
     hermes_request_timeout_seconds: int = 60
     hermes_restart_backoff_seconds: int = 5
+
+    # -----------------------------------------------------------------
+    # GYO native provider core
+    # -----------------------------------------------------------------
+    # API credentials are stored under per-profile opaque names in Windows
+    # Credential Manager.  This service name is not itself a credential and
+    # can be configured for a separate local installation if required.
+    gyo_keyring_service: str = "pqg-workspace-ai-provider"
 
     @field_validator("hermes_args", mode="before")
     @classmethod
@@ -83,6 +121,10 @@ class Settings(BaseSettings):
     )
     n8n_timeout_seconds: int = 30
     n8n_max_retries: int = 2
+    # Retrying a request whose delivery outcome is unknown can duplicate an
+    # external side effect.  Keep this fail-closed unless the receiver has an
+    # explicitly verified idempotency-key dedupe contract.
+    n8n_retry_idempotency_confirmed: bool = False
     
     # Dictionary mapping safe workflow names to their webhook paths
     n8n_allowed_workflows: dict[str, str] = {
@@ -125,6 +167,66 @@ class Settings(BaseSettings):
 
     # Outbox dispatcher poll interval in seconds.
     outbox_dispatcher_poll_seconds: float = 5.0
+
+    # -----------------------------------------------------------------
+    # Local identity boundary
+    # -----------------------------------------------------------------
+    # A governed Action Package write must have a server-owned identity. This
+    # is deliberately unset by default: a local operator must opt in through
+    # private configuration before governed writes can execute. Browser
+    # headers are never an identity source.
+    local_actor_subject: str | None = None
+
+    @field_validator("local_actor_subject")
+    @classmethod
+    def _validate_local_actor_subject(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized or len(normalized) > 200:
+            raise ValueError("local_actor_subject must be a non-empty value of at most 200 characters")
+        return normalized
+
+    # -----------------------------------------------------------------
+    # Personal Memory Hub (Gói 3)
+    # -----------------------------------------------------------------
+    memory_hub_api_base_url: str = "http://127.0.0.1:8000"
+    memory_hub_keyring_service: str = "dirap-memory-hub"
+    memory_hub_mcp_role: str = "hermes"
+
+    # Marketplace catalogs are accepted only after an Ed25519 signature is
+    # verified against an operator-pinned public key.  This is intentionally a
+    # server-side setting; it is never returned to the browser.
+    marketplace_catalog_public_keys: dict[str, str] = {}
+
+    @field_validator("marketplace_catalog_public_keys", mode="before")
+    @classmethod
+    def _parse_marketplace_catalog_public_keys(cls, value: object) -> dict[str, str]:
+        if isinstance(value, str):
+            import json
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise ValueError("marketplace_catalog_public_keys must be JSON") from exc
+            if not isinstance(parsed, dict):
+                raise ValueError("marketplace_catalog_public_keys must be an object")
+            return {str(key): str(item) for key, item in parsed.items()}
+        return value  # type: ignore[return-value]
+
+    @field_validator("memory_hub_api_base_url")
+    @classmethod
+    def _validate_memory_hub_loopback_url(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+            raise ValueError("memory_hub_api_base_url must use HTTP loopback only")
+        return value.rstrip("/")
+
+    @field_validator("memory_hub_mcp_role")
+    @classmethod
+    def _validate_memory_hub_mcp_role(cls, value: str) -> str:
+        if value not in {"hermes", "opencode", "antigravity", "codex", "user"}:
+            raise ValueError("memory_hub_mcp_role is not a supported Memory Hub role")
+        return value
 
     # -----------------------------------------------------------------
     # Logging

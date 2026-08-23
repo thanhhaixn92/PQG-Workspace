@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ChevronDown, RefreshCw } from 'lucide-react';
 import { getSessionAuditEvents, type AuditEvent } from '../api/audit';
 import { useHermesStore } from '../store/store';
@@ -44,7 +44,7 @@ const approvalActionLabel = (action?: string) => {
     case 'write_workspace_file':
       return 'Ghi hoặc sửa tệp';
     case 'hermes.permission':
-      return 'Cấp quyền cho Hermes';
+      return 'Cấp quyền cho Trợ lý GYO';
     default:
       return action || 'Không rõ';
   }
@@ -111,7 +111,20 @@ const parsePayload = (payloadJson?: string | null): Record<string, unknown> => {
   }
 };
 
-const prettyJson = (value: unknown) => JSON.stringify(value ?? {}, null, 2);
+const sensitiveKey = /token|secret|authorization|password|prompt|content|output|arguments|payload/i;
+
+const redactForDisplay = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(redactForDisplay);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+      key,
+      sensitiveKey.test(key) ? '[redacted]' : redactForDisplay(item),
+    ]));
+  }
+  return value;
+};
+
+const prettyJson = (value: unknown) => JSON.stringify(redactForDisplay(value ?? {}), null, 2);
 
 const payloadTaskId = (event: AuditEvent): string | null => {
   const payload = parsePayload(event.payload_json);
@@ -146,11 +159,11 @@ const taskSummary = (items: AuditEvent[]) => {
 
 const idleLiveText = (sessionStatus: string) => {
   if (sessionStatus === 'queued' || sessionStatus === 'running') {
-    return 'Hermes đang chờ token. Nếu chưa có hoạt động mới, thường là model/provider đang phản hồi chậm, phiên dài hoặc đang chờ phê duyệt.';
+    return 'Trợ lý GYO đang chờ token. Nếu chưa có hoạt động mới, thường là model/provider đang phản hồi chậm, phiên dài hoặc đang chờ phê duyệt.';
   }
 
   if (sessionStatus === 'waiting_approval') {
-    return 'Hermes đang chờ bạn phê duyệt để tiếp tục.';
+    return 'Trợ lý GYO đang chờ bạn phê duyệt để tiếp tục.';
   }
 
   return 'Chưa có hoạt động live từ backend.';
@@ -197,7 +210,7 @@ export const ActivityInspector: React.FC = () => {
   const sessionEvents = activeSessionId ? events[activeSessionId] || [] : [];
   const inspectorEvents = sessionEvents.filter(event => event.type !== 'token' && event.type !== 'user_message');
   const hiddenLiveEventCount = Math.max(0, inspectorEvents.length - MAX_LIVE_EVENTS);
-  const visibleInspectorEvents = inspectorEvents.slice(-MAX_LIVE_EVENTS);
+  const visibleInspectorEvents = inspectorEvents.slice(0, MAX_LIVE_EVENTS);
 
   const auditGroups = useMemo(() => {
     const groups = new Map<string, AuditEvent[]>();
@@ -208,7 +221,7 @@ export const ActivityInspector: React.FC = () => {
     return Array.from(groups.entries()).map(([taskId, items]) => ({ taskId, items }));
   }, [auditEvents]);
 
-  const fetchEvents = (isCancelled: () => boolean) => {
+  const fetchEvents = useCallback((isCancelled: () => boolean) => {
     if (!activeSessionId) {
       setAuditEvents([]);
       setAuditError(null);
@@ -264,7 +277,7 @@ export const ActivityInspector: React.FC = () => {
           }
         });
     }
-  };
+  }, [activeSessionId, latestTask]);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,7 +285,7 @@ export const ActivityInspector: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeSessionId, auditRefreshVersion, latestTask]);
+  }, [auditRefreshVersion, fetchEvents]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -328,7 +341,7 @@ export const ActivityInspector: React.FC = () => {
 
             {showTechnicalHint && (
               <div className="runtime-guidance">
-                Mở tab Kỹ thuật để xem payload, actor và command đầy đủ.
+                Mở tab Kỹ thuật để xem metadata đã được che dữ liệu nhạy cảm.
               </div>
             )}
 
@@ -347,7 +360,7 @@ export const ActivityInspector: React.FC = () => {
                     <div key={event.id || index} className="activity-item">
                       <div className="header">
                         <strong>{liveEventLabel(event.type)}</strong>
-                        <span>{new Date().toLocaleTimeString('vi-VN')}</span>
+                        <span>{formatTime(event.created_at) || '—'}</span>
                       </div>
                       <div className="content">
                         {event.type === 'tool_call' && (
@@ -367,7 +380,7 @@ export const ActivityInspector: React.FC = () => {
                         {event.type === 'terminal' && viewMode === 'technical' && (
                           <details className="activity-details" open>
                             <summary><ChevronDown size={13} /> Chi tiết terminal</summary>
-                            <pre>{event.output}</pre>
+                            <pre>[redacted terminal output]</pre>
                           </details>
                         )}
                         {event.type === 'error' && <div style={{ color: 'var(--danger-primary)' }}>{event.message}</div>}
@@ -431,7 +444,7 @@ export const ActivityInspector: React.FC = () => {
                           Đang hiển thị {MAX_AUDIT_EVENTS_PER_GROUP} audit event mới nhất của task này.
                         </div>
                       )}
-                      {group.items.slice(-MAX_AUDIT_EVENTS_PER_GROUP).map(event => {
+                      {group.items.slice(0, MAX_AUDIT_EVENTS_PER_GROUP).map(event => {
                         const summary = targetSummary(event);
                         return (
                           <div key={event.id} className="activity-item">
@@ -446,7 +459,7 @@ export const ActivityInspector: React.FC = () => {
                                   <summary><ChevronDown size={13} /> Chi tiết</summary>
                                   <div>Actor: {event.actor}</div>
                                   {event.target && <div>Mục tiêu: {event.target}</div>}
-                                  {event.payload_json && <pre>{event.payload_json}</pre>}
+                                  {event.payload_json && <pre>{prettyJson(parsePayload(event.payload_json))}</pre>}
                                 </details>
                               )}
                             </div>

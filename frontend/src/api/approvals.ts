@@ -1,4 +1,5 @@
 import { apiFetch } from './client';
+import type { ApprovalRequest } from '../store/store';
 
 export type ApprovalDecision = 'allow_once' | 'allow_for_session' | 'deny';
 
@@ -18,4 +19,8 @@ export const submitApprovalDecision = async (
     method: 'POST',
     body: JSON.stringify({ decision }),
   });
+};
+
+export const fetchPendingApprovals = async (sessionId: string): Promise<ApprovalRequest[]> => {
+  return apiFetch<ApprovalRequest[]>(`/api/approvals?session_id=${encodeURIComponent(sessionId)}`);
 };

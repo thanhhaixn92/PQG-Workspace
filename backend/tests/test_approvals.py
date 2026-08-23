@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 import aiosqlite
 import pytest
@@ -240,5 +241,47 @@ def test_submit_approval_does_not_signal_waiter_before_commit(client: TestClient
             ) as cur:
                 row = await cur.fetchone()
                 assert row == ("pending", None)
+
+    asyncio.run(check_db())
+
+
+def test_concurrent_contradictory_approval_has_exactly_one_winner(client: TestClient) -> None:
+    resp = client.post("/api/sessions", json={"title": "Decision Race", "workspace_path": "/tmp"})
+    session_id = resp.json()["id"]
+    approval_id = "appr-concurrent-decision"
+    from app.api.approvals import register_pending_approval
+    from app.dependencies import get_settings
+
+    settings_override = client.app.dependency_overrides[get_settings]()
+    asyncio.run(register_pending_approval(
+        approval_id=approval_id,
+        session_id=session_id,
+        action="write_workspace_file",
+        target="notes.md",
+        settings=settings_override,
+    ))
+
+    def decide(decision: str):
+        return client.post(f"/api/approvals/{approval_id}", json={"decision": decision})
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(decide, ("allow_once", "deny")))
+
+    assert sorted(response.status_code for response in responses) == [200, 409]
+
+    async def check_db() -> None:
+        async with aiosqlite.connect(settings_override.db_path_resolved) as db:
+            async with db.execute(
+                "SELECT status, decision FROM approval_requests WHERE id = ?", (approval_id,)
+            ) as cur:
+                status, decision = await cur.fetchone()
+                assert status == "resolved"
+                assert decision in {"allow_once", "deny"}
+            async with db.execute(
+                """SELECT COUNT(*) FROM audit_events
+                   WHERE target = ? AND action IN ('approval.allowed_once', 'approval.denied')""",
+                (approval_id,),
+            ) as cur:
+                assert (await cur.fetchone())[0] == 1
 
     asyncio.run(check_db())

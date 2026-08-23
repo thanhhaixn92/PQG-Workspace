@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHermesStore } from '../store/store';
-import { fetchSkills, createSkill, updateSkill, deleteSkill } from '../api/skills';
-import type { Skill } from '../api/skills';
+import { changeSkillStatus, fetchSkillVersions, fetchSkills, createSkill, updateSkill, deleteSkill } from '../api/skills';
+import type { Skill, SkillVersion } from '../api/skills';
 
 export const SkillsPanel: React.FC = () => {
   const skills = useHermesStore(state => state.skills);
@@ -12,6 +12,9 @@ export const SkillsPanel: React.FC = () => {
   const [newSkillName, setNewSkillName] = useState('');
   const [newSkillDesc, setNewSkillDesc] = useState('');
   const [newSkillContent, setNewSkillContent] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [versionsBySkill, setVersionsBySkill] = useState<Record<string, SkillVersion[] | undefined>>({});
 
   const filteredSkills = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -22,19 +25,22 @@ export const SkillsPanel: React.FC = () => {
     );
   }, [skills, search]);
 
-  const loadSkills = async () => {
+  const loadSkills = useCallback(async () => {
+    setLoading(true);
     try {
       setError(null);
       const data = await fetchSkills();
       setSkills(data);
     } catch {
       setError('Không tải được danh sách kỹ năng.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [setSkills]);
 
   useEffect(() => {
     void loadSkills();
-  }, []);
+  }, [loadSkills]);
 
   const handleCreate = async () => {
     if (!newSkillName.trim() || !newSkillContent.trim()) return;
@@ -54,22 +60,60 @@ export const SkillsPanel: React.FC = () => {
   };
 
   const handleToggle = async (skill: Skill) => {
+    if (skill.status !== 'approved') return;
+    setBusyId(skill.id);
     try {
       setError(null);
       await updateSkill(skill.id, { enabled: !skill.enabled });
       await loadSkills();
     } catch {
       setError('Không cập nhật được trạng thái kỹ năng.');
+    } finally {
+      setBusyId(null);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleStatus = async (skill: Skill, status: Skill['status']) => {
+    if (busyId) return;
+    setBusyId(skill.id);
+    try {
+      setError(null);
+      await changeSkillStatus(skill.id, status);
+      await loadSkills();
+    } catch {
+      setError('Không chuyển được trạng thái kỹ năng. Hãy tải lại và thử lại.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const toggleVersions = async (skill: Skill) => {
+    if (versionsBySkill[skill.id]) {
+      setVersionsBySkill(current => ({ ...current, [skill.id]: undefined }));
+      return;
+    }
+    setBusyId(skill.id);
+    try {
+      const versions = await fetchSkillVersions(skill.id);
+      setVersionsBySkill(current => ({ ...current, [skill.id]: versions }));
+    } catch {
+      setError('Không tải được lịch sử phiên bản kỹ năng.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (deletingId || !window.confirm('Xóa kỹ năng “' + name + '”? Không thể hoàn tác.')) return;
+    setDeletingId(id);
     try {
       setError(null);
       await deleteSkill(id);
       await loadSkills();
     } catch {
       setError('Không xóa được kỹ năng.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -87,12 +131,12 @@ export const SkillsPanel: React.FC = () => {
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {filteredSkills.map(skill => (
-          <div key={skill.id} style={{ border: '1px solid var(--border-subtle)', padding: '8px', marginBottom: '8px', borderRadius: '4px' }}>
+          <div key={skill.id} data-review-source="skill" data-review-id={skill.id} tabIndex={-1} style={{ border: '1px solid var(--border-subtle)', padding: '8px', marginBottom: '8px', borderRadius: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
               <div>
                 <strong>{skill.name}</strong>
                 <div style={{ fontSize: '11px', color: skill.enabled ? 'var(--success-primary)' : 'var(--text-secondary)' }}>
-                  {skill.enabled ? 'Đang bật' : 'Đang tắt'}
+                  {skill.status === 'approved' ? 'Đã duyệt' : skill.status === 'review_pending' ? 'Chờ duyệt' : 'Bản nháp'} · {skill.enabled ? 'Đang dùng' : 'Chưa dùng'} · v{skill.version}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -101,14 +145,29 @@ export const SkillsPanel: React.FC = () => {
                     type="checkbox"
                     checked={skill.enabled}
                     onChange={() => void handleToggle(skill)}
+                    disabled={skill.status !== 'approved' || busyId === skill.id}
                     title="Bật/tắt kỹ năng"
                   />
                   Bật
                 </label>
-                <button onClick={() => void handleDelete(skill.id)} style={{ color: 'var(--error)' }}>Xóa</button>
+                <button onClick={() => void handleDelete(skill.id, skill.name)} disabled={deletingId !== null} style={{ color: 'var(--error)' }}>
+                  {deletingId === skill.id ? 'Đang xóa...' : 'Xóa'}
+                </button>
               </div>
             </div>
             {skill.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{skill.description}</div>}
+            {search.trim() && skill.content.toLowerCase().includes(search.trim().toLowerCase()) && (
+              <div className="runtime-guidance">Khớp trong nội dung: {skill.content.slice(0, 140)}{skill.content.length > 140 ? '…' : ''}</div>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              {skill.status === 'draft' && <button className="btn-secondary" disabled={busyId !== null} onClick={() => void handleStatus(skill, 'review_pending')}>Gửi duyệt</button>}
+              {skill.status === 'review_pending' && <button className="btn-primary" disabled={busyId !== null} onClick={() => void handleStatus(skill, 'approved')}>Duyệt kỹ năng</button>}
+              {skill.status !== 'draft' && <button className="btn-secondary" disabled={busyId !== null} onClick={() => void handleStatus(skill, 'draft')}>Đưa về nháp</button>}
+              <button className="btn-secondary" disabled={busyId !== null} onClick={() => void toggleVersions(skill)}>Lịch sử phiên bản</button>
+            </div>
+            {versionsBySkill[skill.id] && <div className="runtime-guidance" style={{ marginTop: 6 }}>
+              {versionsBySkill[skill.id]!.map(version => <div key={version.id}>v{version.version_number} · {version.status} · {new Date(version.updated_at * 1000).toLocaleString('vi-VN')}</div>)}
+            </div>}
           </div>
         ))}
         {skills.length === 0 && (

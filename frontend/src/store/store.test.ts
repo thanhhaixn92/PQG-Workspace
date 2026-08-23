@@ -4,6 +4,7 @@ import type { HermesEvent } from './store';
 
 describe('useHermesStore', () => {
   beforeEach(() => {
+    window.history.replaceState(null, '', '/');
     const store = useHermesStore.getState();
     store.setSessions([]);
     store.setActiveSession(null);
@@ -33,9 +34,17 @@ describe('useHermesStore', () => {
     expect(useHermesStore.getState().activeSessionId).toBe('session-1');
   });
 
+  it('điều hướng tab đang mở qua URL', () => {
+    useHermesStore.getState().setSidebarTab('sessions');
+
+    expect(useHermesStore.getState().sidebarTab).toBe('sessions');
+    expect(window.location.pathname).toBe('/work');
+  });
+
   it('lưu phê duyệt đang chờ', () => {
     const approval = {
       approval_id: 'app-1',
+      session_id: 'session-1',
       action: 'read',
       target: 'file.txt',
       risk_level: 'read' as const,

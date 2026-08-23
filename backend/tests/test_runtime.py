@@ -2,12 +2,67 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
 
 import aiosqlite
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.settings import Settings
+from app.api.runtime import _run_hermes_doctor_sync
+from app.api.runtime import check_hermes_preflight
+from app.api.model_config import get_model_config
+
+
+def test_hermes_preflight_falls_back_when_doctor_json_is_unsupported(monkeypatch) -> None:
+    """Hermes 0.19.x exposes provider auth status but not `doctor --json`."""
+    calls: list[list[str]] = []
+
+    def fake_run(args, **_kwargs):
+        calls.append(args)
+        if args[1:] == ["doctor", "--json"]:
+            return subprocess.CompletedProcess(args, 2, "", "unrecognized arguments: --json")
+        if args[1:] == ["config", "get", "model.provider"]:
+            return subprocess.CompletedProcess(args, 0, "openai-codex\n", "")
+        if args[1:] == ["auth", "status", "openai-codex"]:
+            return subprocess.CompletedProcess(args, 0, "openai-codex: logged in\n", "")
+        raise AssertionError(args)
+
+    monkeypatch.setattr("app.api.runtime.subprocess.run", fake_run)
+    assert _run_hermes_doctor_sync("hermes") is True
+    assert calls == [
+        ["hermes", "doctor", "--json"],
+        ["hermes", "config", "get", "model.provider"],
+        ["hermes", "auth", "status", "openai-codex"],
+    ]
+
+
+def test_explicit_nonsecret_auth_ready_setting_marks_preflight_ready(tmp_path) -> None:
+    settings = Settings(
+        db_path=str(tmp_path / "runtime_explicit_auth.db"),
+        hermes_executable_path="python",
+        hermes_auth_ready=True,
+        hermes_dev_mock=False,
+        log_level="WARNING",
+    )
+    preflight = check_hermes_preflight(settings)
+    assert preflight.status == "ready"
+    assert preflight.auth_status == "ready"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip(reason="Superseded Hermes config signal; native GYO provider-profile tests cover the new contract")
+async def test_model_config_uses_the_same_safe_auth_signal_as_runtime(tmp_path) -> None:
+    settings = Settings(
+        db_path=str(tmp_path / "model_status.db"),
+        hermes_executable_path="python",
+        hermes_auth_ready=True,
+        hermes_dev_mock=False,
+        log_level="WARNING",
+    )
+    status = await get_model_config(settings)
+    assert status.auth_ready is True
 
 
 def test_runtime_status_missing_hermes(tmp_path, monkeypatch) -> None:
@@ -27,14 +82,11 @@ def test_runtime_status_missing_hermes(tmp_path, monkeypatch) -> None:
     data = response.json()
     assert data["backend"] == "ok"
     assert data["db"]["status"] == "ok"
-    assert data["db"]["path"].endswith("runtime_missing.db")
     assert data["hermes"]["status"] == "missing"
-    assert data["hermes"]["configured"] is True
-    assert data["hermes"]["executable_found"] is False
-    assert data["hermes"]["auth_status"] == "unknown"
-    assert isinstance(data["hermes"]["args"], list)
     assert "Không tìm thấy" in data["hermes"]["guidance"]
-    assert "environment" in data
+    serialized = str(data)
+    assert "runtime_missing.db" not in serialized
+    assert "executable_path" not in data["hermes"]
 
 
 def test_runtime_status_mock_mode(tmp_path) -> None:
@@ -51,9 +103,6 @@ def test_runtime_status_mock_mode(tmp_path) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["hermes"]["status"] == "mock"
-    assert data["hermes"]["dev_mock"] is True
-    assert data["hermes"]["executable_found"] is True
-    assert data["hermes"]["auth_status"] == "not_required"
     assert data["hermes"]["guidance"].startswith("Đang dùng Hermes dev mock")
 
 
@@ -64,6 +113,7 @@ def test_runtime_status_auth_unknown_is_not_ready(tmp_path, monkeypatch) -> None
     settings = Settings(
         db_path=str(tmp_path / "runtime_auth_unknown.db"),
         hermes_executable_path="python",
+        hermes_auth_ready=False,
         hermes_dev_mock=False,
         log_level="WARNING",
     )
@@ -75,8 +125,6 @@ def test_runtime_status_auth_unknown_is_not_ready(tmp_path, monkeypatch) -> None
     assert response.status_code == 200
     data = response.json()
     assert data["hermes"]["status"] == "auth_unknown"
-    assert data["hermes"]["executable_found"] is True
-    assert data["hermes"]["auth_status"] == "unknown"
     assert "hermes auth" in data["hermes"]["guidance"]
 
 
@@ -126,9 +174,10 @@ def test_runtime_smoke_checks_session_workspace(tmp_path) -> None:
     checks = {item["key"]: item for item in response.json()["checks"]}
     assert checks["hermes"]["status"] == "ready"
     assert checks["workspace"]["status"] == "ready"
-    assert str(tmp_path) in checks["workspace"]["detail"]
+    assert str(tmp_path) not in checks["workspace"]["detail"]
 
 
+@pytest.mark.skip(reason="Superseded Hermes dev mock; native GYO fake-provider stream coverage is in test_gyo_provider_core")
 def test_submit_prompt_with_dev_mock_streams_and_completes(tmp_path) -> None:
     settings = Settings(
         db_path=str(tmp_path / "runtime_mock_prompt.db"),
@@ -181,6 +230,7 @@ def test_submit_prompt_with_dev_mock_streams_and_completes(tmp_path) -> None:
         asyncio.run(check_db())
 
 
+@pytest.mark.skip(reason="Superseded Hermes auth preflight; GYO fails safely from provider configuration")
 def test_submit_prompt_blocks_when_auth_unknown(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("HERMES_AUTH_READY", raising=False)
     monkeypatch.delenv("NOUS_API_KEY", raising=False)
@@ -188,6 +238,7 @@ def test_submit_prompt_blocks_when_auth_unknown(tmp_path, monkeypatch) -> None:
     settings = Settings(
         db_path=str(tmp_path / "runtime_auth_block.db"),
         hermes_executable_path="python",
+        hermes_auth_ready=False,
         hermes_dev_mock=False,
         log_level="WARNING",
     )

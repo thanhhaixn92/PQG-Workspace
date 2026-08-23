@@ -4,26 +4,10 @@ export interface RuntimeStatus {
   backend: 'ok';
   db: {
     status: 'ok' | 'error';
-    path: string;
   };
   hermes: {
     status: 'ready' | 'mock' | 'missing' | 'not_configured' | 'auth_unknown' | 'auth_expired';
-    executable_path: string;
-    configured: boolean;
-    executable_found: boolean;
-    auth_status: 'ready' | 'unknown' | 'not_required' | 'auth_expired';
-    dev_mock: boolean;
-    args: string[];
     guidance: string;
-  };
-  n8n: {
-    configured: boolean;
-    webhook_base_url: string;
-    guidance: string;
-  };
-  environment: {
-    env_file_exists: boolean;
-    cwd: string;
   };
   timestamp: number;
 }
@@ -42,6 +26,12 @@ export interface RuntimeSmokeResponse {
   timestamp: number;
 }
 
+/** Opaque local scope for client-only draft namespacing; never an actor identifier. */
+export interface RuntimeIdentityScope {
+  identity_scope: string;
+  workspace_scope: string;
+}
+
 export async function fetchRuntimeStatus(): Promise<RuntimeStatus> {
   return apiFetch<RuntimeStatus>('/api/runtime/status');
 }
@@ -52,3 +42,5 @@ export async function runRuntimeSmoke(sessionId?: string | null): Promise<Runtim
     body: JSON.stringify(sessionId ? { session_id: sessionId } : {}),
   });
 }
+
+export const getRuntimeIdentityScope = () => apiFetch<RuntimeIdentityScope>('/api/runtime/identity-scope');

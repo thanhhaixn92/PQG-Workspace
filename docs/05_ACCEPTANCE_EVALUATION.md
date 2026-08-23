@@ -1,4 +1,4 @@
-# Hermes Local Stack - Acceptance And Evaluation
+# DIRAP Local Workbench - Acceptance And Evaluation
 
 ## 1. Evaluation Philosophy
 
@@ -24,8 +24,8 @@ Every phase must pass:
 | Frontend Chat | stream rendering, approval modal, activity panel, no reload required |
 | Files | workspace jail, read/write, autosave, path traversal rejection |
 | Memory/Skills | CRUD, enable/disable, context cap, audit |
-| MCP | max 6 tools, schema descriptions, no policy bypass |
-| n8n | persistent volume, env secrets, approval for webhook execution |
+| MCP | exact allowlist 9 tools, schema descriptions, proposal-only Work update, no policy bypass |
+| n8n | optional loopback sidecar; unavailable graceful; approval when invoked |
 | Diagram | render valid Mermaid, invalid Mermaid does not crash |
 
 ## 4. Required Automated Tests
@@ -56,7 +56,8 @@ Frontend:
 
 Integration:
 
-- create session -> prompt -> stream -> done
+- create Work -> two conversations -> prompt -> stream/source -> done
+- proposal -> verify no mutation -> create/approve Action Package -> execute exactly once
 - approval required -> deny -> cancelled
 - write file -> audit event exists
 - invalid path -> rejected
@@ -66,14 +67,41 @@ Integration:
 - Start backend.
 - Start frontend.
 - Open UI.
-- Create session with workspace path.
+- Create Work with managed workspace and two isolated conversations.
 - Send prompt.
 - Observe streaming.
 - Trigger read file.
 - Trigger write file and approve.
 - Trigger denied action.
 - Open audit log/API and confirm records.
-- Restart backend and confirm sessions metadata still exist.
+- Restart backend and confirm Work/conversation/turn/action state still exists.
+
+## 5.1 V2.2 Human Gate
+
+- Hoan thanh `implementation/V22_FIDELITY_LEDGER.md` o toan bo viewport/theme/keyboard/zoom matrix.
+- Chay `implementation/V22_USABILITY_PROTOCOL.md` voi 5 nguoi khong duoc huong dan; it nhat 4/5 hoan thanh hanh trinh va tra loi du 7 cau trong 30 giay.
+- Mock/agent report khong thay the Hermes that hoac human evidence.
+- Neu con P0/P1 hoac hai artifact tren chua dat, verdict bat buoc `PARTIAL`.
+
+### V2.2 G-SYNTHETIC decision (2026-08-22)
+
+Theo authorization của product owner cho completion plan này, gate năm người ở
+v2.2 được thay riêng bằng `synthetic agent evaluation`: năm evaluator agent độc
+lập, browser/profile/SQLite/workspace/fixture cô lập, cùng source hash và task
+script không lộ source/test. Đây không phải human evidence và không được dùng để
+đưa ra claim usability của con người. Receipt/final report phải ghi nguyên văn
+giới hạn đó, giữ zero real provider/approval/executor mutation và đạt ngưỡng
+5/5 Task 1/3/5, ít nhất 4/5 Task 2/4, không Critical/Major mở. Quyết định này
+chỉ thay gate v2.2; yêu cầu human evidence cho phase khác vẫn giữ nguyên.
+
+### V2.2 G-SYNTHETIC result (2026-08-22)
+
+Aggregate `output/playwright/package-g-synthetic-aggregate-20260822-0837`
+PASS với năm evaluator A01-A05 cùng source fingerprint
+`520e075bed578007ed2b6ec6c396885a2ad9e0b22c3a461b0c1c2a64944e4383`:
+Task 1/3/5 đạt 5/5, Task 2/4 đạt 5/5, không Critical/Major, zero real
+provider/approval/executor. Đây là **synthetic agent evaluation**, không phải
+human usability evidence, không Gate PASS và không thay đổi checkpoint.
 
 ## 6. Quality Rubric
 

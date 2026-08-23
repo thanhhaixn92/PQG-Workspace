@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
 import time
 import uuid
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from app.api.schemas import (
@@ -19,34 +20,29 @@ from app.api.schemas import (
     PromptRequest,
     TaskRunResponse,
     ChatMessageResponse,
+    ChatMessagePageResponse,
     AuditEventResponse,
     ArchiveSessionResponse,
     CleanupSmokeTestsResponse,
+    CleanupSmokeTestsConfirmRequest,
+    CleanupSmokeTestsPreviewResponse,
+    SessionSummaryResponse,
     MemoryEntry,
     SseDoneEvent,
 )
 from app.db.connection import get_db_connection
-from app.dependencies import get_db, get_hermes_client, get_settings
-from app.api.runtime import check_hermes_preflight
+from app.dependencies import get_db, get_gyo_orchestrator, get_settings
 from app.services.audit import log_audit_event
 from app.services.content_quality import enrich_desktop_file_blocks
-from app.services.context import CONTEXT_VERSION_CACHE, get_context_version
 from app.services.event_bus import event_bus
-from app.services.model_resilience import (
-    ModelAuthError,
-    ModelCallable,
-    ModelRateLimitError,
-    ModelServerError,
-    ModelTimeoutError,
-    ModelResilienceService,
-    ResilienceResult,
-)
+from app.services.assistant_context import AssistantContextPackBuilder
+from app.services.gyo_orchestrator import GyoOrchestrator, GyoRunRequest
 from app.settings import Settings
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 
-HERMES_RESPONSE_GUIDANCE = """=== HERMES LOCAL STACK RESPONSE GUIDE ===
+GYO_RESPONSE_GUIDANCE = """=== PQG WORKSPACE RESPONSE GUIDE ===
 Reply in Vietnamese unless the user explicitly asks for another language.
 For final user-visible results, prefer these sections when relevant:
 - Kết quả
@@ -85,13 +81,9 @@ def _is_publishing_prompt(prompt: str) -> bool:
     return any(keyword in lowered for keyword in PUBLISHING_KEYWORDS)
 
 
-def _compose_hermes_prompt(user_prompt: str, context_str: str = "", context_version: int = 0) -> str:
+def _compose_gyo_prompt(user_prompt: str) -> str:
     """Add lightweight UX guidance while preserving the original user prompt."""
-    parts = [HERMES_RESPONSE_GUIDANCE.strip()]
-    if context_str:
-        parts.append(context_str.strip())
-    if context_version:
-        parts.append(f"=== CONTEXT VERSION: {context_version} ===")
+    parts = [GYO_RESPONSE_GUIDANCE.strip()]
     if _is_publishing_prompt(user_prompt):
         parts.append(PUBLISHING_GUIDANCE.strip())
     parts.append(f"=== USER PROMPT ===\n{user_prompt}")
@@ -112,20 +104,23 @@ def _resolve_session_workspace(request: CreateSessionRequest, session_id: str, s
 
     workspace = settings.default_workspace_root_resolved / _slugify_workspace_name(request.title, session_id)
     workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "inputs").mkdir(parents=True, exist_ok=True)
+    (workspace / "working").mkdir(parents=True, exist_ok=True)
     (workspace / "outputs").mkdir(parents=True, exist_ok=True)
     return str(workspace)
 
 
 async def _run_prompt_task(
-    client: Any,
+    gyo_orchestrator: GyoOrchestrator | None,
     session_id: str,
     task_id: str,
     prompt: str,
     db_path: Any,
     use_task_api: bool = False,
-    settings: Settings | None = None,
+    conversation_id: str | None = None,
+    context_text: str = "",
 ) -> None:
-    """Background task to send prompt with model resilience and update DB."""
+    """Run a legacy Work prompt through native GYO without write authority."""
     try:
         async with get_db_connection(db_path) as db:
             await db.execute(
@@ -134,47 +129,25 @@ async def _run_prompt_task(
             )
             await db.commit()
 
-        # Wrap Hermes client as a named model callable for resilience
-        hermes_callable = ModelCallable(
-            id="hermes-acp",
-            fn=lambda p, s: client.send_prompt(s, p),
-        )
-
-        if settings and settings.model_fallback_enabled:
-            svc = ModelResilienceService.from_settings(
-                models=[hermes_callable],
-                settings=settings,
+        if gyo_orchestrator is None:
+            raise RuntimeError("GYO runtime is unavailable")
+        result = await gyo_orchestrator.run(GyoRunRequest(
+            work_id=session_id,
+            prompt=prompt,
+            context=context_text,
+            assistant_turn_id=task_id,
+        ))
+        async with get_db_connection(db_path) as audit_db:
+            await log_audit_event(
+                audit_db, session_id, "system", "model.attempt", target=task_id,
+                payload={"model_id": result.model_id, "status": result.status, "route_mode": result.route_mode,
+                         "selection_reason": result.selection_reason},
+                commit=False,
             )
-            result = await svc.execute_with_resilience(prompt, session_id)
-        else:
-            try:
-                text = await client.send_prompt(session_id, prompt)
-                result = ResilienceResult(success=True, response=text)
-            except Exception as exc:
-                result = ResilienceResult(success=False, error=str(exc))
-
-        # Record attempt chain into audit log
-        if result.attempt_chain:
-            async with get_db_connection(db_path) as audit_db:
-                for attempt in result.attempt_chain:
-                    await log_audit_event(
-                        audit_db,
-                        session_id,
-                        "system",
-                        "model.attempt",
-                        target=task_id,
-                        payload={
-                            "model_id": attempt.model_id,
-                            "status": attempt.status,
-                            "error": attempt.error,
-                        },
-                    )
-                await audit_db.commit()
-
-        if not result.success:
-            raise RuntimeError(result.error or "Model call failed")
-
-        assistant_text = result.response
+            await audit_db.commit()
+        if result.status != "completed" or not result.text.strip():
+            raise RuntimeError("GYO model run failed")
+        assistant_text = result.text
         async with get_db_connection(db_path) as db:
             now = int(time.time())
             async with db.execute(
@@ -201,10 +174,10 @@ async def _run_prompt_task(
             if assistant_text:
                 await db.execute(
                     """
-                    INSERT INTO chat_messages (id, session_id, task_id, role, content, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO chat_messages (id, session_id, task_id, role, content, created_at, conversation_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (str(uuid.uuid4()), session_id, task_id, "assistant", assistant_text, now),
+                    (str(uuid.uuid4()), session_id, task_id, "assistant", assistant_text, now, conversation_id),
                 )
             await db.execute(
                 "UPDATE task_runs SET status = 'completed', finished_at = ? WHERE id = ?",
@@ -241,7 +214,7 @@ async def _run_prompt_task(
                 db, session_id, "system", "task_run.failed", payload={"task_id": task_id, "error": str(e)}
             )
             await log_audit_event(
-                db, session_id, "system", "hermes.error", payload={"task_id": task_id, "error": str(e)}
+                db, session_id, "system", "gyo.error", payload={"task_id": task_id, "reason": "model_run_failed"}
             )
             await db.execute(
                 "UPDATE sessions SET updated_at = ? WHERE id = ?",
@@ -272,10 +245,15 @@ async def create_session(
 
     await conn.execute(
         """
-        INSERT INTO sessions (id, title, workspace_path, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, title, goal, data_scope, workspace_path, created_at, updated_at, last_opened_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (session_id, request.title, workspace_path, now, now),
+        (session_id, request.title, request.goal, request.data_scope, workspace_path, now, now, now),
+    )
+    await conn.execute(
+        """INSERT INTO conversations (id, session_id, title, purpose, status, created_at, updated_at, last_opened_at)
+           VALUES (?, ?, ?, ?, 'active', ?, ?, ?)""",
+        (f"conversation-{session_id}", session_id, "Trao đổi ban đầu", "Phiên trao đổi đầu tiên của Công việc", now, now, now),
     )
     await conn.commit()
 
@@ -287,6 +265,8 @@ async def create_session(
         action="session.created",
         payload={
             "title": request.title,
+            "has_goal": bool(request.goal),
+            "data_scope": request.data_scope,
             "workspace_path": workspace_path,
             "auto_created_workspace": not bool((request.workspace_path or "").strip()),
         },
@@ -299,6 +279,9 @@ async def create_session(
         created_at=now,
         updated_at=now,
         archived=0,
+        goal=request.goal,
+        data_scope=request.data_scope,
+        last_opened_at=now,
     )
 
 
@@ -315,18 +298,42 @@ async def list_sessions(
     return [SessionResponse(**dict(row)) for row in rows]
 
 
-@router.post("/cleanup-smoke-tests", response_model=CleanupSmokeTestsResponse)
-async def cleanup_smoke_test_sessions(
-    conn: aiosqlite.Connection = Depends(get_db),
-) -> CleanupSmokeTestsResponse:
-    """Archive generated smoke-test sessions without deleting their data."""
-    now = int(time.time())
+async def _smoke_cleanup_candidates(conn: aiosqlite.Connection) -> list[dict[str, str]]:
     async with conn.execute(
-        "SELECT id FROM sessions WHERE archived = 0 AND title LIKE 'Smoke Test%'"
+        "SELECT id, title FROM sessions WHERE archived = 0 AND title LIKE 'Smoke Test%' ORDER BY id"
     ) as cursor:
         rows = await cursor.fetchall()
+    return [{"id": row[0], "title": row[1]} for row in rows]
 
-    session_ids = [row[0] for row in rows]
+
+def _smoke_cleanup_token(items: list[dict[str, str]]) -> str:
+    identity = "\x1f".join(item["id"] for item in items)
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
+@router.get("/cleanup-smoke-tests/preview", response_model=CleanupSmokeTestsPreviewResponse)
+async def preview_cleanup_smoke_test_sessions(
+    conn: aiosqlite.Connection = Depends(get_db),
+) -> CleanupSmokeTestsPreviewResponse:
+    """Preview the exact generated sessions that a later confirmation may archive."""
+    items = await _smoke_cleanup_candidates(conn)
+    return CleanupSmokeTestsPreviewResponse(items=items, confirmation_token=_smoke_cleanup_token(items))
+
+
+@router.post("/cleanup-smoke-tests", response_model=CleanupSmokeTestsResponse)
+async def cleanup_smoke_test_sessions(
+    request: CleanupSmokeTestsConfirmRequest,
+    conn: aiosqlite.Connection = Depends(get_db),
+) -> CleanupSmokeTestsResponse:
+    """Archive only the exact previewed generated sessions, without deleting data."""
+    now = int(time.time())
+    items = await _smoke_cleanup_candidates(conn)
+    if request.confirmation_token != _smoke_cleanup_token(items):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Cleanup preview changed; review the current candidates before confirming",
+        )
+    session_ids = [item["id"] for item in items]
     if session_ids:
         await conn.executemany(
             "UPDATE sessions SET archived = 1, updated_at = ? WHERE id = ?",
@@ -368,7 +375,27 @@ async def update_session(
         updates.append("title = ?")
         params.append(title)
 
+    if request.goal is not None:
+        updates.append("goal = ?")
+        params.append(" ".join(request.goal.split()) or None)
+
+    if request.data_scope is not None:
+        updates.append("data_scope = ?")
+        params.append(request.data_scope)
+
     if request.archived is not None:
+        if request.archived and current["archived"] != 1:
+            async with conn.execute(
+                "SELECT id FROM task_runs WHERE session_id = ? "
+                "AND status IN ('queued', 'running', 'waiting_approval') LIMIT 1",
+                (session_id,),
+            ) as cursor:
+                active_run = await cursor.fetchone()
+            if active_run:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    "Cannot archive a session while a task is active; cancel or resolve it first",
+                )
         updates.append("archived = ?")
         params.append(1 if request.archived else 0)
 
@@ -390,6 +417,24 @@ async def update_session(
                 payload={"old_title": current["title"], "new_title": request.title.strip()},
             )
 
+        if request.goal is not None and (" ".join(request.goal.split()) or None) != current.get("goal"):
+            await log_audit_event(
+                conn,
+                session_id=session_id,
+                actor="user",
+                action="session.goal_updated",
+                payload={"has_goal": bool(request.goal.strip())},
+            )
+
+        if request.data_scope is not None and request.data_scope != current.get("data_scope", "work_only"):
+            await log_audit_event(
+                conn,
+                session_id=session_id,
+                actor="user",
+                action="session.data_scope_updated",
+                payload={"data_scope": request.data_scope},
+            )
+
         if request.archived is True and current["archived"] != 1:
             await log_audit_event(
                 conn,
@@ -405,6 +450,47 @@ async def update_session(
         updated = await cursor.fetchone()
 
     return SessionResponse(**dict(updated))
+
+
+@router.get("/{session_id}/summary", response_model=SessionSummaryResponse)
+async def get_session_summary(
+    session_id: str,
+    conn: aiosqlite.Connection = Depends(get_db),
+) -> SessionSummaryResponse:
+    """Return a small end-user work summary without exposing diagnostic payloads."""
+    async with conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)) as cursor:
+        row = await cursor.fetchone()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    session = dict(row)
+    now = int(time.time())
+    await conn.execute("UPDATE sessions SET last_opened_at = ? WHERE id = ?", (now, session_id))
+    async with conn.execute("SELECT COUNT(*) FROM chat_messages WHERE session_id = ?", (session_id,)) as cur:
+        message_count = (await cur.fetchone())[0]
+    async with conn.execute("SELECT COUNT(*) FROM approval_requests WHERE session_id = ? AND status = 'pending'", (session_id,)) as cur:
+        pending_approval_count = (await cur.fetchone())[0]
+    async with conn.execute("SELECT COUNT(*) FROM artifacts WHERE session_id = ?", (session_id,)) as cur:
+        artifact_count = (await cur.fetchone())[0]
+    async with conn.execute(
+        "SELECT status FROM task_runs WHERE session_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1", (session_id,)
+    ) as cur:
+        task = await cur.fetchone()
+    await log_audit_event(
+        conn,
+        session_id=session_id,
+        actor="user",
+        action="session.summary_opened",
+        payload={"message_count": message_count, "artifact_count": artifact_count},
+    )
+    await conn.commit()
+    session["last_opened_at"] = now
+    return SessionSummaryResponse(
+        session=SessionResponse(**session),
+        message_count=message_count,
+        pending_approval_count=pending_approval_count,
+        artifact_count=artifact_count,
+        latest_task_status=task[0] if task else None,
+    )
 
 
 @router.delete("/{session_id}", response_model=ArchiveSessionResponse)
@@ -455,13 +541,16 @@ async def list_session_messages(
     conn: aiosqlite.Connection = Depends(get_db),
 ) -> list[ChatMessageResponse]:
     """List persisted user-visible chat messages for a session."""
-    async with conn.execute("SELECT id FROM sessions WHERE id = ?", (session_id,)) as cursor:
-        if not await cursor.fetchone():
+    async with conn.execute("SELECT archived FROM sessions WHERE id = ?", (session_id,)) as cursor:
+        session = await cursor.fetchone()
+        if not session:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+        if session[0]:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Session is archived")
 
     async with conn.execute(
         """
-        SELECT id, session_id, task_id, role, content, created_at
+        SELECT id, session_id, task_id, role, content, created_at, conversation_id
         FROM chat_messages
         WHERE session_id = ?
         ORDER BY created_at ASC, rowid ASC
@@ -471,6 +560,50 @@ async def list_session_messages(
         rows = await cursor.fetchall()
 
     return [ChatMessageResponse(**dict(row)) for row in rows]
+
+
+@router.get("/{session_id}/messages/page", response_model=ChatMessagePageResponse)
+async def list_session_messages_page(
+    session_id: str,
+    limit: int = Query(100, ge=1, le=200),
+    before_id: str | None = Query(None),
+    conn: aiosqlite.Connection = Depends(get_db),
+) -> ChatMessagePageResponse:
+    """Return the newest page, or the page immediately before one persisted message."""
+    async with conn.execute("SELECT archived FROM sessions WHERE id = ?", (session_id,)) as cursor:
+        session = await cursor.fetchone()
+    if not session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    if session[0]:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Session is archived")
+
+    before_rowid: int | None = None
+    if before_id is not None:
+        async with conn.execute(
+            "SELECT rowid FROM chat_messages WHERE id = ? AND session_id = ?",
+            (before_id, session_id),
+        ) as cursor:
+            cursor_row = await cursor.fetchone()
+        if cursor_row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Message cursor not found")
+        before_rowid = int(cursor_row[0])
+
+    where = "session_id = ?" + (" AND rowid < ?" if before_rowid is not None else "")
+    params: list[object] = [session_id]
+    if before_rowid is not None:
+        params.append(before_rowid)
+    params.append(limit + 1)
+    async with conn.execute(
+        f"""SELECT id, session_id, task_id, role, content, created_at, conversation_id, rowid
+            FROM chat_messages WHERE {where}
+            ORDER BY rowid DESC LIMIT ?""",
+        params,
+    ) as cursor:
+        rows = await cursor.fetchall()
+    has_more = len(rows) > limit
+    selected = list(reversed(rows[:limit]))
+    messages = [ChatMessageResponse(**{key: row[key] for key in ChatMessageResponse.model_fields}) for row in selected]
+    return ChatMessagePageResponse(messages=messages, has_more=has_more)
 
 
 @router.get("/{session_id}/task-runs/latest", response_model=TaskRunResponse | None)
@@ -553,46 +686,45 @@ async def list_session_audit_events(
     return [AuditEventResponse(**dict(row)) for row in rows]
 
 
-from app.services.context import build_context
-
 @router.post("/{session_id}/prompt", response_model=TaskRunResponse, status_code=status.HTTP_202_ACCEPTED)
 async def submit_prompt(
     session_id: str,
     request: PromptRequest,
     conn: aiosqlite.Connection = Depends(get_db),
-    client: Any = Depends(get_hermes_client),
+    gyo_orchestrator: GyoOrchestrator = Depends(get_gyo_orchestrator),
     settings: Settings = Depends(get_settings),
 ) -> TaskRunResponse:
-    """Submit a prompt to the Hermes agent for a specific session."""
-    # Validate session exists
-    async with conn.execute("SELECT id FROM sessions WHERE id = ?", (session_id,)) as cursor:
-        if not await cursor.fetchone():
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    """Submit a prompt to native GYO for a specific session."""
+    return await _submit_prompt_for_conversation(session_id, None, request, conn, gyo_orchestrator, settings)
 
-    preflight = check_hermes_preflight(settings, run_doctor=True)
-    if preflight.status not in {"ready", "mock"}:
-        message_by_status = {
-            "missing": "Không tìm thấy Hermes executable. Hãy kiểm tra HERMES_EXECUTABLE_PATH trong backend/.env.",
-            "not_configured": "Hermes chưa được cấu hình. Hãy tạo backend/.env và cấu hình HERMES_EXECUTABLE_PATH.",
-            "auth_unknown": "Hermes cần đăng nhập lại hoặc kiểm tra provider. Hãy chạy hermes auth hoặc hermes doctor rồi thử lại.",
-            "auth_expired": "Hermes đã đăng nhập nhưng token không còn hợp lệ. Hãy chạy hermes auth để đăng nhập lại.",
-        }
-        message = message_by_status.get(preflight.status, preflight.guidance)
-        await log_audit_event(
-            conn,
-            session_id=session_id,
-            actor="system",
-            action="runtime.preflight_blocked",
-            payload={
-                "runtime": "hermes",
-                "status": preflight.status,
-                "auth_status": preflight.auth_status,
-                "executable_found": preflight.executable_found,
-                "message": message,
-            },
-        )
-        await conn.commit()
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, message)
+
+async def _submit_prompt_for_conversation(
+    session_id: str,
+    conversation_id: str | None,
+    request: PromptRequest,
+    conn: aiosqlite.Connection,
+    gyo_orchestrator: GyoOrchestrator | None,
+    settings: Settings,
+) -> TaskRunResponse:
+    """Core prompt path shared by legacy sessions and new Work conversations."""
+    # Validate session exists
+    async with conn.execute("SELECT id, archived FROM sessions WHERE id = ?", (session_id,)) as cursor:
+        work = await cursor.fetchone()
+        if not work:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+        if work[1]:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Work is archived")
+    if conversation_id is None:
+        conversation_id = f"conversation-{session_id}"
+    async with conn.execute(
+        "SELECT id, status FROM conversations WHERE id = ? AND session_id = ?",
+        (conversation_id, session_id),
+    ) as cursor:
+        conversation = await cursor.fetchone()
+    if not conversation:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+    if conversation[1] != "active":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Conversation is archived")
 
     task_id = str(uuid.uuid4())
     now = int(time.time())
@@ -601,35 +733,32 @@ async def submit_prompt(
     # Create task run
     await conn.execute(
         """
-        INSERT INTO task_runs (id, session_id, status, started_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO task_runs (id, session_id, status, started_at, conversation_id)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (task_id, session_id, status_str, now),
+        (task_id, session_id, status_str, now, conversation_id),
     )
     await conn.execute(
         """
-        INSERT INTO chat_messages (id, session_id, task_id, role, content, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO chat_messages (id, session_id, task_id, role, content, created_at, conversation_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (str(uuid.uuid4()), session_id, task_id, "user", request.prompt, now),
+        (str(uuid.uuid4()), session_id, task_id, "user", request.prompt, now, conversation_id),
     )
     await conn.execute(
         "UPDATE sessions SET updated_at = ? WHERE id = ?",
         (now, session_id),
     )
+    await conn.execute(
+        "UPDATE conversations SET updated_at = ?, last_opened_at = ? WHERE id = ?",
+        (now, now, conversation_id),
+    )
     await conn.commit()
 
-    # 1) Context Injection
-    context_str = await build_context(conn, session_id)
-    ctx_version = await get_context_version(conn)
-    last_version = CONTEXT_VERSION_CACHE.get(session_id, 0)
-    if ctx_version != last_version:
-        CONTEXT_VERSION_CACHE[session_id] = ctx_version
-        await log_audit_event(
-            conn, session_id, "system", "context.version_changed",
-            payload={"old_version": last_version, "new_version": ctx_version},
-        )
-    final_prompt = _compose_hermes_prompt(request.prompt, context_str, context_version=ctx_version)
+    # Legacy task runs use the same deterministic Work context boundary as
+    # the modern Assistant.  Memory Hub remains opt-in (suggest_only here).
+    context_pack = await AssistantContextPackBuilder(conn).build(session_id, conversation_id)
+    final_prompt = _compose_gyo_prompt(request.prompt)
 
     # Log audit events
     await log_audit_event(
@@ -652,20 +781,20 @@ async def submit_prompt(
         from app.services.legacy_task_adapter import LegacyTaskAdapter
         from app.services.task_service import TaskService
         adapter = LegacyTaskAdapter(TaskService(conn))
-        await adapter.on_prompt_submit(conn, session_id, task_id, request.prompt)
+        await adapter.on_prompt_submit(conn, session_id, task_id, request.prompt, conversation_id)
 
-    # Spawn hermes (lazy) and send prompt in background
-    # Note: We send asynchronously to avoid blocking the HTTP response.
-    # In a production setup, we might use a proper background worker.
+    # The legacy task/run contract remains asynchronous, but it calls the
+    # native GYO orchestration seam only; there is no ACP fallback.
     asyncio.create_task(
         _run_prompt_task(
-            client=client,
+            gyo_orchestrator=gyo_orchestrator,
             session_id=session_id,
             task_id=task_id,
             prompt=final_prompt,
             db_path=settings.db_path_resolved,
             use_task_api=settings.use_task_api,
-            settings=settings,
+            conversation_id=conversation_id,
+            context_text=context_pack.text,
         )
     )
 
@@ -675,6 +804,7 @@ async def submit_prompt(
         status=status_str,
         started_at=now,
         retry_count=0,
+        conversation_id=conversation_id,
     )
 
 
@@ -712,7 +842,10 @@ def _curator_candidate_from_messages(rows: list[aiosqlite.Row]) -> dict[str, str
         ("project_fact", "thông tin dự án", ("dự án", "workspace", "repo", "webapp")),
     ]
 
-    for row in reversed(rows):
+    # Rows are selected newest-first. Only user language may become user memory.
+    for row in rows:
+        if row["role"] != "user":
+            continue
         content = str(row["content"]).strip()
         lowered = content.lower()
         if len(content) < 12:
@@ -746,9 +879,12 @@ async def curate_session(
     from app.api.approvals import register_pending_approval
     
     # Verify session exists
-    async with db.execute("SELECT id FROM sessions WHERE id = ?", (session_id,)) as cur:
-        if not await cur.fetchone():
+    async with db.execute("SELECT archived FROM sessions WHERE id = ?", (session_id,)) as cur:
+        session = await cur.fetchone()
+        if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+        if session[0]:
+            raise HTTPException(status_code=409, detail="Session is archived")
             
     async with db.execute(
         """

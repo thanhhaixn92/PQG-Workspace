@@ -9,6 +9,8 @@ vi.mock('../api/skills', () => ({
   createSkill: vi.fn(),
   updateSkill: vi.fn(),
   deleteSkill: vi.fn(),
+  changeSkillStatus: vi.fn(),
+  fetchSkillVersions: vi.fn(),
 }));
 
 describe('SkillsPanel', () => {
@@ -22,6 +24,8 @@ describe('SkillsPanel', () => {
         description: 'Kiểm tra lỗi',
         content: 'Always review diffs',
         enabled: true,
+        status: 'approved',
+        version: 2,
         updated_at: 1,
       },
       {
@@ -30,6 +34,8 @@ describe('SkillsPanel', () => {
         description: 'Viết tài liệu',
         content: 'Use concise Vietnamese',
         enabled: false,
+        status: 'draft',
+        version: 1,
         updated_at: 1,
       },
     ]);
@@ -52,6 +58,8 @@ describe('SkillsPanel', () => {
       description: 'Kiểm tra lỗi',
       content: 'Always review diffs',
       enabled: false,
+      status: 'approved',
+      version: 3,
       updated_at: 2,
     });
 

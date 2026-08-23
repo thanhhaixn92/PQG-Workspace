@@ -1,11 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Archive, Check, MessageSquare, Pencil, PlayCircle, Plus, Search, Trash2, X } from 'lucide-react';
 import { useHermesStore } from '../store/store';
-import { archiveSession, cleanupSmokeTestSessions, createSession, updateSession } from '../api/sessions';
+import { archiveSession, cleanupSmokeTestSessions, createSession, previewSmokeTestCleanup, updateSession } from '../api/sessions';
 
 const DEFAULT_DEMO_WORKSPACE =
   (import.meta.env.VITE_DEMO_WORKSPACE_PATH as string | undefined) ||
   '';
+
+const TEST_WORK_MARKERS = ['uat-codex-', 'smoke test', '404test-', 'e2e', 'uat resolver', 'uat remediation summary', 'ki?m tra hermes oauth', 'memory hub mcp e2e'];
+
+export function isTestWork(session: { title: string; workspace_path: string }): boolean {
+  if (import.meta.env.VITE_SHOW_TEST_WORKS === '1') return false;
+  const searchable = `${session.title} ${session.workspace_path}`.toLocaleLowerCase();
+  return TEST_WORK_MARKERS.some(marker => searchable.includes(marker));
+}
 
 function taskStatusLabel(status?: string): string | null {
   switch (status) {
@@ -34,16 +42,6 @@ function resolveWorkspacePath(value: string): { path: string; usedDefault: boole
   return { path: '', usedDefault: true };
 }
 
-function isCodeWorkspacePath(path: string): boolean {
-  const normalized = path.replace(/\\/g, '/').toLowerCase();
-  return (
-    normalized.endsWith('/hermes') ||
-    normalized.includes('/hermes/backend') ||
-    normalized.includes('/hermes/frontend') ||
-    normalized.includes('/hermes/infra')
-  );
-}
-
 export const SessionList: React.FC = () => {
   const sessions = useHermesStore(state => state.sessions);
   const latestTaskBySession = useHermesStore(state => state.latestTaskBySession);
@@ -53,31 +51,35 @@ export const SessionList: React.FC = () => {
 
   const [isCreating, setIsCreating] = useState(false);
   const [title, setTitle] = useState('');
+  const [goal, setGoal] = useState('');
+  const [dataScope, setDataScope] = useState<'work_only' | 'approved_library'>('work_only');
   const [workspace, setWorkspace] = useState('');
+  const [showAdvancedCreate, setShowAdvancedCreate] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [query, setQuery] = useState('');
+  const [showTestWork, setShowTestWork] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const filteredSessions = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return sessions;
-    }
-    return sessions.filter(session =>
-      session.title.toLowerCase().includes(normalized) ||
-      session.workspace_path.toLowerCase().includes(normalized),
-    );
-  }, [query, sessions]);
+    return sessions.filter(session => {
+      if (!showTestWork && isTestWork(session)) return false;
+      return !normalized ||
+        session.title.toLowerCase().includes(normalized) ||
+        (session.goal || '').toLowerCase().includes(normalized);
+    });
+  }, [query, sessions, showTestWork]);
 
   const smokeSessionCount = sessions.filter(session => session.title.startsWith('Smoke Test')).length;
+  const testWorkCount = sessions.filter(isTestWork).length;
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
     const nextTitle = title.trim();
     if (!nextTitle) {
-      setError('Tên phiên không được để trống.');
+      setError('Tên Công việc không được để trống.');
       return;
     }
 
@@ -86,21 +88,24 @@ export const SessionList: React.FC = () => {
     try {
       setError(null);
       setNotice(null);
-      const newSession = await createSession(nextTitle, resolvedWorkspace.path);
+      const newSession = await createSession(nextTitle, resolvedWorkspace.path, goal, dataScope);
       useHermesStore.setState(state => ({
         sessions: [newSession, ...state.sessions.filter(session => session.id !== newSession.id)],
         activeSessionId: newSession.id,
       }));
       setIsCreating(false);
       setTitle('');
+      setGoal('');
+      setDataScope('work_only');
       setWorkspace('');
+      setShowAdvancedCreate(false);
       setQuery('');
       if (resolvedWorkspace.usedDefault) {
-        setNotice(`Đã tự tạo workspace: ${newSession.workspace_path}`);
+        setNotice('Đã tự tạo nơi lưu trữ riêng cho Công việc này.');
       }
     } catch (err) {
       console.error('Failed to create session', err);
-      setError('Không tạo được phiên. Hãy kiểm tra backend đang chạy và workspace có thể truy cập.');
+      setError('Không tạo được Công việc. Hãy kiểm tra ứng dụng đang sẵn sàng rồi thử lại.');
     }
   };
 
@@ -108,7 +113,7 @@ export const SessionList: React.FC = () => {
     setIsCreating(true);
     setError(null);
     setNotice(null);
-    setTitle('Phiên dùng thử Hermes');
+    setTitle('Công việc dùng thử Hermes');
     setWorkspace(DEFAULT_DEMO_WORKSPACE);
   };
 
@@ -122,7 +127,7 @@ export const SessionList: React.FC = () => {
   const saveRename = async (sessionId: string) => {
     const nextTitle = editingTitle.trim();
     if (!nextTitle) {
-      setError('Tên phiên không được để trống.');
+      setError('Tên Công việc không được để trống.');
       return;
     }
 
@@ -133,15 +138,15 @@ export const SessionList: React.FC = () => {
       updateSessionInStore(sessionId, updated);
       setEditingId(null);
       setEditingTitle('');
-      setNotice('Đã đổi tên phiên.');
+      setNotice('Đã đổi tên Công việc.');
     } catch (err) {
       console.error('Failed to rename session', err);
-      setError('Không đổi tên được phiên. Hãy thử lại.');
+      setError('Không đổi tên được Công việc. Hãy thử lại.');
     }
   };
 
   const handleArchive = async (sessionId: string) => {
-    const confirmed = window.confirm('Lưu trữ phiên này? Dữ liệu chat vẫn được giữ trong SQLite.');
+    const confirmed = window.confirm('Lưu trữ Công việc này? Lịch sử vẫn được giữ và không bị xóa vĩnh viễn.');
     if (!confirmed) {
       return;
     }
@@ -159,30 +164,34 @@ export const SessionList: React.FC = () => {
           activeSessionId: nextActiveSessionId,
         };
       });
-      setNotice('Đã lưu trữ phiên.');
+      setNotice('Đã lưu trữ Công việc.');
     } catch (err) {
       console.error('Failed to archive session', err);
-      setError('Không lưu trữ được phiên. Hãy thử lại.');
+      setError('Không lưu trữ được Công việc. Hãy thử lại.');
     }
   };
 
   const handleCleanupSmokeTests = async () => {
     if (smokeSessionCount === 0) {
-      setNotice('Không có phiên Smoke Test cần dọn.');
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Lưu trữ ${smokeSessionCount} phiên Smoke Test? Dữ liệu sẽ không bị xóa vĩnh viễn.`,
-    );
-    if (!confirmed) {
+      setNotice('Không có Công việc thử nghiệm cần dọn.');
       return;
     }
 
     try {
       setError(null);
       setNotice(null);
-      const result = await cleanupSmokeTestSessions();
+      const preview = await previewSmokeTestCleanup();
+      if (preview.items.length === 0) {
+        setNotice('Không có Công việc thử nghiệm cần dọn.');
+        return;
+      }
+      const names = preview.items.slice(0, 5).map(item => `• ${item.title}`).join('\n');
+      const remainder = preview.items.length > 5 ? `\n• và ${preview.items.length - 5} Công việc khác` : '';
+      const confirmed = window.confirm(
+        `Lưu trữ đúng ${preview.items.length} Công việc thử nghiệm sau?\n\n${names}${remainder}\n\nDữ liệu sẽ không bị xóa vĩnh viễn.`,
+      );
+      if (!confirmed) return;
+      const result = await cleanupSmokeTestSessions(preview.confirmation_token);
       useHermesStore.setState(state => {
         const remainingSessions = state.sessions.filter(session => !session.title.startsWith('Smoke Test'));
         const nextActiveSessionId =
@@ -195,25 +204,25 @@ export const SessionList: React.FC = () => {
           activeSessionId: nextActiveSessionId,
         };
       });
-      setNotice(`Đã lưu trữ ${result.archived_count} phiên test.`);
+      setNotice(`Đã lưu trữ ${result.archived_count} Công việc thử nghiệm.`);
     } catch (err) {
       console.error('Failed to cleanup smoke tests', err);
-      setError('Không dọn được phiên test. Hãy thử lại.');
+      setError('Không dọn được dữ liệu thử nghiệm. Hãy thử lại.');
     }
   };
 
   return (
     <>
       <div className="panel-header">
-        <h3>Phiên</h3>
+        <h3>Công việc</h3>
         <div className="session-header-actions">
-          <button className="btn-secondary icon-button" onClick={handleCleanupSmokeTests} title="Dọn phiên test">
+          {showTestWork && smokeSessionCount > 0 && <button className="btn-secondary icon-button" onClick={handleCleanupSmokeTests} title="Lưu trữ dữ liệu thử nghiệm">
             <Trash2 size={15} />
-          </button>
+          </button>}
           <button
             className="btn-secondary icon-button"
             onClick={() => setIsCreating(current => !current)}
-            title="Tạo phiên mới"
+            title="Tạo Công việc mới"
           >
             <Plus size={16} />
           </button>
@@ -222,23 +231,35 @@ export const SessionList: React.FC = () => {
 
       <div className="panel-content">
         {sessions.length > 0 && (
+          <>
           <label className="session-search">
             <Search size={14} />
             <input
               type="search"
-              placeholder="Tìm phiên hoặc workspace..."
+              placeholder="Tìm Công việc..."
               value={query}
               onChange={event => setQuery(event.target.value)}
             />
           </label>
+          {testWorkCount > 0 && (
+            <button
+              type="button"
+              className="btn-secondary compact-button test-data-toggle"
+              aria-pressed={showTestWork}
+              onClick={() => setShowTestWork(current => !current)}
+            >
+              {showTestWork ? 'Ẩn dữ liệu kiểm thử' : `Hiện dữ liệu kiểm thử (${testWorkCount})`}
+            </button>
+          )}
+          </>
         )}
 
         {sessions.length === 0 && !isCreating && (
           <div className="empty-state">
-            <div className="empty-state-title">Bắt đầu với không gian làm việc cục bộ</div>
-            <div className="empty-state-text">Tạo phiên, chọn thư mục dự án, rồi gửi yêu cầu đầu tiên.</div>
+            <div className="empty-state-title">Bắt đầu Công việc đầu tiên</div>
+            <div className="empty-state-text">Đặt tên, ghi mục tiêu rồi gửi yêu cầu đầu tiên cho Hermes.</div>
             <button className="btn-primary" onClick={startDemoSession}>
-              <PlayCircle size={14} /> Dùng không gian mẫu
+              <PlayCircle size={14} /> Dùng Công việc mẫu
             </button>
           </div>
         )}
@@ -247,18 +268,43 @@ export const SessionList: React.FC = () => {
           <form onSubmit={handleCreate} className="session-form">
             <input
               type="text"
-              placeholder="Tên phiên"
+              placeholder="Tên Công việc"
               value={title}
               onChange={event => setTitle(event.target.value)}
               autoFocus
             />
-            <input
-              type="text"
-              placeholder="Bỏ trống để tự tạo thư mục output"
-              value={workspace}
-              onChange={event => setWorkspace(event.target.value)}
+            <textarea
+              className="session-goal"
+              placeholder="Mục tiêu công việc (không bắt buộc)"
+              value={goal}
+              onChange={event => setGoal(event.target.value)}
+              rows={2}
             />
-            <div className="form-hint">Bỏ trống để backend tự tạo workspace trong thư mục workspace_outputs.</div>
+            <label className="session-data-scope">
+              <span>Phạm vi dữ liệu Hermes được dùng</span>
+              <select aria-label="Phạm vi dữ liệu Hermes được dùng" value={dataScope} onChange={event => setDataScope(event.target.value as 'work_only' | 'approved_library')}>
+                <option value="work_only">Chỉ tài liệu và trao đổi của Công việc này</option>
+                <option value="approved_library">Công việc này và tri thức đã duyệt</option>
+              </select>
+              <small>Bạn có thể thay đổi sau. Memory Hub và nhật ký kỹ thuật không tự được đưa vào chat.</small>
+            </label>
+            <button
+              type="button"
+              className="btn-secondary compact-button"
+              aria-expanded={showAdvancedCreate}
+              onClick={() => setShowAdvancedCreate(current => !current)}
+            >
+              {showAdvancedCreate ? 'Ẩn tùy chọn nâng cao' : 'Tùy chọn nâng cao'}
+            </button>
+            {showAdvancedCreate && <>
+              <input
+                type="text"
+                placeholder="Vị trí lưu trữ tùy chọn"
+                value={workspace}
+                onChange={event => setWorkspace(event.target.value)}
+              />
+              <div className="form-hint">Chỉ thay đổi khi bạn cần dùng một thư mục có sẵn. Nếu bỏ trống, ứng dụng tự tạo nơi lưu trữ an toàn.</div>
+            </>}
             <button type="submit" className="btn-primary">
               Tạo
             </button>
@@ -270,8 +316,8 @@ export const SessionList: React.FC = () => {
 
         {sessions.length > 0 && filteredSessions.length === 0 && (
           <div className="empty-state">
-            <div className="empty-state-title">Không tìm thấy phiên</div>
-            <div className="empty-state-text">Thử tìm bằng tên phiên hoặc đường dẫn workspace khác.</div>
+            <div className="empty-state-title">Không tìm thấy Công việc</div>
+            <div className="empty-state-text">Thử tìm bằng tên hoặc mục tiêu của Công việc.</div>
           </div>
         )}
 
@@ -284,7 +330,16 @@ export const SessionList: React.FC = () => {
               <div
                 key={session.id}
                 className={`session-item ${session.id === activeSessionId ? 'active' : ''}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => setActiveSession(session.id)}
+                onKeyDown={event => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setActiveSession(session.id);
+                  }
+                }}
               >
                 <MessageSquare
                   size={16}
@@ -295,11 +350,11 @@ export const SessionList: React.FC = () => {
                     <div className="session-rename" onClick={event => event.stopPropagation()}>
                       <input
                         type="text"
-                        aria-label="Tên phiên mới"
+                        aria-label="Tên Công việc mới"
                         value={editingTitle}
                         onChange={event => setEditingTitle(event.target.value)}
                       />
-                      <button title="Lưu tên phiên" onClick={() => void saveRename(session.id)}>
+                      <button title="Lưu tên Công việc" onClick={() => void saveRename(session.id)}>
                         <Check size={14} />
                       </button>
                       <button
@@ -322,21 +377,16 @@ export const SessionList: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <div className="session-path">{session.workspace_path}</div>
-                      {isCodeWorkspacePath(session.workspace_path) && (
-                        <div className="runtime-guidance session-workspace-warning">
-                          Không nên lưu output vào thư mục code. Hãy tạo phiên mới và bỏ trống workspace để tự tạo thư mục đầu ra.
-                        </div>
-                      )}
+                      <div className="session-path">{session.goal || 'Sẵn sàng để tiếp tục'}</div>
                     </>
                   )}
                 </div>
                 {editingId !== session.id && (
                   <div className="session-actions" onClick={event => event.stopPropagation()}>
-                    <button title="Đổi tên phiên" onClick={() => startRename(session.id, session.title)}>
+                    <button title="Đổi tên Công việc" onClick={() => startRename(session.id, session.title)}>
                       <Pencil size={14} />
                     </button>
-                    <button title="Lưu trữ phiên" onClick={() => void handleArchive(session.id)}>
+                    <button title="Lưu trữ Công việc" onClick={() => void handleArchive(session.id)}>
                       <Archive size={14} />
                     </button>
                   </div>

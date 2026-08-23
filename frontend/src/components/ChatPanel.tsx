@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Loader2, RotateCcw, Send } from 'lucide-react';
 import { useHermesStore, type TaskRun } from '../store/store';
-import { submitPrompt } from '../api/sessions';
+import { getSessionMessagePage, submitPrompt } from '../api/sessions';
 import { apiFetch, VITE_USE_TASK_API } from '../api/client';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { subscribeToSessionEvents, subscribeToTaskEvents } from '../api/events';
@@ -39,7 +39,7 @@ function taskStatusHint(status?: string): string {
     case 'queued':
       return 'Yêu cầu đã được ghi nhận và đang chờ Hermes xử lý.';
     case 'running':
-      return 'Hermes hoặc model đang xử lý. Nếu mất hơn 30 giây, thường do provider chậm, phiên dài hoặc đang chờ quyền.';
+      return 'Hermes đang xử lý. Nếu mất hơn 30 giây, Công việc có thể dài hoặc đang chờ bạn duyệt quyền.';
     case 'waiting_approval':
       return 'Hermes đang chờ bạn phê duyệt một hành động trong hộp thoại hoặc nhật ký bên phải.';
     case 'completed':
@@ -58,7 +58,7 @@ function runtimeStatusText(status: string, elapsedSeconds: number, isSubmitting:
   }
   if (status === 'queued' || status === 'running') {
     if (elapsedSeconds >= 30) {
-      return `Hermes phản hồi chậm (${elapsedSeconds}s). Thường do model/provider, phiên dài hoặc đang chờ phê duyệt.`;
+      return `Hermes đang cần thêm thời gian (${elapsedSeconds}s). Công việc có thể dài hoặc đang chờ bạn duyệt quyền.`;
     }
     return `Hermes đang xử lý... (${elapsedSeconds}s)`;
   }
@@ -76,7 +76,9 @@ export const ChatPanel: React.FC = () => {
   const setSessionError = useHermesStore(state => state.setSessionError);
   const setSessionStartedAt = useHermesStore(state => state.setSessionStartedAt);
   const addEvent = useHermesStore(state => state.addEvent);
+  const removeEvent = useHermesStore(state => state.removeEvent);
   const setLatestTask = useHermesStore(state => state.setLatestTask);
+  const setEvents = useHermesStore(state => state.setEvents);
 
   const [prompt, setPrompt] = useState('');
   const [lastFailedPrompt, setLastFailedPrompt] = useState('');
@@ -84,6 +86,8 @@ export const ChatPanel: React.FC = () => {
   const [promptError, setPromptError] = useState<string | null>(null);
   const [curatorMessage, setCuratorMessage] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [hasEarlier, setHasEarlier] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const latestTask = activeSessionId ? latestTaskBySession[activeSessionId] : null;
@@ -101,6 +105,47 @@ export const ChatPanel: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [activeSessionId, sessionEvents.length]);
+
+  useEffect(() => {
+    setPrompt('');
+    setLastFailedPrompt('');
+    setPromptError(null);
+    setCuratorMessage(null);
+    setIsSubmitting(false);
+    setLoadingEarlier(false);
+    setHasEarlier(true);
+  }, [activeSessionId]);
+
+  const loadEarlierMessages = async () => {
+    if (!activeSessionId || loadingEarlier || chatEvents.length === 0) return;
+    const sessionId = activeSessionId;
+    const oldestPersisted = chatEvents.find(event => !event.id.startsWith('local-'));
+    if (!oldestPersisted) {
+      setHasEarlier(false);
+      return;
+    }
+    setLoadingEarlier(true);
+    try {
+      const page = await getSessionMessagePage(sessionId, 100, oldestPersisted.id);
+      if (useHermesStore.getState().activeSessionId !== sessionId) return;
+      const current = useHermesStore.getState().events[sessionId] ?? [];
+      const known = new Set(current.map(event => event.id));
+      const older = page.messages
+        .filter(message => !known.has(message.id))
+        .map(message => ({
+          id: message.id,
+          type: message.role === 'user' ? 'user_message' as const : 'token' as const,
+          text: message.content,
+          created_at: message.created_at,
+        }));
+      setEvents(sessionId, [...older, ...current]);
+      setHasEarlier(page.has_more);
+    } catch {
+      if (useHermesStore.getState().activeSessionId === sessionId) setPromptError('Không tải được tin nhắn cũ hơn.');
+    } finally {
+      if (useHermesStore.getState().activeSessionId === sessionId) setLoadingEarlier(false);
+    }
+  };
 
   useEffect(() => {
     const isWaiting = status === 'queued' || status === 'running' || status === 'waiting_approval';
@@ -121,15 +166,17 @@ export const ChatPanel: React.FC = () => {
       return;
     }
 
+    const sessionId = activeSessionId;
+    const optimisticEventId = `local-user-${Date.now()}`;
     setIsSubmitting(true);
     try {
       setPromptError(null);
       setCuratorMessage(null);
-      setSessionError(activeSessionId, null);
-      setSessionStatus(activeSessionId, 'queued');
-      setSessionStartedAt(activeSessionId, Date.now());
-      addEvent(activeSessionId, {
-        id: `local-user-${Date.now()}`,
+      setSessionError(sessionId, null);
+      setSessionStatus(sessionId, 'queued');
+      setSessionStartedAt(sessionId, Date.now());
+      addEvent(sessionId, {
+        id: optimisticEventId,
         type: 'user_message',
         text: nextPrompt,
         created_at: Math.floor(Date.now() / 1000),
@@ -137,7 +184,7 @@ export const ChatPanel: React.FC = () => {
 
       if (VITE_USE_TASK_API) {
         const createdTask = await createTask({
-          session_id: activeSessionId,
+          session_id: sessionId,
           title: nextPrompt.slice(0, 100),
           description: nextPrompt,
           task_type: 'prompt',
@@ -145,31 +192,32 @@ export const ChatPanel: React.FC = () => {
         const task = await startTask(createdTask.id);
         const taskRun: TaskRun = {
           id: task.id,
-          session_id: activeSessionId,
+          session_id: sessionId,
           status: task.status === 'succeeded' ? 'succeeded' : task.status,
           started_at: task.created_at || Math.floor(Date.now() / 1000),
           retry_count: 0,
         };
-        setLatestTask(activeSessionId, taskRun);
-        setSessionStatus(activeSessionId, task.status === 'waiting_approval' ? 'waiting_approval' : 'queued');
-        subscribeToTaskEvents(activeSessionId, task.id);
+        setLatestTask(sessionId, taskRun);
+        setSessionStatus(sessionId, task.status === 'waiting_approval' ? 'waiting_approval' : 'queued');
+        subscribeToTaskEvents(sessionId, task.id);
       } else {
-        const task = await submitPrompt(activeSessionId, nextPrompt);
-        setLatestTask(activeSessionId, task);
-        setSessionStatus(activeSessionId, task.status === 'waiting_approval' ? 'waiting_approval' : 'queued');
-        subscribeToSessionEvents(activeSessionId);
+        const task = await submitPrompt(sessionId, nextPrompt);
+        setLatestTask(sessionId, task);
+        setSessionStatus(sessionId, task.status === 'waiting_approval' ? 'waiting_approval' : 'queued');
+        subscribeToSessionEvents(sessionId);
       }
       setPrompt('');
       setLastFailedPrompt('');
     } catch (err) {
       console.error('Failed to submit prompt', err);
+      removeEvent(sessionId, optimisticEventId);
       const message = 'Không gửi được yêu cầu. Hãy kiểm tra backend đang chạy và Hermes đã được cấu hình trong backend/.env.';
       setPromptError(message);
-      setSessionError(activeSessionId, message);
+      setSessionError(sessionId, message);
       setLastFailedPrompt(nextPrompt);
       setPrompt(nextPrompt);
-      setSessionStatus(activeSessionId, 'error');
-      setSessionStartedAt(activeSessionId, null);
+      setSessionStatus(sessionId, 'error');
+      setSessionStartedAt(sessionId, null);
     } finally {
       setIsSubmitting(false);
     }
@@ -246,8 +294,8 @@ export const ChatPanel: React.FC = () => {
           <h2>Trò chuyện</h2>
           <p>
             {activeSessionId
-              ? 'Gửi yêu cầu cho Hermes và theo dõi kết quả tại nhật ký bên phải.'
-              : 'Tạo hoặc chọn một phiên để bắt đầu.'}
+              ? 'Gửi yêu cầu cho Hermes và mở Hoạt động khi bạn cần xem tiến độ.'
+              : 'Tạo hoặc chọn một Công việc để bắt đầu.'}
           </p>
         </div>
 
@@ -264,7 +312,7 @@ export const ChatPanel: React.FC = () => {
               className="btn-danger compact-button"
               onClick={handleCancel}
               style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', fontWeight: '500' }}
-              title="Việc hủy chỉ được cập nhật trên metadata, không đảm bảo dừng tiến trình Hermes legacy đang chạy."
+              title="Yêu cầu dừng có thể cần một lúc để Hermes hoàn tất bước hiện tại."
             >
               Hủy
             </button>
@@ -279,7 +327,7 @@ export const ChatPanel: React.FC = () => {
 
       {latestTask && (
         <div className={`task-status-strip ${latestTask.status === 'failed' ? 'failed' : ''}`}>
-          <span>Task gần nhất: {taskStatusLabel(latestTask.status)}</span>
+          <span>Yêu cầu gần nhất: {taskStatusLabel(latestTask.status)}</span>
           {latestTask.finished_at && <span>Hoàn tất lúc {formatTime(latestTask.finished_at)}</span>}
           {taskHint && <span>{taskHint}</span>}
         </div>
@@ -288,7 +336,7 @@ export const ChatPanel: React.FC = () => {
       {VITE_USE_TASK_API && (
         <div className="task-api-warning-banner" style={{ background: '#f59e0b', color: '#000', padding: '8px 12px', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
           <AlertCircle size={16} />
-          <span>Task API đang ở chế độ metadata, chưa thay thế Hermes chat runtime.</span>
+          <span>Chế độ tương thích đang bật; trạng thái dừng có thể cập nhật chậm hơn phản hồi của Hermes.</span>
         </div>
       )}
 
@@ -297,8 +345,8 @@ export const ChatPanel: React.FC = () => {
       <div className="chat-messages">
         {!activeSessionId ? (
           <div className="empty-state centered-empty-state">
-            <div className="empty-state-title">Tạo phiên để bắt đầu</div>
-            <div className="empty-state-text">1. Mở tab Phiên. 2. Chọn không gian làm việc. 3. Gửi yêu cầu đầu tiên.</div>
+            <div className="empty-state-title">Tạo Công việc để bắt đầu</div>
+            <div className="empty-state-text">1. Mở mục Công việc. 2. Tạo hoặc chọn một Công việc. 3. Gửi yêu cầu đầu tiên.</div>
           </div>
         ) : chatEvents.length === 0 ? (
           <div className="empty-state centered-empty-state">
@@ -307,6 +355,7 @@ export const ChatPanel: React.FC = () => {
           </div>
         ) : (
           <div className="message-list">
+            {hasEarlier && <button type="button" className="btn-secondary compact-button history-load-button" onClick={() => void loadEarlierMessages()} disabled={loadingEarlier}>{loadingEarlier ? 'Đang tải…' : 'Tải tin nhắn trước'}</button>}
             {chatEvents.map((event, index) => {
               const isUser = event.type === 'user_message';
               return (
@@ -334,7 +383,7 @@ export const ChatPanel: React.FC = () => {
           <button
             className="btn-secondary compact-button"
             onClick={handleRetry}
-            disabled={isSubmitting || !activeSessionId || !lastUserPrompt}
+            disabled={isSubmitting || !activeSessionId || !(lastFailedPrompt || lastUserPrompt)}
           >
             <RotateCcw size={14} /> Gửi lại
           </button>

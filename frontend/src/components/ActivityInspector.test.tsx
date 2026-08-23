@@ -37,7 +37,7 @@ describe('ActivityInspector', () => {
       expect(getSessionAuditEvents).toHaveBeenCalledWith('s1');
       expect(screen.getByText('Nhận yêu cầu')).toBeDefined();
     });
-    expect(screen.getByText('Mở tab Kỹ thuật để xem payload, actor và command đầy đủ.')).toBeDefined();
+    expect(screen.getByText('Mở tab Kỹ thuật để xem metadata đã được che dữ liệu nhạy cảm.')).toBeDefined();
     expect(screen.queryByText('Actor: user')).toBeNull();
     expect(screen.queryByText(/prompt_length/)).toBeNull();
   });
@@ -90,7 +90,21 @@ describe('ActivityInspector', () => {
 
     fireEvent.click(screen.getByText('Kỹ thuật'));
     expect(screen.getByText('Chi tiết terminal')).toBeDefined();
-    expect(screen.getByText('Terminal command blocked by policy')).toBeDefined();
+    expect(screen.getByText('[redacted terminal output]')).toBeDefined();
+    expect(screen.queryByText('Terminal command blocked by policy')).toBeNull();
+  });
+
+  it('dùng timestamp của live event thay vì thời điểm render', async () => {
+    vi.mocked(getSessionAuditEvents).mockResolvedValue([]);
+    const occurredAt = 1_800_000_000;
+    useHermesStore.setState({
+      activeSessionId: 's1',
+      events: { s1: [{ id: 'live-at', type: 'terminal', output: 'đã nhận', created_at: occurredAt }] },
+    });
+
+    render(<ActivityInspector />);
+
+    expect(await screen.findByText(new Date(occurredAt * 1000).toLocaleTimeString('vi-VN'))).toBeDefined();
   });
 
   it('hiển thị tool arguments trong tab kỹ thuật', async () => {
@@ -112,7 +126,7 @@ describe('ActivityInspector', () => {
     expect(screen.getByText(/README.md/)).toBeDefined();
   });
 
-  it('giải thích khi Hermes đang xử lý nhưng chưa có live event', async () => {
+  it('giải thích khi Trợ lý GYO đang xử lý nhưng chưa có live event', async () => {
     vi.mocked(getSessionAuditEvents).mockResolvedValue([]);
     useHermesStore.setState({
       activeSessionId: 's1',
@@ -122,6 +136,7 @@ describe('ActivityInspector', () => {
 
     render(<ActivityInspector />);
 
+    expect(screen.getByText(/Trợ lý GYO đang chờ token/)).toBeDefined();
     expect(screen.getByText(/model\/provider đang phản hồi chậm/)).toBeDefined();
   });
 
@@ -145,7 +160,7 @@ describe('ActivityInspector', () => {
 
     render(<ActivityInspector />);
 
-    expect(screen.getByText('Hành động: Cấp quyền cho Hermes')).toBeDefined();
+    expect(screen.getByText('Hành động: Cấp quyền cho Trợ lý GYO')).toBeDefined();
     expect(screen.queryByText('Mã hành động: hermes.permission')).toBeNull();
 
     fireEvent.click(screen.getByText('Kỹ thuật'));
@@ -178,6 +193,6 @@ describe('ActivityInspector', () => {
     render(<ActivityInspector />);
 
     await screen.findByText('Nhận yêu cầu');
-    expect(screen.getAllByText('Mở tab Kỹ thuật để xem payload, actor và command đầy đủ.')).toHaveLength(1);
+    expect(screen.getAllByText('Mở tab Kỹ thuật để xem metadata đã được che dữ liệu nhạy cảm.')).toHaveLength(1);
   });
 });

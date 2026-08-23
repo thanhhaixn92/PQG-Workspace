@@ -1,10 +1,9 @@
-# Hermes Local Stack - Data And Storage Model
+# DIRAP Local Workbench - Data And Storage Model
 
 ## 1. Nguyen Tac Luu Tru
 
-- Hermes state.db la owner cua conversation/runtime state chi tiet.
-- App SQLite `app.db` la owner cua business metadata.
-- Khong duplicate full chat history vao app.db trong MVP.
+- App SQLite `app.db` la owner cua Work, conversation va Assistant turns hien thi cho nguoi dung cung business metadata.
+- Hermes state la owner cua ACP session, reasoning va runtime noi bo; ung dung khong doc/sua truc tiep `state.db`.
 - Moi data co kha nang thay doi hanh vi dai han cua agent phai co audit.
 - Moi secret nam ngoai source code, trong `.env` hoac store rieng.
 
@@ -12,17 +11,17 @@
 
 | Storage | Owner | Noi dung | Ghi chu |
 |---|---|---|---|
-| Hermes state.db | Hermes | conversation history, ACP sessions, internal recall | Khong sua truc tiep tu app |
-| app.db | Hermes Local Stack | sessions metadata, task runs, memory, skills, audit, permissions, files index | SQLite WAL |
+| Hermes state.db | Hermes | ACP sessions, reasoning, internal runtime/recall | Khong doc, sua hoac dong bo truc tiep tu app |
+| app.db | DIRAP Local Workbench | Work, plan, conversations, Assistant turns/parts, task runs, approvals/action packages, knowledge, memory, skills, audit | SQLite WAL |
 | workspace files | User/project | source docs, output files, editor content | Chi truy cap trong workspace path |
-| n8n data volume | n8n | workflows, credentials, settings | Can persistent volume va encryption key |
+| n8n data volume | n8n | workflows, credentials, settings neu sidecar duoc cau hinh | Tuy chon, loopback-only |
 | `.env` | Operator | secrets, webhook URLs, keys | Khong commit |
 
 ## 3. Core Entities
 
 ### sessions
 
-Dung de map app session voi ACP session.
+Entity tuong thich dai dien cho Work; khong phai owner cua Hermes reasoning.
 
 Fields bat buoc:
 
@@ -156,15 +155,22 @@ Fields bat buoc:
 
 ## 4. Data Ownership Rules
 
-- Conversation content: Hermes owns.
+- User-visible Work conversations, Assistant turns va parts: app owns.
+- ACP reasoning/runtime state: Hermes owns.
 - Session title/workspace/archive: app owns.
 - Skills: app owns.
 - Memory entries: app owns.
 - File content: workspace owns.
 - File metadata cache: app owns.
-- Workflow credentials: n8n owns.
+- Workflow credentials: n8n owns neu optional sidecar duoc cau hinh.
 - Approval decisions: app owns.
 - Audit events: app owns and should be append-only.
+
+## 4.1 Ba lop tri thuc dai han
+
+- Legacy `memory_entries`: kho tuong thich cu, khong dong nghia voi Memory Hub.
+- Governed Memory Hub: proposal/review/activation rieng, khong auto-inject vao Assistant context.
+- Knowledge Records: lifecycle tri thuc theo Work va nguon; Review chi projection, khong tao lifecycle thu hai.
 
 ## 5. Retention
 

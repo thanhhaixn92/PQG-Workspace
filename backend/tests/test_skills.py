@@ -18,6 +18,14 @@ async def _fetch_audits(settings):
         await conn.close()
 
 
+async def _approve_skill(client, skill_id: str):
+    review = await client.post(f"/api/skills/{skill_id}/status", json={"status": "review_pending"})
+    assert review.status_code == 200
+    approved = await client.post(f"/api/skills/{skill_id}/status", json={"status": "approved"})
+    assert approved.status_code == 200
+    return approved
+
+
 class TestSkillsCRUD:
 
     async def test_create_skill(self, client, test_app):
@@ -25,20 +33,27 @@ class TestSkillsCRUD:
             "name": "Test Skill",
             "description": "Test Desc",
             "content": "Do things right.",
-            "enabled": True,
         })
         assert resp.status_code == 200
         skill = resp.json()
         assert skill["name"] == "Test Skill"
         assert skill["status"] == "draft"
         assert skill["version"] == 1
-        assert skill["enabled"] is True
+        assert skill["enabled"] is False
         skill_id = skill["id"]
 
         from app.dependencies import get_settings
         settings = test_app.dependency_overrides.get(get_settings, get_settings)()
         audits = _audit_tuples(await _fetch_audits(settings))
         assert ("skill.created", skill_id) in audits
+
+    async def test_legacy_enabled_flag_is_accepted_but_draft_remains_disabled(self, client):
+        resp = await client.post("/api/skills", json={
+            "name": "Legacy Create", "content": "Needs review", "enabled": True,
+        })
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "draft"
+        assert resp.json()["enabled"] is False
 
     async def test_create_skill_duplicate_name(self, client, test_app):
         await client.post("/api/skills", json={"name": "Dup", "content": "First"})
@@ -67,7 +82,7 @@ class TestSkillsCRUD:
 
     async def test_update_skill(self, client, test_app):
         create = await client.post("/api/skills", json={
-            "name": "Before", "content": "Old content", "enabled": True,
+            "name": "Before", "content": "Old content",
         })
         sid = create.json()["id"]
         assert create.json()["version"] == 1
@@ -172,10 +187,10 @@ class TestSkillStatus:
         sid = create.json()["id"]
         assert create.json()["status"] == "draft"
 
-        resp = await client.post(f"/api/skills/{sid}/status", json={"status": "approved"})
+        resp = await _approve_skill(client, sid)
         assert resp.status_code == 200
         assert resp.json()["status"] == "approved"
-        assert resp.json()["version"] == 2
+        assert resp.json()["version"] == 3
 
         from app.dependencies import get_settings
         settings = test_app.dependency_overrides.get(get_settings, get_settings)()
@@ -187,7 +202,7 @@ class TestSkillStatus:
             "name": "AlreadyApproved", "content": "X",
         })
         sid = create.json()["id"]
-        await client.post(f"/api/skills/{sid}/status", json={"status": "approved"})
+        await _approve_skill(client, sid)
         resp = await client.post(f"/api/skills/{sid}/status", json={"status": "approved"})
         assert resp.status_code == 400
 
@@ -196,12 +211,12 @@ class TestSkillStatus:
             "name": "RevertMe", "content": "Approved content",
         })
         sid = create.json()["id"]
-        await client.post(f"/api/skills/{sid}/status", json={"status": "approved"})
+        await _approve_skill(client, sid)
 
         resp = await client.post(f"/api/skills/{sid}/status", json={"status": "draft"})
         assert resp.status_code == 200
         assert resp.json()["status"] == "draft"
-        assert resp.json()["version"] == 3
+        assert resp.json()["version"] == 4
 
     async def test_status_change_snapshots_version(self, client, test_app):
         create = await client.post("/api/skills", json={
@@ -209,18 +224,33 @@ class TestSkillStatus:
         })
         sid = create.json()["id"]
 
-        await client.post(f"/api/skills/{sid}/status", json={"status": "approved"})
+        await _approve_skill(client, sid)
 
         versions = (await client.get(f"/api/skills/{sid}/versions")).json()
-        assert len(versions) == 2  # v1 create + v2 status-change snapshot
-        assert versions[1]["status"] == "draft"  # snapshot captured the old draft state
+        assert len(versions) == 3  # create + submit-for-review + approve snapshots
+        assert versions[1]["status"] == "draft"
+        assert versions[2]["status"] == "review_pending"
+
+    async def test_draft_cannot_be_enabled_and_content_edit_invalidates_approval(self, client):
+        create = await client.post("/api/skills", json={"name": "Governed", "content": "v1"})
+        sid = create.json()["id"]
+        blocked = await client.put(f"/api/skills/{sid}", json={"enabled": True})
+        assert blocked.status_code == 409
+
+        await _approve_skill(client, sid)
+        enabled = await client.put(f"/api/skills/{sid}", json={"enabled": True})
+        assert enabled.status_code == 200
+        edited = await client.put(f"/api/skills/{sid}", json={"content": "v2 needs review"})
+        assert edited.status_code == 200
+        assert edited.json()["status"] == "draft"
+        assert edited.json()["enabled"] is False
 
 
 class TestContextFiltering:
 
     async def test_draft_skill_excluded_from_context(self, client, test_app, migrated_db_path):
         await client.post("/api/skills", json={
-            "name": "DraftSkill", "content": "Draft content", "enabled": True,
+            "name": "DraftSkill", "content": "Draft content",
         })
 
         from app.db.connection import open_db
@@ -234,10 +264,11 @@ class TestContextFiltering:
 
     async def test_approved_skill_included_in_context(self, client, test_app, migrated_db_path):
         create = await client.post("/api/skills", json={
-            "name": "ApprovedSkill", "content": "Approved content", "enabled": True,
+            "name": "ApprovedSkill", "content": "Approved content",
         })
         sid = create.json()["id"]
-        await client.post(f"/api/skills/{sid}/status", json={"status": "approved"})
+        await _approve_skill(client, sid)
+        await client.put(f"/api/skills/{sid}", json={"enabled": True})
 
         from app.db.connection import open_db
         conn = await open_db(migrated_db_path)
@@ -251,10 +282,10 @@ class TestContextFiltering:
 
     async def test_disabled_approved_skill_excluded(self, client, test_app, migrated_db_path):
         create = await client.post("/api/skills", json={
-            "name": "DisabledApproved", "content": "Disabled", "enabled": True,
+            "name": "DisabledApproved", "content": "Disabled",
         })
         sid = create.json()["id"]
-        await client.post(f"/api/skills/{sid}/status", json={"status": "approved"})
+        await _approve_skill(client, sid)
         await client.put(f"/api/skills/{sid}", json={"enabled": False})
 
         from app.db.connection import open_db
@@ -276,7 +307,8 @@ class TestAuditTrail:
         sid = create.json()["id"]
 
         await client.put(f"/api/skills/{sid}", json={"content": "Y"})
-        await client.post(f"/api/skills/{sid}/status", json={"status": "approved"})
+        await _approve_skill(client, sid)
+        await client.put(f"/api/skills/{sid}", json={"enabled": True})
         await client.put(f"/api/skills/{sid}", json={"enabled": False})
 
         from app.dependencies import get_settings
@@ -287,6 +319,7 @@ class TestAuditTrail:
             ("skill.created", sid),
             ("skill.updated", sid),
             ("skill.status_approved", sid),
+            ("skill.enabled", sid),
             ("skill.disabled", sid),
         ]
         for exp in expected:

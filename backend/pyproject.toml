@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hermes-local-stack"
-version = "0.1.0"
-description = "Hermes Local Stack - local-first AI office assistant backend"
+version = "2.2.0"
+description = "DIRAP Local Workbench - local-first AI office assistant backend"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.111.0",
@@ -14,7 +14,10 @@ dependencies = [
     "pydantic-settings>=2.2.0",
     "agent-client-protocol==0.10.1",
     "sse-starlette==3.4.5",
-    "mcp>=1.2.0",
+    "mcp==1.29.0",
+    "keyring>=25.7,<26",
+    "httpx>=0.27.0",
+    "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]

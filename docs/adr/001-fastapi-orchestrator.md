@@ -5,7 +5,7 @@
 
 ## Context
 
-Hermes Local Stack có nhiều thành phần: FastAPI backend, Hermes ACP agent, n8n workflow engine, SQLite database, và frontend webapp. Trong quá trình phát triển, có thể xu hướng để Hermes hoặc n8n tự do gọi nhau trực tiếp, dẫn đến:
+DIRAP Local Workbench có nhiều thành phần: FastAPI backend, Hermes ACP agent, n8n workflow engine, SQLite database, và frontend webapp. Trong quá trình phát triển, có thể xu hướng để Hermes hoặc n8n tự do gọi nhau trực tiếp, dẫn đến:
 
 - Policy boundary bị phá vỡ (approval, audit bị bypass)
 - Khó xác định nơi giữ task state

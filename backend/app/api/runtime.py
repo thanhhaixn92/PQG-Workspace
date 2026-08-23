@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import os
 import shutil
@@ -14,7 +15,7 @@ import aiosqlite
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.dependencies import get_db, get_settings
+from app.dependencies import get_db, get_settings, get_trusted_actor
 from app.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -24,37 +25,17 @@ router = APIRouter(prefix="/api/runtime", tags=["runtime"])
 
 class RuntimeDbStatus(BaseModel):
     status: Literal["ok", "error"]
-    path: str
 
 
 class RuntimeHermesStatus(BaseModel):
     status: Literal["ready", "mock", "missing", "not_configured", "auth_unknown", "auth_expired"]
-    executable_path: str
-    configured: bool
-    executable_found: bool
-    auth_status: Literal["ready", "unknown", "not_required", "auth_expired"]
-    dev_mock: bool
-    args: list[str]
     guidance: str
-
-
-class RuntimeN8nStatus(BaseModel):
-    configured: bool
-    webhook_base_url: str
-    guidance: str
-
-
-class RuntimeEnvironmentStatus(BaseModel):
-    env_file_exists: bool
-    cwd: str
 
 
 class RuntimeStatusResponse(BaseModel):
     backend: Literal["ok"]
     db: RuntimeDbStatus
     hermes: RuntimeHermesStatus
-    n8n: RuntimeN8nStatus
-    environment: RuntimeEnvironmentStatus
     timestamp: int
 
 
@@ -74,11 +55,25 @@ class RuntimeSmokeResponse(BaseModel):
     timestamp: int
 
 
+class RuntimeIdentityScopeResponse(BaseModel):
+    """Public, non-secret namespace used by browser-only draft state."""
+
+    identity_scope: str
+    workspace_scope: Literal["local"] = "local"
+
+
 def _is_executable_found(path_value: str) -> bool:
     path = Path(path_value)
     if path.is_absolute() or any(sep in path_value for sep in ("\\", "/")):
         return path.exists()
     return shutil.which(path_value) is not None
+
+
+@router.get("/identity-scope", response_model=RuntimeIdentityScopeResponse)
+async def runtime_identity_scope(actor: str = Depends(get_trusted_actor)) -> RuntimeIdentityScopeResponse:
+    """Return a stable opaque scope without exposing the actor subject."""
+    digest = hashlib.sha256(f"pqg-workspace:local-scope:{actor}".encode("utf-8")).hexdigest()
+    return RuntimeIdentityScopeResponse(identity_scope=digest[:32])
 
 
 def _hermes_configured(settings: Settings) -> bool:
@@ -89,8 +84,11 @@ def _hermes_configured(settings: Settings) -> bool:
     )
 
 
-def _hermes_auth_ready_signal() -> bool:
+def _hermes_auth_ready_signal(settings: Settings | None = None) -> bool:
     """Return whether local config has a non-secret sign that Hermes auth exists."""
+    if settings is not None and settings.hermes_auth_ready:
+        return True
+
     explicit = os.getenv("HERMES_AUTH_READY")
     if explicit and explicit.strip().lower() in {"1", "true", "yes", "on"}:
         return True
@@ -115,18 +113,35 @@ class HermesPreflightResult(BaseModel):
     guidance: str
 
 
-def _run_hermes_doctor_sync(executable_path: str) -> bool:
-    """Run `hermes doctor --json` synchronously; return True if auth is valid.
+def _run_hermes_auth_status_sync(executable_path: str) -> bool:
+    """Compatibility health check for Hermes releases without doctor JSON."""
+    try:
+        provider_result = subprocess.run(
+            [executable_path, "config", "get", "model.provider"],
+            capture_output=True, text=True, timeout=4.0,
+        )
+        provider = provider_result.stdout.strip() if provider_result.returncode == 0 else ""
+        if not provider:
+            return False
+        status_result = subprocess.run(
+            [executable_path, "auth", "status", provider],
+            capture_output=True, text=True, timeout=4.0,
+        )
+        return status_result.returncode == 0 and "logged in" in status_result.stdout.casefold()
+    except (subprocess.TimeoutError, FileNotFoundError, OSError):
+        return False
 
-    Timeout after 8 seconds. Returns False on any failure (timeout, non-zero
-    exit, parse error, or unhealthy auth status).
-    """
+
+def _run_hermes_doctor_sync(executable_path: str) -> bool:
+    """Validate auth, falling back for Hermes releases without doctor JSON."""
     try:
         result = subprocess.run(
             [executable_path, "doctor", "--json"],
             capture_output=True, text=True, timeout=8.0,
         )
         if result.returncode != 0:
+            if "unrecognized arguments: --json" in result.stderr:
+                return _run_hermes_auth_status_sync(executable_path)
             logger.warning("hermes doctor exited %d: %s", result.returncode, result.stderr.strip())
             return False
         data = json.loads(result.stdout)
@@ -182,7 +197,7 @@ def check_hermes_preflight(settings: Settings, run_doctor: bool = False) -> Herm
             guidance="Không tìm thấy Hermes executable. Hãy kiểm tra HERMES_EXECUTABLE_PATH.",
         )
 
-    if not _hermes_auth_ready_signal():
+    if not _hermes_auth_ready_signal(settings):
         return HermesPreflightResult(
             status="auth_unknown",
             configured=True,
@@ -227,36 +242,12 @@ async def runtime_status(
 
     hermes_preflight = check_hermes_preflight(settings)
 
-    n8n_configured = bool(settings.n8n_webhook_secret)
-
     return RuntimeStatusResponse(
         backend="ok",
-        db=RuntimeDbStatus(
-            status="ok" if db_ok else "error",
-            path=str(settings.db_path_resolved),
-        ),
+        db=RuntimeDbStatus(status="ok" if db_ok else "error"),
         hermes=RuntimeHermesStatus(
             status=hermes_preflight.status,
-            executable_path=settings.hermes_executable_path,
-            configured=hermes_preflight.configured,
-            executable_found=hermes_preflight.executable_found,
-            auth_status=hermes_preflight.auth_status,
-            dev_mock=settings.hermes_dev_mock,
-            args=settings.hermes_args,
             guidance=hermes_preflight.guidance,
-        ),
-        n8n=RuntimeN8nStatus(
-            configured=n8n_configured,
-            webhook_base_url=settings.n8n_webhook_base_url,
-            guidance=(
-                "n8n webhook đã cấu hình."
-                if n8n_configured
-                else "n8n chưa cấu hình secret; bỏ qua nếu chưa dùng automation."
-            ),
-        ),
-        environment=RuntimeEnvironmentStatus(
-            env_file_exists=Path(".env").exists(),
-            cwd=str(Path.cwd()),
         ),
         timestamp=int(time.time()),
     )
@@ -286,7 +277,7 @@ async def runtime_smoke(
                 key="db",
                 label="Cơ sở dữ liệu",
                 status="ready",
-                detail=f"SQLite sẵn sàng: {settings.db_path_resolved}",
+                detail="SQLite sẵn sàng.",
             )
         )
     except Exception as exc:
@@ -324,7 +315,7 @@ async def runtime_smoke(
                 key="hermes",
                 label="Hermes executable",
                 status="error",
-                detail=f"Không tìm thấy executable: {settings.hermes_executable_path}",
+                detail="Không tìm thấy Hermes executable đã cấu hình.",
             )
         )
     elif hermes_preflight.status == "auth_unknown":
@@ -351,7 +342,7 @@ async def runtime_smoke(
                 key="hermes",
                 label="Hermes runtime",
                 status="ready",
-                detail=f"Đã tìm thấy executable và auth local hợp lệ: {settings.hermes_executable_path}",
+                detail="Hermes executable và auth local đã sẵn sàng.",
             )
         )
 
@@ -387,9 +378,9 @@ async def runtime_smoke(
                     label="File workspace",
                     status="ready" if workspace.exists() and workspace.is_dir() else "error",
                     detail=(
-                        f"Workspace sẵn sàng: {workspace}"
+                        "Workspace sẵn sàng."
                         if workspace.exists() and workspace.is_dir()
-                        else f"Workspace không tồn tại: {workspace}"
+                        else "Workspace không tồn tại hoặc không truy cập được."
                     ),
                 )
             )

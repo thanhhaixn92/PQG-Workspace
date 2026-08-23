@@ -1,8 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, FileWarning, Folder, FolderOpen, RefreshCw } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, FilePlus2, FileText, FileWarning, Folder, FolderOpen, FolderPlus, RefreshCw, Upload, X } from 'lucide-react';
 import { useHermesStore } from '../store/store';
-import { fetchFileContent, fetchFileTree } from '../api/files';
+import { createManagedFolder, createManagedTextFile, fetchFileContent, fetchFileTree, importDocument } from '../api/files';
 import type { FileNode } from '../api/files';
+
+const TEST_DATA_MARKERS = ['uat-codex-', 'smoke-test-', '404test-'];
+export const isTestDataNode = (node: FileNode) => TEST_DATA_MARKERS.some(marker => node.name.toLowerCase().startsWith(marker));
+export const filterTestDataNodes = (nodes: FileNode[]): FileNode[] => nodes
+  .filter(node => !isTestDataNode(node))
+  .map(node => node.children ? { ...node, children: filterTestDataNodes(node.children) } : node);
+const countTestDataNodes = (nodes: FileNode[]): number => nodes.reduce((total, node) => total + (isTestDataNode(node) ? 1 : 0) + (node.children ? countTestDataNodes(node.children) : 0), 0);
 
 const FileTreeNode: React.FC<{
   node: FileNode;
@@ -32,9 +39,12 @@ const FileTreeNode: React.FC<{
     try {
       onError(null);
       setLoading(true);
-      const file = await fetchFileContent(activeSessionId, node.path);
-      openFile(node.path, file.content, { mtime: file.mtime, size: file.size });
+      const sessionId = activeSessionId;
+      const file = await fetchFileContent(sessionId, node.path);
+      if (useHermesStore.getState().activeSessionId !== sessionId) return;
+      openFile(node.path, file.content, { mtime: file.mtime, size: file.size, hash: file.hash });
     } catch (err: unknown) {
+      if (useHermesStore.getState().activeSessionId !== activeSessionId) return;
       const message = err instanceof Error ? err.message : 'lỗi không xác định';
       onError(`Không đọc được tệp ${node.name}: ${message}`);
     } finally {
@@ -46,8 +56,10 @@ const FileTreeNode: React.FC<{
 
   return (
     <div>
-      <div
+      <button
+        type="button"
         onClick={() => void handleClick()}
+        onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void handleClick(); } }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -75,7 +87,7 @@ const FileTreeNode: React.FC<{
           )}
         </span>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.name}</span>
-      </div>
+      </button>
       {isDirectory && expanded && node.children && (
         <div>
           {node.children.map(child => (
@@ -87,43 +99,112 @@ const FileTreeNode: React.FC<{
   );
 };
 
-export const FileExplorer: React.FC = () => {
-  const { activeSessionId, fileTree, setFileTree } = useHermesStore();
+export const FileExplorer: React.FC<{ grouped?: boolean }> = ({ grouped = false }) => {
+  const activeSessionId = useHermesStore(state => state.activeSessionId);
+  const fileTree = useHermesStore(state => state.fileTree);
+  const setFileTree = useHermesStore(state => state.setFileTree);
   const [loading, setLoading] = useState(false);
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestVersion = useRef(0);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [createKind, setCreateKind] = useState<'file' | 'folder' | null>(null);
+  const [newItemName, setNewItemName] = useState('');
+  const [newFileContent, setNewFileContent] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [showTestData, setShowTestData] = useState(false);
 
-  const loadTree = async () => {
-    if (!activeSessionId) {
+  const loadTree = useCallback(async () => {
+    const sessionId = activeSessionId;
+    const version = ++requestVersion.current;
+    if (!sessionId) {
+      setFileTree([]);
       return;
     }
 
     try {
       setError(null);
       setLoading(true);
-      const res = await fetchFileTree(activeSessionId);
+      const res = await fetchFileTree(sessionId, grouped);
+      if (version !== requestVersion.current || useHermesStore.getState().activeSessionId !== sessionId) return;
       setFileTree(res.tree);
       setTruncated(res.truncated);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'lỗi không xác định';
-      setError(`Không tải được cây tệp: ${message}`);
+      if (version === requestVersion.current) setError(`Không tải được cây tệp: ${message}`);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
+    }
+  }, [activeSessionId, grouped, setFileTree]);
+
+  useEffect(() => {
+    requestVersion.current += 1;
+    setFileTree([]);
+    void loadTree();
+  }, [loadTree, setFileTree]);
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const sessionId = activeSessionId;
+    event.target.value = '';
+    if (!file || !sessionId) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Tệp vượt giới hạn nhập 10 MB.');
+      return;
+    }
+    setImporting(true);
+    setError(null);
+    try {
+      const key = globalThis.crypto?.randomUUID?.() ?? `import-${Date.now()}-${file.size}`;
+      await importDocument(sessionId, file, key);
+      if (useHermesStore.getState().activeSessionId === sessionId) await loadTree();
+    } catch (err: unknown) {
+      if (useHermesStore.getState().activeSessionId === sessionId) {
+        setError(err instanceof Error ? `Không nhập được tệp: ${err.message}` : 'Không nhập được tệp.');
+      }
+    } finally {
+      if (useHermesStore.getState().activeSessionId === sessionId) setImporting(false);
     }
   };
 
-  useEffect(() => {
-    void loadTree();
-  }, [activeSessionId]);
+  const handleCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const sessionId = activeSessionId;
+    const name = newItemName.trim();
+    if (!sessionId || !createKind || !name) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const key = globalThis.crypto?.randomUUID?.() ?? `create-${Date.now()}-${name}`;
+      if (createKind === 'folder') await createManagedFolder(sessionId, name, key);
+      else await createManagedTextFile(sessionId, name, newFileContent, key);
+      if (useHermesStore.getState().activeSessionId === sessionId) {
+        setCreateKind(null);
+        setNewItemName('');
+        setNewFileContent('');
+        await loadTree();
+      }
+    } catch (err: unknown) {
+      if (useHermesStore.getState().activeSessionId === sessionId) {
+        setError(err instanceof Error ? `Không tạo được tài liệu: ${err.message}` : 'Không tạo được tài liệu.');
+      }
+    } finally {
+      if (useHermesStore.getState().activeSessionId === sessionId) setCreating(false);
+    }
+  };
 
   if (!activeSessionId) {
     return (
       <div className="empty-state">
-        <div className="empty-state-title">Chưa chọn không gian làm việc</div>
-        <div className="empty-state-text">Tạo hoặc chọn một phiên trước khi duyệt tệp.</div>
+        <div className="empty-state-title">Chưa chọn Công việc</div>
+        <div className="empty-state-text">Tạo hoặc chọn một Công việc trước khi quản lý tài liệu.</div>
       </div>
     );
   }
+
+  const testDataCount = grouped ? countTestDataNodes(fileTree) : 0;
+  const visibleTree = grouped && !showTestData ? filterTestDataNodes(fileTree) : fileTree;
 
   return (
     <div className="file-explorer" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -141,25 +222,39 @@ export const FileExplorer: React.FC = () => {
         }}
       >
         <span>Không gian làm việc</span>
-        <button
-          onClick={() => void loadTree()}
-          disabled={loading}
-          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
-        >
-          <RefreshCw size={14} className={loading ? 'spin' : ''} />
-        </button>
+        <div style={{ display: 'flex', gap: '0.35rem' }}>
+          {grouped && testDataCount > 0 && <button className="btn-secondary compact-button" type="button" onClick={() => setShowTestData(current => !current)}>{showTestData ? 'Ẩn dữ liệu kiểm thử' : `Hiện dữ liệu kiểm thử (${testDataCount})`}</button>}
+          <input ref={importInputRef} type="file" hidden onChange={event => void handleImport(event)} />
+          <button className="icon-button" type="button" onClick={() => importInputRef.current?.click()} disabled={importing} title="Nhập tệp vào Công việc">
+            <Upload size={14} className={importing ? 'spin' : ''} />
+          </button>
+          <button className="icon-button" type="button" onClick={() => setCreateKind('file')} title="Tạo tệp văn bản"><FilePlus2 size={14} /></button>
+          <button className="icon-button" type="button" onClick={() => setCreateKind('folder')} title="Tạo thư mục"><FolderPlus size={14} /></button>
+          <button className="icon-button" type="button" onClick={() => void loadTree()} disabled={loading} title="Làm mới tài liệu">
+            <RefreshCw size={14} className={loading ? 'spin' : ''} />
+          </button>
+        </div>
       </div>
+
+      {createKind && (
+        <form className="session-form" onSubmit={event => void handleCreate(event)} style={{ margin: '0.6rem' }}>
+          <div className="section-header"><strong>{createKind === 'file' ? 'Tạo tệp văn bản' : 'Tạo thư mục'}</strong><button type="button" className="icon-button" title="Đóng" onClick={() => setCreateKind(null)}><X size={14} /></button></div>
+          <input aria-label="Tên tài liệu mới" value={newItemName} onChange={event => setNewItemName(event.target.value)} placeholder={createKind === 'file' ? 'Ví dụ: ghi-chu.txt' : 'Ví dụ: Nguồn tham khảo'} />
+          {createKind === 'file' && <textarea aria-label="Nội dung tệp mới" value={newFileContent} onChange={event => setNewFileContent(event.target.value)} rows={3} placeholder="Có thể để trống và sửa sau" />}
+          <button className="btn-primary" disabled={creating || !newItemName.trim()}>{creating ? 'Đang tạo…' : 'Tạo'}</button>
+        </form>
+      )}
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0' }}>
         {error && <div className="inline-error" style={{ margin: '0.5rem 1rem' }}>{error}</div>}
 
-        {fileTree.length === 0 && !loading ? (
+        {visibleTree.length === 0 && !loading ? (
           <div className="empty-state">
             <div className="empty-state-title">Không gian làm việc đang trống</div>
             <div className="empty-state-text">Thêm tệp vào không gian làm việc rồi làm mới cây tệp.</div>
           </div>
         ) : (
-          fileTree.map(node => <FileTreeNode key={node.path} node={node} depth={0} onError={setError} />)
+          visibleTree.map(node => <FileTreeNode key={node.path} node={node} depth={0} onError={setError} />)
         )}
 
         {truncated && (

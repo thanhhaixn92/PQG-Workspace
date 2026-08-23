@@ -17,6 +17,7 @@ class LegacyTaskAdapter:
         session_id: str,
         task_run_id: str,
         prompt: str,
+        conversation_id: str | None = None,
     ) -> str:
         task, _ = await self._task_service.create_task(
             session_id=session_id,
@@ -27,6 +28,11 @@ class LegacyTaskAdapter:
             "UPDATE task_runs SET task_id = ? WHERE id = ?",
             (task["id"], task_run_id),
         )
+        if conversation_id is not None:
+            await db.execute(
+                "UPDATE tasks SET conversation_id = ? WHERE id = ?",
+                (conversation_id, task["id"]),
+            )
         await self._task_service.start_task(task["id"], run_id=task_run_id)
         await db.commit()
         return task["id"]

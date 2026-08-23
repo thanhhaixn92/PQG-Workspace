@@ -2,7 +2,7 @@
 
 ## Architecture Snapshot
 
-Hermes Local Stack is a local-first single-user assistant.
+DIRAP Local Workbench is a local-first single-user assistant. Hermes is its internal agent/runtime.
 
 ```text
 React/Zustand UI
@@ -20,17 +20,17 @@ FastAPI
 
 - FastAPI owns validation, permissions, audit, and process boundaries.
 - UI owns presentation and interaction state only.
-- Hermes owns agent reasoning and detailed conversation state.
-- SQLite owns app-visible metadata only.
-- n8n owns workflow automation and credentials.
+- `app.db` owns Work conversations and Assistant turns visible to the user.
+- Hermes owns ACP sessions, reasoning and internal runtime state only; the app never edits Hermes `state.db`.
+- n8n owns optional workflow automation and credentials when configured.
 
 ## Core Flows
 
 ### Chat
 
-1. User creates or opens a session.
+1. User creates or opens a Work and selects a conversation.
 2. Frontend posts prompt to backend.
-3. Backend creates `task_run`.
+3. Backend persists the user-visible turn/run in `app.db`.
 4. Backend sends prompt to Hermes ACP.
 5. Backend emits typed SSE events.
 6. Frontend routes events into Zustand reducers.
@@ -59,7 +59,10 @@ FastAPI
 - No direct frontend-to-n8n access.
 - No direct frontend-to-Hermes process access.
 - No MCP tool bypassing backend policy.
-- No duplicate full chat history in app.db.
+- No direct read, write or synchronization against Hermes `state.db`.
+- No Work mutation from an MCP call: Hermes emits `DIRAP_ACTION_PROPOSAL:`, the user creates an Action Package, then approval/executor applies it once.
+- Hermes MCP exposes exactly the nine tools documented in PRD v2.2.
+- Memory Hub is never auto-injected and Review remains a projection over source lifecycles.
 
 ## Primary References
 

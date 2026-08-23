@@ -36,6 +36,8 @@ CP1_TABLES = {
     "notification_outbox",
 }
 
+REMEDIATION_TABLES = {"operation_claims", "artifacts"}
+
 
 @pytest.mark.asyncio
 async def test_all_required_tables_exist(migrated_db_path):
@@ -54,6 +56,9 @@ async def test_all_required_tables_exist(migrated_db_path):
 
     cp1_missing = CP1_TABLES - tables
     assert not cp1_missing, f"Missing CP1 tables: {cp1_missing}"
+
+    remediation_missing = REMEDIATION_TABLES - tables
+    assert not remediation_missing, f"Missing remediation tables: {remediation_missing}"
 
 
 @pytest.mark.asyncio
@@ -153,6 +158,152 @@ async def test_migration_is_idempotent(temp_db_path):
 
     await run_migrations(temp_db_path)
     await run_migrations(temp_db_path)  # second run must be a no-op
+
+
+@pytest.mark.asyncio
+async def test_end_user_work_migrations_are_recorded_and_nullable(migrated_db_path):
+    conn = await open_db(migrated_db_path)
+    try:
+        async with conn.execute("PRAGMA table_info(sessions)") as cur:
+            columns = {row[1] async for row in cur}
+        assert {"goal", "last_opened_at"}.issubset(columns)
+        async with conn.execute("SELECT version FROM schema_migrations WHERE version IN ('0023_end_user_work', '0024_artifacts_and_operation_claims')") as cur:
+            versions = {row[0] async for row in cur}
+        assert versions == {"0023_end_user_work", "0024_artifacts_and_operation_claims"}
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_migration_0025_backfills_a_default_conversation_for_legacy_work(temp_db_path):
+    """A pre-Work-Hub session must retain its existing chat/run links after upgrade."""
+    from app.db.migrations import run_migrations
+
+    await run_migrations(temp_db_path)
+    conn = await open_db(temp_db_path)
+    try:
+        # Simulate the schema/data immediately before 0025.  The retained
+        # columns are harmless: a real old database simply lacks them.
+        await conn.execute("DROP TABLE IF EXISTS work_context_summaries")
+        await conn.execute("DROP TABLE IF EXISTS work_plan_steps")
+        await conn.execute("DROP TABLE IF EXISTS work_plan_phases")
+        await conn.execute("DELETE FROM schema_migrations WHERE version = '0025_work_conversations'")
+        await conn.execute(
+            "INSERT INTO sessions (id, title, workspace_path, created_at, updated_at, archived) VALUES (?, ?, ?, ?, ?, 0)",
+            ("legacy-work", "Legacy work", "C:/workspace/legacy-work", 10, 10),
+        )
+        await conn.execute(
+            "INSERT INTO task_runs (id, session_id, status, started_at) VALUES (?, ?, ?, ?)",
+            ("legacy-run", "legacy-work", "completed", 11),
+        )
+        await conn.execute(
+            "INSERT INTO chat_messages (id, session_id, task_id, role, content, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("legacy-message", "legacy-work", "legacy-run", "user", "Keep this chat", 12),
+        )
+        await conn.commit()
+    finally:
+        await conn.close()
+
+    await run_migrations(temp_db_path)
+
+    conn = await open_db(temp_db_path)
+    try:
+        async with conn.execute("SELECT id, title FROM conversations WHERE session_id = ?", ("legacy-work",)) as cur:
+            conversation = await cur.fetchone()
+        assert tuple(conversation) == ("conversation-legacy-work", "Trao đổi ban đầu")
+        async with conn.execute("SELECT conversation_id FROM chat_messages WHERE id = ?", ("legacy-message",)) as cur:
+            assert (await cur.fetchone())[0] == "conversation-legacy-work"
+        async with conn.execute("SELECT conversation_id FROM task_runs WHERE id = ?", ("legacy-run",)) as cur:
+            assert (await cur.fetchone())[0] == "conversation-legacy-work"
+        async with conn.execute("SELECT 1 FROM schema_migrations WHERE version = '0025_work_conversations'") as cur:
+            assert await cur.fetchone() is not None
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_migration_0028_binds_only_unambiguous_assistant_threads(temp_db_path):
+    """The additive thread link backfills one matching conversation and leaves ambiguity unbound."""
+    from app.db.migrations import MIGRATIONS, run_migrations
+
+    conn = await open_db(temp_db_path)
+    try:
+        for version, step in MIGRATIONS:
+            if version == "0028_assistant_conversation_link":
+                break
+            if isinstance(step, str):
+                await conn.executescript(step)
+            else:
+                await step(conn)
+            await conn.execute("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)", (version, 1))
+            await conn.commit()
+        await conn.execute("INSERT INTO sessions (id, title, workspace_path, created_at, updated_at, archived) VALUES (?, ?, ?, ?, ?, 0)", ("work-0028", "Work", "C:/tmp/work", 1, 1))
+        await conn.executemany("INSERT INTO conversations (id, session_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", [("conversation-a", "work-0028", "A", 1, 1), ("conversation-b", "work-0028", "B", 1, 1)])
+        await conn.executemany("INSERT INTO assistant_threads (id, title, work_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", [("thread-single", "Single", "work-0028", 1, 1), ("thread-mixed", "Mixed", "work-0028", 1, 1)])
+        await conn.executemany("INSERT INTO assistant_turns (id, thread_id, work_id, conversation_id, role, status, created_at) VALUES (?, ?, ?, ?, 'user', 'completed', ?)", [("turn-single", "thread-single", "work-0028", "conversation-a", 1), ("turn-mixed-a", "thread-mixed", "work-0028", "conversation-a", 1), ("turn-mixed-b", "thread-mixed", "work-0028", "conversation-b", 2)])
+        await conn.commit()
+    finally:
+        await conn.close()
+
+    await run_migrations(temp_db_path)
+
+    conn = await open_db(temp_db_path)
+    try:
+        async with conn.execute("SELECT id, conversation_id FROM assistant_threads ORDER BY id") as cur:
+            assert [tuple(row) async for row in cur] == [("thread-mixed", None), ("thread-single", "conversation-a")]
+        async with conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_assistant_threads_conversation'") as cur:
+            assert await cur.fetchone() is not None
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_migration_0022_rolls_back_partial_data_and_is_not_recorded(temp_db_path, monkeypatch):
+    """A failure inside 0022 must leave neither a partial repair nor its version."""
+    from app.db import migrations
+
+    await migrations.run_migrations(temp_db_path)
+    conn = await open_db(temp_db_path)
+    try:
+        await conn.execute(
+            "INSERT INTO skills (id, name, description, content, enabled, status, version, updated_at, normalized_name) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("skill-rollback", "  Legacy   Skill  ", None, "content", 1, "draft", 1, 1, "legacy-placeholder"),
+        )
+        await conn.execute("DELETE FROM schema_migrations WHERE version = '0022_security_integrity'")
+        await conn.commit()
+    finally:
+        await conn.close()
+
+    original_audit = migrations._migration_audit
+
+    async def fail_audit(*_args, **_kwargs):
+        raise RuntimeError("simulated migration audit failure")
+
+    monkeypatch.setattr(migrations, "_migration_audit", fail_audit)
+    with pytest.raises(RuntimeError, match="simulated migration audit failure"):
+        await migrations.run_migrations(temp_db_path)
+
+    conn = await open_db(temp_db_path)
+    try:
+        async with conn.execute("SELECT name FROM skills WHERE id = 'skill-rollback'") as cur:
+            assert (await cur.fetchone())[0] == "  Legacy   Skill  "
+        async with conn.execute("SELECT 1 FROM schema_migrations WHERE version = '0022_security_integrity'") as cur:
+            assert await cur.fetchone() is None
+    finally:
+        await conn.close()
+
+    monkeypatch.setattr(migrations, "_migration_audit", original_audit)
+    await migrations.run_migrations(temp_db_path)
+    conn = await open_db(temp_db_path)
+    try:
+        async with conn.execute("SELECT name, normalized_name FROM skills WHERE id = 'skill-rollback'") as cur:
+            row = await cur.fetchone()
+            assert (row[0], row[1]) == ("Legacy Skill", "legacy skill")
+        async with conn.execute("SELECT 1 FROM schema_migrations WHERE version = '0022_security_integrity'") as cur:
+            assert await cur.fetchone() is not None
+    finally:
+        await conn.close()
 
 
 @pytest.mark.asyncio

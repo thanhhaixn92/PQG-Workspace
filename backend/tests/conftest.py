@@ -48,6 +48,10 @@ async def test_app(migrated_db_path):
         hermes_dev_mock=False,
         log_level="WARNING",
         outbox_dispatcher_enabled=False,
+        # Exercise the same server-owned loopback identity path used by the
+        # local runtime. Dedicated governance tests still construct apps with
+        # no actor to prove fail-closed behaviour.
+        local_actor_subject="user",
     )
 
     application = create_app(settings_override=test_settings)

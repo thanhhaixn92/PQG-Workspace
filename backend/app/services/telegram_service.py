@@ -6,7 +6,7 @@ import json
 from typing import Optional
 
 from app.api.schemas import TelegramWebhookRequest
-from app.repositories.idempotency_repository import IdempotencyRepository
+from app.repositories.idempotency_repository import IdempotencyFailed, IdempotencyInProgress, IdempotencyRepository
 from app.repositories.telegram_repository import TelegramRepository
 from app.services.task_service import TaskService
 from app.settings import Settings
@@ -47,44 +47,70 @@ class TelegramService:
         allowed = [uid.strip() for uid in raw.split(",") if uid.strip()]
         return user_id in allowed
 
-    async def check_idempotency(self, message_id: str) -> Optional[dict]:
-        idem_key = f"telegram-msg-{message_id}"
+    def _idempotency_key(self, parsed: TelegramWebhookRequest) -> str:
+        if parsed.update_id is not None:
+            return f"telegram-update-{parsed.update_id}"
+        return f"telegram-msg-{parsed.from_id}-{parsed.message_id}"
+
+    async def check_idempotency(self, parsed: TelegramWebhookRequest) -> Optional[dict]:
+        idem_key = self._idempotency_key(parsed)
         row = await self._idempotency.get(idem_key)
         if row is not None:
             return json.loads(row["response_json"])
         return None
 
-    async def process_telegram_update(self, parsed: TelegramWebhookRequest) -> tuple[dict, Optional[str]]:
-        task, _ = await self._task_service.create_task(
-            session_id=None,
-            title=parsed.text[:200] if parsed.text else f"Telegram message {parsed.message_id}",
-            description=json.dumps({
-                "source": "telegram",
-                "update_id": parsed.update_id,
-                "message_id": parsed.message_id,
-                "from_id": parsed.from_id,
-                "text": parsed.text,
-            }, ensure_ascii=False),
-            task_type="telegram",
+    async def process_telegram_update(self, parsed: TelegramWebhookRequest) -> tuple[dict, Optional[str], bool]:
+        request_hash = hashlib.sha256(
+            json.dumps(parsed.model_dump(), sort_keys=True, ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
+        claim, inserted = await self._idempotency.claim_operation(
+            actor="telegram",
+            operation="webhook.process",
+            scope=str(parsed.from_id or "unknown"),
+            client_key=self._idempotency_key(parsed),
+            request_hash=request_hash,
+            ttl_seconds=86400,
         )
+        if not inserted:
+            if claim["state"] == "completed":
+                replay = json.loads(claim["response_json"])
+                return replay["task"], replay.get("callback_token"), True
+            if claim["state"] == "processing":
+                raise IdempotencyInProgress("Telegram update is already being processed")
+            raise IdempotencyFailed("A previous attempt to process this Telegram update failed")
 
-        if parsed.message_id:
-            idem_key = f"telegram-msg-{parsed.message_id}"
-            response_json = json.dumps({"task_id": task["id"]})
-            await self._idempotency.set(
-                idem_key, response_json, 200,
-                ttl_seconds=86400,
+        try:
+            task, _ = await self._task_service.create_task(
+                session_id=None,
+                title=parsed.text[:200] if parsed.text else f"Telegram message {parsed.message_id}",
+                description=json.dumps({
+                    "source": "telegram",
+                    "update_id": parsed.update_id,
+                    "message_id": parsed.message_id,
+                    "from_id": parsed.from_id,
+                    "text": parsed.text,
+                }, ensure_ascii=False),
+                task_type="telegram",
             )
-
-        if parsed.await_callback:
-            token_record = await self._telegram_repo.insert_callback_token(
-                task_id=task["id"],
-                action_type="approval",
-                ttl_seconds=self._settings.telegram_callback_token_ttl_seconds,
+            token: Optional[str] = None
+            if parsed.await_callback:
+                token_record = await self._telegram_repo.insert_callback_token(
+                    task_id=task["id"],
+                    action_type="approval",
+                    ttl_seconds=self._settings.telegram_callback_token_ttl_seconds,
+                )
+                token = token_record["token"]
+            await self._idempotency.finalize_operation(
+                claim,
+                response={"task": task, "callback_token": token},
+                status_code=200,
+                resource_id=task["id"],
             )
-            return task, token_record["token"]
-
-        return task, None
+            return task, token, False
+        except Exception:
+            await self._db.rollback()
+            await self._idempotency.fail_operation(claim)
+            raise
 
     async def consume_callback_token(self, token: str) -> dict:
         return await self._telegram_repo.consume_callback_token(token)

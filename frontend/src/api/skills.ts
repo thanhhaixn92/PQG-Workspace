@@ -6,6 +6,19 @@ export interface Skill {
   description: string | null;
   content: string;
   enabled: boolean;
+  status: 'draft' | 'review_pending' | 'approved';
+  version?: number;
+  updated_at: number;
+}
+
+export interface SkillVersion {
+  id: string;
+  skill_id: string;
+  version_number: number;
+  name: string;
+  description: string | null;
+  content: string;
+  status: Skill['status'];
   updated_at: number;
 }
 
@@ -25,6 +38,17 @@ export async function updateSkill(id: string, skill: Partial<Skill>): Promise<Sk
     method: 'PUT',
     body: JSON.stringify(skill),
   });
+}
+
+export async function changeSkillStatus(id: string, status: Skill['status']): Promise<Skill> {
+  return await apiFetch(`/api/skills/${id}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function fetchSkillVersions(id: string): Promise<SkillVersion[]> {
+  return await apiFetch(`/api/skills/${id}/versions`);
 }
 
 export async function deleteSkill(id: string): Promise<void> {

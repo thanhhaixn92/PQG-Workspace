@@ -1,3 +1,7 @@
+import asyncio
+import hashlib
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,7 +22,19 @@ MAX_ENTRIES = 2000
 class FileContentRequest(BaseModel):
     content: str
     expected_mtime: float | None = None
+    expected_hash: str | None = None
     force: bool = False
+
+
+_file_locks: dict[str, asyncio.Lock] = {}
+
+
+def _content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _lock_for(path: Path) -> asyncio.Lock:
+    return _file_locks.setdefault(str(path), asyncio.Lock())
 
 def _build_tree(dir_path: Path, workspace_path: Path, current_depth: int, entries_count: list[int]) -> list[dict[str, Any]]:
     if current_depth > MAX_DEPTH:
@@ -78,14 +94,34 @@ def _build_tree(dir_path: Path, workspace_path: Path, current_depth: int, entrie
 @router.get("/tree")
 async def get_file_tree(
     session_id: str,
+    grouped: bool = Query(False, description="Group files into end-user Work categories"),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
     async with get_db_connection(settings.db_path_resolved) as db:
         workspace = await get_workspace_path(session_id, db)
         
     entries_count = [0]
-    tree = _build_tree(workspace, workspace, 0, entries_count)
-    
+    raw_tree = _build_tree(workspace, workspace, 0, entries_count)
+    if not grouped:
+        tree = raw_tree
+    else:
+        managed_names = {"inputs", "working", "outputs"}
+        labels = {
+            "inputs": "Tài liệu đầu vào",
+            "working": "Tài liệu làm việc",
+            "outputs": "Đầu ra",
+        }
+        managed_by_name = {node["name"]: node for node in raw_tree if node["name"] in managed_names}
+        tree = [
+            {
+                **managed_by_name.get(folder, {"path": folder, "type": "directory", "children": []}),
+                "name": label,
+            }
+            for folder, label in labels.items()
+        ]
+        # The Work-facing grouped view is deliberately limited to managed
+        # roots. Legacy/root files remain available only through the compatible
+        # ungrouped endpoint and never appear in the normal Work document UI.
     return {"tree": tree, "truncated": entries_count[0] >= MAX_ENTRIES}
 
 @router.get("/content")
@@ -105,7 +141,7 @@ async def get_file_content(
     try:
         stat_result = target.stat()
         content = target.read_text(encoding="utf-8")
-        return {"content": content, "mtime": stat_result.st_mtime, "size": stat_result.st_size}
+        return {"content": content, "mtime": stat_result.st_mtime, "size": stat_result.st_size, "hash": _content_hash(content)}
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail="File is binary or not valid UTF-8")
     except OSError as e:
@@ -127,26 +163,40 @@ async def put_file_content(
     if len(request.content.encode("utf-8")) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File content exceeds 1 MB limit")
 
-    if target.exists() and request.expected_mtime is not None and not request.force:
-        current_mtime = target.stat().st_mtime
-        if abs(current_mtime - request.expected_mtime) > 0.000001:
+    async with _lock_for(target):
+        # Re-resolve inside the critical section so a parent junction/symlink swap
+        # cannot turn a previously checked target into an escape.
+        target = resolve_and_validate_path(workspace, path, check_binary=False)
+        current_content: str | None = None
+        current_mtime: float | None = None
+        if target.exists():
+            current_mtime = target.stat().st_mtime
+            current_content = target.read_text(encoding="utf-8")
+        current_hash = _content_hash(current_content) if current_content is not None else None
+        if not request.force and (
+            (request.expected_hash is not None and request.expected_hash != current_hash)
+            or (request.expected_hash is None and request.expected_mtime is not None and current_mtime is not None and abs(current_mtime - request.expected_mtime) > 0.000001)
+        ):
             raise HTTPException(
                 status_code=409,
-                detail={
-                    "message": "File changed on disk",
-                    "current_mtime": current_mtime,
-                    "expected_mtime": request.expected_mtime,
-                },
+                detail={"message": "File changed on disk", "current_mtime": current_mtime, "current_hash": current_hash},
             )
-        
-    # Write file
-    try:
-        # Create parent directories if they don't exist
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(request.content, encoding="utf-8")
-        stat_result = target.stat()
-    except OSError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent, text=True)
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+                handle.write(request.content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_name, target)
+            stat_result = target.stat()
+        except OSError as e:
+            try:
+                if 'tmp_name' in locals() and os.path.exists(tmp_name):
+                    os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise HTTPException(status_code=500, detail="Failed to write file") from e
 
     # Log audit event
     try:
@@ -164,4 +214,4 @@ async def put_file_content(
             payload={"size": len(request.content)}
         )
 
-    return {"status": "saved", "mtime": stat_result.st_mtime, "size": stat_result.st_size}
+    return {"status": "saved", "mtime": stat_result.st_mtime, "size": stat_result.st_size, "hash": _content_hash(request.content)}

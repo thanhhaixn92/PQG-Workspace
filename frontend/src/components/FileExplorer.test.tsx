@@ -3,10 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileExplorer } from './FileExplorer';
 import { useHermesStore } from '../store/store';
 import * as filesApi from '../api/files';
+import { filterTestDataNodes } from './FileExplorer';
 
 vi.mock('../api/files', () => ({
   fetchFileTree: vi.fn(),
   fetchFileContent: vi.fn(),
+  importDocument: vi.fn(),
+  createManagedTextFile: vi.fn(),
+  createManagedFolder: vi.fn(),
 }));
 
 describe('FileExplorer', () => {
@@ -36,7 +40,7 @@ describe('FileExplorer', () => {
   it('shows guided state when no session is selected', () => {
     useHermesStore.setState({ activeSessionId: null, fileTree: [] });
     render(<FileExplorer />);
-    expect(screen.getByText('Chưa chọn không gian làm việc')).toBeDefined();
+    expect(screen.getByText('Chưa chọn Công việc')).toBeDefined();
   });
 
   it('opens a file and stores metadata', async () => {
@@ -115,5 +119,64 @@ describe('FileExplorer', () => {
 
     expect(filesApi.fetchFileContent).not.toHaveBeenCalled();
     expect(screen.getByText(/tệp quá lớn/)).toBeDefined();
+  });
+
+  it('ignores file content that returns after the active session changed', async () => {
+    let resolveContent!: (value: { content: string; mtime: number; size: number; hash: string }) => void;
+    vi.mocked(filesApi.fetchFileTree).mockResolvedValue({
+      tree: [{ name: 'old.txt', path: 'old.txt', type: 'file' }],
+      truncated: false,
+    });
+    vi.mocked(filesApi.fetchFileContent).mockReturnValue(new Promise(resolve => {
+      resolveContent = resolve;
+    }));
+
+    render(<FileExplorer />);
+    fireEvent.click(await screen.findByText('old.txt'));
+    act(() => useHermesStore.getState().setActiveSession('session-2'));
+    resolveContent({ content: 'session one', mtime: 1, size: 11, hash: 'old-hash' });
+
+    await waitFor(() => expect(filesApi.fetchFileContent).toHaveBeenCalled());
+    expect(useHermesStore.getState().openFiles).toEqual([]);
+    expect(useHermesStore.getState().fileContents['old.txt']).toBeUndefined();
+  });
+
+  it('imports a selected file then refreshes the document tree', async () => {
+    vi.mocked(filesApi.fetchFileTree).mockResolvedValue({ tree: [], truncated: false });
+    vi.mocked(filesApi.importDocument).mockResolvedValue({
+      id: 'artifact-1', session_id: 'session-1', relative_path: 'inputs/source.txt',
+      kind: 'imported_file', sha256: 'hash', size_bytes: 5, created_at: 1, duplicate: false,
+    });
+    render(<FileExplorer />);
+    await waitFor(() => expect(filesApi.fetchFileTree).toHaveBeenCalledTimes(1));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['hello'], 'source.txt', { type: 'text/plain' });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(filesApi.importDocument).toHaveBeenCalledWith('session-1', file, expect.any(String)));
+    await waitFor(() => expect(filesApi.fetchFileTree).toHaveBeenCalledTimes(2));
+  });
+
+  it('creates a managed text file from the end-user form', async () => {
+    vi.mocked(filesApi.fetchFileTree).mockResolvedValue({ tree: [], truncated: false });
+    vi.mocked(filesApi.createManagedTextFile).mockResolvedValue({
+      id: 'created-1', session_id: 'session-1', relative_path: 'inputs/note.txt',
+      kind: 'created_text_file', sha256: 'hash', size_bytes: 5, created_at: 1, duplicate: false,
+    });
+    render(<FileExplorer />);
+    fireEvent.click(screen.getByTitle('Tạo tệp văn bản'));
+    fireEvent.change(screen.getByLabelText('Tên tài liệu mới'), { target: { value: 'note.txt' } });
+    fireEvent.change(screen.getByLabelText('Nội dung tệp mới'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo' }));
+    await waitFor(() => expect(filesApi.createManagedTextFile).toHaveBeenCalledWith(
+      'session-1', 'note.txt', 'hello', expect.any(String),
+    ));
+  });
+
+  it('hides only known UAT/test markers from the normal grouped document view', () => {
+    expect(filterTestDataNodes([
+      { name: 'inputs', path: 'inputs', type: 'directory' },
+      { name: 'uat-codex-run', path: 'uat-codex-run', type: 'directory' },
+      { name: 'meeting-notes.md', path: 'meeting-notes.md', type: 'file' },
+    ]).map(node => node.name)).toEqual(['inputs', 'meeting-notes.md']);
   });
 });

@@ -13,6 +13,23 @@ export interface LocalDataSummary {
 export interface LocalDataBackup {
   backup_path: string;
   created_at: number;
+  sha256: string;
+  manifest_name: string;
+}
+
+export interface LocalDataBackupInfo {
+  name: string;
+  created_at: number;
+  size_bytes: number;
+  integrity_status: 'ok' | 'invalid';
+  sha256: string | null;
+  manifest_status: 'ok' | 'missing' | 'invalid';
+  coverage: 'database_only';
+}
+
+export interface RestoreReadiness extends LocalDataBackupInfo {
+  schema_versions: number;
+  managed_workspace_coverage: 'not_included';
 }
 
 export async function getLocalDataSummary(): Promise<LocalDataSummary> {
@@ -24,3 +41,8 @@ export async function createLocalDataBackup(): Promise<LocalDataBackup> {
     method: 'POST',
   });
 }
+
+export const getLocalDataBackups = (): Promise<LocalDataBackupInfo[]> => apiFetch('/api/local-data/backups');
+
+export const getRestoreReadiness = (name: string): Promise<RestoreReadiness> =>
+  apiFetch(`/api/local-data/backups/${encodeURIComponent(name)}/restore-readiness`);

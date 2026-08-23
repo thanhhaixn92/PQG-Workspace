@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Moon, RefreshCw, SearchCheck, Sun, Workflow } from 'lucide-react';
 import { fetchRuntimeStatus, runRuntimeSmoke } from '../api/runtime';
 import type { RuntimeSmokeCheck, RuntimeStatus } from '../api/runtime';
@@ -90,60 +90,88 @@ export const RuntimeStatusPanel: React.FC = () => {
   const [smokeLoading, setSmokeLoading] = useState(false);
   const [n8nLoading, setN8nLoading] = useState(false);
   const [smokeTimestamp, setSmokeTimestamp] = useState<number | null>(null);
+  const statusRequestVersion = useRef(0);
+  const smokeRequestVersion = useRef(0);
+  const n8nRequestVersion = useRef(0);
 
   const loadStatus = async () => {
+    const requestVersion = ++statusRequestVersion.current;
     setLoading(true);
     try {
-      setError(null);
       const [runtime, n8n] = await Promise.all([
         fetchRuntimeStatus(),
         fetchN8nStatus().catch(() => null),
       ]);
+      if (requestVersion !== statusRequestVersion.current) return;
+      setError(null);
       setStatus(runtime);
       setN8nStatus(n8n);
     } catch {
+      if (requestVersion !== statusRequestVersion.current) return;
       setError('Không tải được tình trạng hệ thống.');
       setStatus(null);
     } finally {
-      setLoading(false);
+      if (requestVersion === statusRequestVersion.current) setLoading(false);
     }
   };
 
   const runSmoke = async () => {
+    const requestVersion = ++smokeRequestVersion.current;
+    const sessionId = activeSessionId;
     setSmokeLoading(true);
     try {
       setSmokeError(null);
-      const result = await runRuntimeSmoke(activeSessionId);
+      const result = await runRuntimeSmoke(sessionId);
+      if (requestVersion !== smokeRequestVersion.current || useHermesStore.getState().activeSessionId !== sessionId) return;
       setSmokeChecks(result.checks);
       setSmokeTimestamp(result.timestamp);
     } catch {
-      setSmokeChecks([]);
-      setSmokeError('Không chạy được kiểm tra nhanh.');
+      if (requestVersion === smokeRequestVersion.current) {
+        setSmokeChecks([]);
+        setSmokeError('Không chạy được kiểm tra nhanh.');
+      }
     } finally {
-      setSmokeLoading(false);
+      if (requestVersion === smokeRequestVersion.current) setSmokeLoading(false);
     }
   };
 
   const runN8nEcho = async () => {
+    const requestVersion = ++n8nRequestVersion.current;
+    const sessionId = activeSessionId;
     setN8nLoading(true);
     try {
       setN8nError(null);
-      if (activeSessionId) {
-        subscribeToSessionEvents(activeSessionId);
+      if (sessionId) {
+        subscribeToSessionEvents(sessionId);
       }
-      setN8nResult(await testN8nEcho(activeSessionId));
+      const result = await testN8nEcho(sessionId);
+      if (requestVersion !== n8nRequestVersion.current || useHermesStore.getState().activeSessionId !== sessionId) return;
+      setN8nResult(result);
     } catch (err) {
+      if (requestVersion !== n8nRequestVersion.current) return;
       const message = err instanceof Error ? err.message : 'Không gọi được workflow n8n echo.';
       setN8nResult(null);
       setN8nError(message);
     } finally {
-      setN8nLoading(false);
+      if (requestVersion === n8nRequestVersion.current) setN8nLoading(false);
     }
   };
 
   useEffect(() => {
     void loadStatus();
   }, []);
+
+  useEffect(() => {
+    smokeRequestVersion.current += 1;
+    n8nRequestVersion.current += 1;
+    setSmokeChecks([]);
+    setSmokeTimestamp(null);
+    setSmokeError(null);
+    setSmokeLoading(false);
+    setN8nResult(null);
+    setN8nError(null);
+    setN8nLoading(false);
+  }, [activeSessionId]);
 
   const hermesKind = useMemo(() => {
     if (status?.hermes.status === 'ready' || status?.hermes.status === 'mock') return 'ok';
@@ -161,16 +189,28 @@ export const RuntimeStatusPanel: React.FC = () => {
           {status && <small> Lần cuối: {checkedAt(status.timestamp)}</small>}
         </div>
         <div style={{ display: 'flex', gap: '0.25rem' }}>
-          <button title={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} onClick={toggleTheme}>
+          <button aria-label={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} title={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} onClick={toggleTheme}>
             {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
           </button>
-          <button title="Làm mới tình trạng hệ thống" onClick={loadStatus} disabled={loading}>
+          <button aria-label="Làm mới tình trạng hệ thống" title="Làm mới tình trạng hệ thống" onClick={loadStatus} disabled={loading}>
             <RefreshCw size={13} className={loading ? 'spin' : ''} />
           </button>
         </div>
       </div>
 
       {error && <div className="runtime-guidance">{error}</div>}
+
+      {status && (
+        <div className="runtime-row runtime-user-status">
+          <span>Tình trạng ứng dụng</span>
+          <span className={statusClass(hermesKind)}>
+            {hermesKind === 'ok' ? 'Sẵn sàng' : hermesKind === 'warn' ? 'Cần chú ý' : 'Chưa sẵn sàng'}
+          </span>
+        </div>
+      )}
+
+      <details className="runtime-diagnostics">
+        <summary>Chẩn đoán kỹ thuật</summary>
 
       {status && (
         <div className="runtime-status-list">
@@ -186,17 +226,7 @@ export const RuntimeStatusPanel: React.FC = () => {
               {status.db.status === 'ok' ? 'Sẵn sàng' : 'Lỗi'}
             </span>
           </div>
-          <div className="runtime-guidance">DB: {status.db.path}</div>
-
-          <div className="runtime-row">
-            <span>File .env</span>
-            <span className={statusClass(status.environment.env_file_exists ? 'ok' : 'warn')}>
-              {status.environment.env_file_exists ? 'Đã có' : 'Cần tạo'}
-            </span>
-          </div>
-          {!status.environment.env_file_exists && (
-            <div className="runtime-guidance">Tạo bằng cách copy backend/.env.example thành backend/.env.</div>
-          )}
+          <div className="runtime-guidance">Cơ sở dữ liệu cục bộ đang được kiểm tra.</div>
 
           <div className="runtime-row">
             <span>Hermes</span>
@@ -207,31 +237,32 @@ export const RuntimeStatusPanel: React.FC = () => {
             <br />
             {hermesFix(status)}
             <br />
-            Lệnh: {status.hermes.executable_path || '(chưa cấu hình)'} {status.hermes.args.join(' ')}
           </div>
 
           <div className="runtime-row">
             <span>SSE stream</span>
-            <span className={statusClass('ok')}>Sẵn sàng</span>
+            <span className={statusClass('warn')}>Chưa kiểm tra</span>
           </div>
 
           <div className="runtime-row">
             <span>File workspace</span>
-            <span className={statusClass('ok')}>Sẵn sàng</span>
+            <span className={statusClass('warn')}>Chưa kiểm tra</span>
           </div>
 
           <div className="runtime-row">
             <span>Memory/Approval</span>
-            <span className={statusClass('ok')}>Sẵn sàng</span>
+            <span className={statusClass('warn')}>Chưa kiểm tra</span>
           </div>
 
           <div className="runtime-row">
             <span>n8n</span>
-            <span className={statusClass(status.n8n.configured ? 'ok' : 'skip')}>
-              {status.n8n.configured ? 'Sẵn sàng' : 'Bỏ qua'}
+            <span className={statusClass(n8nStatus?.configured ? 'ok' : 'skip')}>
+              {n8nStatus?.configured ? 'Sẵn sàng' : 'Bỏ qua'}
             </span>
           </div>
-          <div className="runtime-guidance">{status.n8n.guidance}</div>
+          <div className="runtime-guidance">
+            {n8nStatus?.guidance ?? 'Không có thông tin automation; bỏ qua nếu chưa dùng.'}
+          </div>
           {n8nStatus && n8nStatus.allowed_workflows.length > 0 && (
             <div className="runtime-guidance">
               Workflow cho phép: {n8nStatus.allowed_workflows.join(', ')}
@@ -275,6 +306,7 @@ export const RuntimeStatusPanel: React.FC = () => {
           ))}
         </div>
       )}
+      </details>
     </div>
   );
 };

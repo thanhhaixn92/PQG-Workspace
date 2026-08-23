@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 @pytest.mark.asyncio
-async def test_memory_crud_and_validation(client: TestClient, test_app) -> None:
+async def test_memory_crud_and_validation(client: TestClient, test_app, tmp_path) -> None:
     # Helper to check audits
     async def get_audits():
         import aiosqlite
@@ -20,6 +20,25 @@ async def test_memory_crud_and_validation(client: TestClient, test_app) -> None:
         "kind": "invalid_kind"
     })
     assert resp.status_code == 422
+
+    for invalid in (
+        {"key": "   ", "value": "x", "kind": "project_fact"},
+        {"key": "x", "value": "   ", "kind": "project_fact"},
+        {"key": "x", "value": "y", "kind": "project_fact", "importance_score": 101},
+    ):
+        assert (await client.post("/api/memory", json=invalid)).status_code == 422
+
+    missing = await client.post("/api/memory", json={
+        "session_id": "missing-session", "key": "x", "value": "y", "kind": "project_fact"
+    })
+    assert missing.status_code == 404
+
+    session = (await client.post("/api/sessions", json={"title": "Memory archive", "workspace_path": str(tmp_path)})).json()
+    assert (await client.delete(f"/api/sessions/{session['id']}")).status_code == 200
+    archived = await client.post("/api/memory", json={
+        "session_id": session["id"], "key": "x", "value": "y", "kind": "project_fact"
+    })
+    assert archived.status_code == 409
     
     # Valid kind
     resp = await client.post("/api/memory", json={

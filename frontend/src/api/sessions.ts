@@ -15,23 +15,44 @@ export const getSessions = async (): Promise<Session[]> => {
 };
 
 export const getSessionMessages = async (sessionId: string): Promise<ChatMessage[]> => {
-  return apiFetch<ChatMessage[]>(`/api/sessions/${sessionId}/messages`);
+  const page = await getSessionMessagePage(sessionId);
+  return page.messages;
+};
+
+export interface ChatMessagePage {
+  messages: ChatMessage[];
+  has_more: boolean;
+}
+
+export const getSessionMessagePage = async (
+  sessionId: string,
+  limit = 100,
+  beforeId?: string,
+): Promise<ChatMessagePage> => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (beforeId) params.set('before_id', beforeId);
+  return apiFetch<ChatMessagePage>(`/api/sessions/${sessionId}/messages/page?${params}`);
 };
 
 export const getLatestSessionTaskRun = async (sessionId: string): Promise<TaskRun | null> => {
   return apiFetch<TaskRun | null>(`/api/sessions/${sessionId}/task-runs/latest`);
 };
 
-export const createSession = async (title: string, workspace_path?: string): Promise<Session> => {
+export const createSession = async (
+  title: string,
+  workspace_path?: string,
+  goal?: string,
+  data_scope: 'work_only' | 'approved_library' = 'work_only',
+): Promise<Session> => {
   return apiFetch<Session>('/api/sessions', {
     method: 'POST',
-    body: JSON.stringify({ title, workspace_path: workspace_path?.trim() || undefined }),
+    body: JSON.stringify({ title, goal: goal?.trim() || undefined, data_scope, workspace_path: workspace_path?.trim() || undefined }),
   });
 };
 
 export const updateSession = async (
   sessionId: string,
-  updates: { title?: string; archived?: boolean },
+  updates: { title?: string; goal?: string; data_scope?: 'work_only' | 'approved_library'; archived?: boolean },
 ): Promise<Session> => {
   return apiFetch<Session>(`/api/sessions/${sessionId}`, {
     method: 'PATCH',
@@ -45,9 +66,18 @@ export const archiveSession = async (sessionId: string): Promise<void> => {
   });
 };
 
-export const cleanupSmokeTestSessions = async (): Promise<{ archived_count: number }> => {
+export interface SmokeCleanupPreview {
+  items: Array<{ id: string; title: string }>;
+  confirmation_token: string;
+}
+
+export const previewSmokeTestCleanup = async (): Promise<SmokeCleanupPreview> =>
+  apiFetch<SmokeCleanupPreview>('/api/sessions/cleanup-smoke-tests/preview');
+
+export const cleanupSmokeTestSessions = async (confirmationToken: string): Promise<{ archived_count: number }> => {
   return apiFetch<{ archived_count: number }>('/api/sessions/cleanup-smoke-tests', {
     method: 'POST',
+    body: JSON.stringify({ confirmation_token: confirmationToken }),
   });
 };
 

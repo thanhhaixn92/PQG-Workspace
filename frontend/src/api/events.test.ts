@@ -125,6 +125,21 @@ describe('events.ts', () => {
     expect(MockEventSource.instances).toHaveLength(2);
   });
 
+  it('không hiển thị approval đến muộn của phiên không còn được chọn', () => {
+    useHermesStore.setState({ activeSessionId: 'session-1' });
+    subscribeToSessionEvents('session-1');
+    const oldStream = lastEventSource();
+    useHermesStore.setState({ activeSessionId: 'session-2', pendingApproval: null });
+
+    oldStream.listeners.approval_required.forEach(listener => listener({
+      type: 'approval_required',
+      data: JSON.stringify({ approval_id: 'approval-old', action: 'write', target: 'old.txt' }),
+    } as MessageEvent));
+
+    expect(useHermesStore.getState().pendingApproval).toBeNull();
+    expect(useHermesStore.getState().sessionStatusById['session-1']).toBe('waiting_approval');
+  });
+
   it('dịch lỗi khởi động Hermes, xóa timer và không nâng thành lỗi toàn app', async () => {
     vi.mocked(getLatestSessionTaskRun).mockResolvedValue({
       id: 'task-1',
@@ -216,7 +231,7 @@ describe('events.ts', () => {
     vi.useRealTimers();
   });
 
-  it('subscribeToTaskEvents với VITE_USE_TASK_API=true khi EventSource đóng sẽ giải phóng UI và giữ nguyên trạng thái running nếu backend trả về running', async () => {
+  it('subscribeToTaskEvents với VITE_USE_TASK_API=true khi EventSource đóng vẫn khóa UI nếu backend trả về running', async () => {
     mockUseTaskApi = true;
     vi.mocked(getTask).mockResolvedValueOnce({
       id: 'task-1',
@@ -249,11 +264,33 @@ describe('events.ts', () => {
     await flushPromises();
 
     const state = useHermesStore.getState();
-    expect(state.sessionStatusById['session-1']).toBe('idle');
-    expect(state.sessionStartedAtById['session-1']).toBeUndefined();
+    expect(state.sessionStatusById['session-1']).toBe('running');
     expect(state.latestTaskBySession['session-1']?.status).toBe('running');
     expect(es.close).toHaveBeenCalled();
     expect(getTask).toHaveBeenCalledWith('task-1');
+  });
+
+  it('không mở khóa UI nếu không thể đọc snapshot task sau khi stream mất', async () => {
+    mockUseTaskApi = true;
+    vi.mocked(getTask).mockRejectedValueOnce(new Error('network unavailable'));
+    useHermesStore.setState({
+      activeSessionId: 'session-1',
+      sessionStatusById: { 'session-1': 'running' },
+      latestTaskBySession: {
+        'session-1': {
+          id: 'task-1', session_id: 'session-1', status: 'running', started_at: 1000, retry_count: 0,
+        },
+      },
+    });
+
+    subscribeToTaskEvents('session-1', 'task-1');
+    lastEventSource().onerror?.({} as Event);
+    await flushPromises();
+
+    const state = useHermesStore.getState();
+    expect(state.sessionStatusById['session-1']).toBe('running');
+    expect(state.latestTaskBySession['session-1']?.status).toBe('running');
+    expect(state.sessionErrorById['session-1']).toMatch(/Không thể xác nhận trạng thái task/);
   });
 
   it('subscribeToTaskEvents với VITE_USE_TASK_API=true khi EventSource đóng sẽ giải phóng UI và cập nhật trạng thái terminal từ backend', async () => {

@@ -49,4 +49,15 @@ describe('apiFetch', () => {
     await expect(apiFetch('/test-404')).rejects.toThrow(ApiError);
     await expect(apiFetch('/test-404')).rejects.toThrow('Resource not found');
   });
+
+  it('keeps the JSON content type when an idempotency header is supplied', async () => {
+    (global.fetch as any).mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ ok: true }) });
+
+    await apiFetch('/report', { method: 'POST', headers: { 'Idempotency-Key': 'report-key' }, body: JSON.stringify({ title: 'Báo cáo' }) });
+
+    expect(global.fetch).toHaveBeenCalledWith(`${BASE_URL}/report`, expect.objectContaining({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'report-key' },
+    }));
+  });
 });

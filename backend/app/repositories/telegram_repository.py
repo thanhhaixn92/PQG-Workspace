@@ -57,26 +57,35 @@ class TelegramRepository:
         return dict(row) if row else None
 
     async def consume_callback_token(self, token: str) -> dict:
+        now = int(time.time())
+        # The conditional update is the ownership claim.  A previous
+        # SELECT-then-UPDATE allowed two concurrent callbacks to both observe
+        # ``pending`` and both report success.
+        cursor = await self._db.execute(
+            "UPDATE telegram_callback_tokens SET status = 'used' "
+            "WHERE token = ? AND status = 'pending' AND expires_at >= ?",
+            (token, now),
+        )
+        claimed = cursor.rowcount == 1
+        await cursor.close()
+        if claimed:
+            async with self._db.execute(
+                "SELECT * FROM telegram_callback_tokens WHERE token = ?", (token,)
+            ) as cur:
+                row = await cur.fetchone()
+            # The token is not deleted by this service, but retain a precise
+            # error rather than returning a partial callback response.
+            if row is None:
+                raise TelegramCallbackTokenNotFound(f"Callback token not found: {token}")
+            return dict(row)
+
         async with self._db.execute(
-            "SELECT * FROM telegram_callback_tokens WHERE token = ?",
+            "SELECT status, expires_at FROM telegram_callback_tokens WHERE token = ?",
             (token,),
         ) as cur:
             row = await cur.fetchone()
-
         if row is None:
             raise TelegramCallbackTokenNotFound(f"Callback token not found: {token}")
-
-        record = dict(row)
-        now = int(time.time())
-
-        if record["status"] == "used":
+        if row["status"] == "used":
             raise TelegramCallbackTokenConflict(f"Callback token already used: {token}")
-
-        if now > record["expires_at"]:
-            raise TelegramCallbackTokenExpired(f"Callback token expired: {token}")
-
-        await self._db.execute(
-            "UPDATE telegram_callback_tokens SET status = 'used' WHERE token = ?",
-            (token,),
-        )
-        return record
+        raise TelegramCallbackTokenExpired(f"Callback token expired: {token}")

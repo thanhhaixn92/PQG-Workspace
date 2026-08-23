@@ -5,7 +5,7 @@ import contextlib
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from acp import Agent, Client, spawn_agent_process
 from acp.schema import (
@@ -52,6 +52,25 @@ from app.settings import Settings
 
 logger = logging.getLogger(__name__)
 
+CancelReadOnlyOutcome = Literal[
+    "cancelled",
+    "not_active",
+    "session_starting",
+    "connection_unavailable",
+    "adapter_failed",
+]
+CANCEL_READ_ONLY_OUTCOMES: frozenset[str] = frozenset({
+    "cancelled",
+    "not_active",
+    "session_starting",
+    "connection_unavailable",
+    "adapter_failed",
+})
+
+
+def _assistant_thread_id(channel: str | None) -> str | None:
+    return channel.split(":", 1)[1] if channel and channel.startswith("assistant:") else None
+
 
 class HermesClientManager(Client):
     def __init__(self, settings: Settings) -> None:
@@ -64,6 +83,15 @@ class HermesClientManager(Client):
         self._acp_to_internal: dict[str, str] = {}
         self._internal_to_acp: dict[str, str] = {}
         self._response_buffers: dict[str, list[str]] = {}
+        # A central Assistant answer must never inherit the broader ACP session
+        # used by a Work conversation.  Keep its session key and its original
+        # Work id separate, so every tool boundary can enforce read-only mode.
+        self._read_only_internal_sessions: set[str] = set()
+        self._read_only_session_work: dict[str, str] = {}
+        self._read_only_event_channels: dict[str, str] = {}
+        self._read_only_turn_ids: dict[str, str] = {}
+        self._read_only_turn_sessions: dict[str, str] = {}
+        self._read_only_structured_parts: dict[str, list[tuple[str, dict[str, Any]]]] = {}
         self._stopping = False
 
     async def _watch_process(self) -> None:
@@ -162,15 +190,121 @@ class HermesClientManager(Client):
             await event_bus.publish(session_id, SseErrorEvent(message=error_message))
             raise RuntimeError(error_message) from exc
 
-    async def _send_mock_prompt(self, session_id: str, prompt: str) -> str:
-        """Stream a deterministic local response for first-chat smoke testing."""
-        await event_bus.publish(
-            session_id,
-            SseToolCallEvent(
-                tool_name="mock_hermes_dev_agent",
-                arguments={"prompt_length": len(prompt)},
-            ),
+    async def send_read_only_prompt(
+        self,
+        work_id: str,
+        prompt: str,
+        *,
+        event_channel: str | None = None,
+        assistant_turn_id: str | None = None,
+    ) -> str:
+        """Ask Hermes for a Work-scoped answer without granting mutation tools.
+
+        This uses a distinct ACP session from the normal Work conversation.
+        The separation matters: reusing a session that was previously allowed
+        to request writes would make the Assistant Home fail open.
+        """
+        if self.settings.hermes_dev_mock:
+            # The Assistant stream is thread-scoped.  Routing mock events to
+            # the Work channel would mix a preview answer into a normal Work
+            # conversation and make visual testing lie about SSE isolation.
+            return await self._send_mock_prompt(event_channel, prompt, assistant_turn_id=assistant_turn_id)
+
+        # Concurrent Assistant threads for the same Work must never share an
+        # ACP buffer or event destination. Synchronous compatibility calls can
+        # retain their stable key; streamed runs receive an isolated key.
+        internal_session_id = (
+            f"assistant-readonly:{work_id}:{uuid.uuid4()}" if event_channel else f"assistant-readonly:{work_id}"
         )
+        self._read_only_internal_sessions.add(internal_session_id)
+        self._read_only_session_work[internal_session_id] = work_id
+        if event_channel:
+            self._read_only_event_channels[internal_session_id] = event_channel
+        if assistant_turn_id:
+            self._read_only_turn_ids[internal_session_id] = assistant_turn_id
+            self._read_only_turn_sessions[assistant_turn_id] = internal_session_id
+        try:
+            await self.ensure_spawned()
+            if not self._agent_conn:
+                raise RuntimeError("Agent connection not established.")
+            if internal_session_id not in self._internal_to_acp:
+                workspace = await self._get_workspace_for_internal_session(internal_session_id)
+                response = await self._agent_conn.new_session(cwd=str(workspace), mcp_servers=[])
+                self._internal_to_acp[internal_session_id] = response.session_id
+                self._acp_to_internal[response.session_id] = internal_session_id
+
+            acp_session_id = self._internal_to_acp[internal_session_id]
+            self._response_buffers[internal_session_id] = []
+            await self._agent_conn.prompt(
+                session_id=acp_session_id,
+                prompt=[TextContentBlock(type="text", text=prompt)],
+            )
+            await asyncio.sleep(0.05)
+            return "".join(self._response_buffers.pop(internal_session_id, [])).strip()
+        except Exception as exc:
+            self._response_buffers.pop(internal_session_id, None)
+            error_message = str(exc) or f"{type(exc).__name__}: {exc!r}"
+            logger.error("Failed to send read-only Hermes prompt: %s", error_message)
+            await event_bus.publish(
+                event_channel or work_id,
+                SseErrorEvent(message=error_message, assistant_turn_id=assistant_turn_id, thread_id=_assistant_thread_id(event_channel)),
+            )
+            raise RuntimeError(error_message) from exc
+        finally:
+            acp_session_id = self._internal_to_acp.pop(internal_session_id, None)
+            if acp_session_id:
+                self._acp_to_internal.pop(acp_session_id, None)
+            self._read_only_event_channels.pop(internal_session_id, None)
+            self._read_only_turn_ids.pop(internal_session_id, None)
+            if assistant_turn_id:
+                self._read_only_turn_sessions.pop(assistant_turn_id, None)
+            self._read_only_session_work.pop(internal_session_id, None)
+            self._read_only_internal_sessions.discard(internal_session_id)
+
+    async def cancel_read_only_turn(self, assistant_turn_id: str) -> CancelReadOnlyOutcome:
+        """Cancel the isolated ACP session serving one Assistant turn.
+
+        Durable turn state remains authoritative, but ACP cancellation avoids
+        spending compute on an answer the user has already cancelled.  A
+        failure here is deliberately non-fatal: the guarded database update
+        still prevents any late content from becoming visible.
+        """
+        internal_session_id = self._read_only_turn_sessions.get(assistant_turn_id)
+        if not internal_session_id:
+            return "not_active"
+        if not self._agent_conn:
+            return "connection_unavailable"
+        acp_session_id = self._internal_to_acp.get(internal_session_id)
+        if not acp_session_id:
+            return "session_starting"
+        try:
+            await asyncio.wait_for(self._agent_conn.cancel(session_id=acp_session_id), timeout=2.0)
+            with contextlib.suppress(Exception, asyncio.TimeoutError):
+                await asyncio.wait_for(self._agent_conn.close_session(session_id=acp_session_id), timeout=1.0)
+            return "cancelled"
+        except (Exception, asyncio.TimeoutError):
+            logger.warning("Could not cancel isolated Hermes turn %s; late output will be discarded", assistant_turn_id)
+            return "adapter_failed"
+
+    def consume_read_only_parts(self, assistant_turn_id: str) -> list[tuple[str, dict[str, Any]]]:
+        """Return filtered ACP event summaries for one persisted Assistant turn."""
+        return self._read_only_structured_parts.pop(assistant_turn_id, [])
+
+    async def _send_mock_prompt(self, session_id: str | None, prompt: str, *, assistant_turn_id: str | None = None) -> str:
+        """Stream a deterministic local response for first-chat smoke testing."""
+        if session_id:
+            await event_bus.publish(
+                session_id,
+                SseToolCallEvent(
+                    tool_name="mock_hermes_dev_agent",
+                    arguments={"prompt_length": len(prompt)},
+                ),
+            )
+        if assistant_turn_id:
+            self._read_only_structured_parts.setdefault(assistant_turn_id, []).append((
+                "tool_result",
+                {"tool_name": "mock_hermes_dev_agent", "status": "succeeded", "summary": "Đã tạo phản hồi mẫu local."},
+            ))
         chunks = [
             "Xin chào, đây là phản hồi mẫu từ Hermes dev mock.\n\n",
             "Luồng chat, SSE và trạng thái hoàn tất đang hoạt động bình thường.\n\n",
@@ -178,7 +312,11 @@ class HermesClientManager(Client):
         ]
         for chunk in chunks:
             await asyncio.sleep(0.05)
-            await event_bus.publish(session_id, SseTokenEvent(text=chunk))
+            if session_id:
+                await event_bus.publish(
+                    session_id,
+                    SseTokenEvent(text=chunk, assistant_turn_id=assistant_turn_id, thread_id=_assistant_thread_id(session_id)),
+                )
         return "".join(chunks).strip()
 
     def on_connect(self, conn: Agent) -> None:
@@ -190,9 +328,12 @@ class HermesClientManager(Client):
             raise RuntimeError(f"Unknown ACP session: {acp_session_id}")
         return internal_session_id
 
+    def _work_id_for_internal_session(self, internal_session_id: str) -> str:
+        return self._read_only_session_work.get(internal_session_id, internal_session_id)
+
     async def _get_workspace_for_internal_session(self, internal_session_id: str) -> Path:
         async with get_db_connection(self.settings.db_path_resolved) as db:
-            return await get_workspace_path(internal_session_id, db)
+            return await get_workspace_path(self._work_id_for_internal_session(internal_session_id), db)
 
     async def session_update(
         self,
@@ -217,18 +358,39 @@ class HermesClientManager(Client):
             logger.warning("Received event for unknown ACP session: %s", session_id)
             return
 
+        work_id = self._work_id_for_internal_session(internal_session_id)
+        is_read_only = internal_session_id in self._read_only_internal_sessions
+        # A synchronous Assistant call has no live stream. Never fall back to
+        # the Work channel, otherwise Assistant tokens leak into conversation
+        # SSE and fill a queue with events no client subscribed to.
+        event_channel = self._read_only_event_channels.get(internal_session_id) if is_read_only else work_id
+        assistant_turn_id = self._read_only_turn_ids.get(internal_session_id)
         if isinstance(update, AgentMessageChunk):
             text = ""
             if isinstance(update.content, TextContentBlock):
                 text = update.content.text
             if text:
                 self._response_buffers.setdefault(internal_session_id, []).append(text)
-            await event_bus.publish(internal_session_id, SseTokenEvent(text=text))
+            if event_channel:
+                await event_bus.publish(
+                    event_channel,
+                    SseTokenEvent(text=text, assistant_turn_id=assistant_turn_id, thread_id=_assistant_thread_id(event_channel)),
+                )
         elif isinstance(update, ToolCallStart):
-            await event_bus.publish(
-                internal_session_id,
-                SseToolCallEvent(tool_name=update.title, arguments={}),
-            )
+            if assistant_turn_id:
+                self._read_only_structured_parts.setdefault(assistant_turn_id, []).append((
+                    "tool_result",
+                    {
+                        "tool_name": str(update.title or "Hermes tool"),
+                        "status": "started",
+                        "summary": "Hermes đã bắt đầu một thao tác chỉ đọc.",
+                    },
+                ))
+            if event_channel:
+                await event_bus.publish(
+                    event_channel,
+                    SseToolCallEvent(tool_name=update.title, arguments={}),
+                )
 
     async def create_terminal(
         self,
@@ -241,8 +403,9 @@ class HermesClientManager(Client):
         **kwargs: Any,
     ) -> CreateTerminalResponse:
         internal_session_id = self._internal_session_id(session_id)
+        work_id = self._work_id_for_internal_session(internal_session_id)
         await event_bus.publish(
-            internal_session_id,
+            work_id,
             SseTerminalEvent(output=f"Terminal command blocked by policy: {command}"),
         )
         raise RuntimeError("Terminal execution is blocked in the ACP bridge. Use approved MCP run_safe_task instead.")
@@ -268,6 +431,9 @@ class HermesClientManager(Client):
         **kwargs: Any,
     ) -> ReadTextFileResponse:
         internal_session_id = self._internal_session_id(session_id)
+        if internal_session_id in self._read_only_internal_sessions:
+            raise RuntimeError("File reads are not available from the read-only Assistant context.")
+        work_id = self._work_id_for_internal_session(internal_session_id)
         workspace = await self._get_workspace_for_internal_session(internal_session_id)
         target = resolve_and_validate_path(workspace, path, check_binary=True)
         if not target.exists():
@@ -294,7 +460,7 @@ class HermesClientManager(Client):
         async with get_db_connection(self.settings.db_path_resolved) as db:
             await log_audit_event(
                 db,
-                internal_session_id,
+                work_id,
                 "hermes",
                 "file.read",
                 target=rel_path,
@@ -310,6 +476,9 @@ class HermesClientManager(Client):
         **kwargs: Any,
     ) -> WriteTextFileResponse | None:
         internal_session_id = self._internal_session_id(session_id)
+        if internal_session_id in self._read_only_internal_sessions:
+            raise RuntimeError("File writes are not available from the read-only Assistant.")
+        work_id = self._work_id_for_internal_session(internal_session_id)
         workspace = await self._get_workspace_for_internal_session(internal_session_id)
         target = resolve_and_validate_path(workspace, path, check_binary=False)
 
@@ -321,7 +490,7 @@ class HermesClientManager(Client):
         description = f"Hermes muốn ghi/sửa tệp: {rel_path}"
         await register_pending_approval(
             approval_id=approval_id,
-            session_id=internal_session_id,
+            session_id=work_id,
             action="write_workspace_file",
             target=rel_path,
             risk_level="write_internal",
@@ -329,7 +498,7 @@ class HermesClientManager(Client):
             settings=self.settings,
         )
         await event_bus.publish(
-            internal_session_id,
+            work_id,
             SseApprovalRequiredEvent(
                 approval_id=approval_id,
                 action="write_workspace_file",
@@ -351,7 +520,7 @@ class HermesClientManager(Client):
         async with get_db_connection(self.settings.db_path_resolved) as db:
             await log_audit_event(
                 db,
-                internal_session_id,
+                work_id,
                 "hermes",
                 "file.write",
                 target=rel_path,
@@ -370,6 +539,9 @@ class HermesClientManager(Client):
             raise RuntimeError("Hermes requested permission without options.")
 
         internal_session_id = self._internal_session_id(session_id)
+        if internal_session_id in self._read_only_internal_sessions:
+            return RequestPermissionResponse(outcome=DeniedOutcome(outcome="cancelled"))
+        work_id = self._work_id_for_internal_session(internal_session_id)
         target = getattr(tool_call, "title", None) or getattr(tool_call, "id", None) or "Hermes tool call"
         target_text = str(target)
         description = f"Hermes yêu cầu quyền thực hiện: {target_text}"
@@ -388,7 +560,7 @@ class HermesClientManager(Client):
         approval_id = f"appr-{uuid.uuid4().hex[:8]}"
         await register_pending_approval(
             approval_id=approval_id,
-            session_id=internal_session_id,
+            session_id=work_id,
             action="hermes.permission",
             target=target_text,
             risk_level=risk_level,
@@ -396,7 +568,7 @@ class HermesClientManager(Client):
             settings=self.settings,
         )
         await event_bus.publish(
-            internal_session_id,
+            work_id,
             SseApprovalRequiredEvent(
                 approval_id=approval_id,
                 action="hermes.permission",

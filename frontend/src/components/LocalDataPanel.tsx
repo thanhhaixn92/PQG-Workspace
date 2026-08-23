@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Database, Download, RefreshCw } from 'lucide-react';
-import { createLocalDataBackup, getLocalDataSummary } from '../api/localData';
-import type { LocalDataBackup, LocalDataSummary } from '../api/localData';
+import { createLocalDataBackup, getLocalDataBackups, getLocalDataSummary, getRestoreReadiness } from '../api/localData';
+import type { LocalDataBackup, LocalDataBackupInfo, LocalDataSummary, RestoreReadiness } from '../api/localData';
 
 const formatBytes = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -22,6 +22,8 @@ const formatTime = (value: number) =>
 export const LocalDataPanel: React.FC = () => {
   const [summary, setSummary] = useState<LocalDataSummary | null>(null);
   const [backup, setBackup] = useState<LocalDataBackup | null>(null);
+  const [backups, setBackups] = useState<LocalDataBackupInfo[]>([]);
+  const [readiness, setReadiness] = useState<RestoreReadiness | null>(null);
   const [loading, setLoading] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +33,7 @@ export const LocalDataPanel: React.FC = () => {
     try {
       setError(null);
       setSummary(await getLocalDataSummary());
+      setBackups(await getLocalDataBackups());
     } catch {
       setError('Không tải được thông tin dữ liệu cục bộ.');
     } finally {
@@ -49,6 +52,15 @@ export const LocalDataPanel: React.FC = () => {
       setError('Không tạo được backup DB.');
     } finally {
       setBackupLoading(false);
+    }
+  };
+
+  const inspectBackup = async (name: string) => {
+    try {
+      setError(null);
+      setReadiness(await getRestoreReadiness(name));
+    } catch {
+      setError('Không kiểm tra được khả năng khôi phục của backup này.');
     }
   };
 
@@ -77,7 +89,7 @@ export const LocalDataPanel: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <div className="runtime-status-list">
             <div className="runtime-row">
-              <span>Phiên</span>
+              <span>Công việc</span>
               <span className="runtime-pill ok">{summary.active_sessions_count}/{summary.sessions_count}</span>
             </div>
             <div className="runtime-row">
@@ -98,11 +110,7 @@ export const LocalDataPanel: React.FC = () => {
             </div>
           </div>
 
-          <div className="runtime-guidance">
-            DB:
-            <br />
-            {summary.db_path}
-          </div>
+          <div className="runtime-guidance">Dữ liệu được lưu trên máy này. Vị trí kỹ thuật không hiển thị trong giao diện thường dùng.</div>
 
           <button className="primary-button" onClick={runBackup} disabled={backupLoading}>
             {backupLoading ? <RefreshCw size={16} className="spin" /> : <Download size={16} />}
@@ -111,11 +119,23 @@ export const LocalDataPanel: React.FC = () => {
 
           {backup && (
             <div className="runtime-guidance" role="status">
-              Đã tạo backup lúc {formatTime(backup.created_at)}
-              <br />
-              {backup.backup_path}
+              Đã tạo bản sao lưu lúc {formatTime(backup.created_at)}. Bản sao chỉ gồm dữ liệu ứng dụng, không bao gồm credential hoặc thư mục ngoài vùng quản lý.
             </div>
           )}
+
+          <div className="backup-list">
+            <strong>Backup gần đây</strong>
+            {backups.length === 0 && <div className="runtime-guidance">Chưa có backup nào.</div>}
+            {backups.map(item => (
+              <div className="runtime-row" key={item.name}>
+                <span>{formatTime(item.created_at)} · {formatBytes(item.size_bytes)}</span>
+                <button className="btn-secondary compact-button" onClick={() => void inspectBackup(item.name)} disabled={item.integrity_status !== 'ok' || item.manifest_status !== 'ok'}>
+                  {item.integrity_status === 'ok' && item.manifest_status === 'ok' ? 'Kiểm tra sẵn sàng' : 'Thiếu xác minh'}
+                </button>
+              </div>
+            ))}
+          </div>
+          {readiness && <div className="runtime-guidance" role="status">Backup DB hợp lệ, có {readiness.schema_versions} phiên bản schema. Chưa bao gồm workspace ngoài vùng quản lý hay credential; khôi phục chỉ thực hiện bằng công cụ maintenance offline.</div>}
         </div>
       ) : (
         !error && <div className="empty-state">Đang tải dữ liệu cục bộ...</div>

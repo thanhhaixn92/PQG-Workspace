@@ -5,6 +5,7 @@ import pytest
 from app.db.connection import open_db
 from app.repositories.task_repository import TaskRepository
 from app.repositories.idempotency_repository import IdempotencyRepository
+from app.repositories.idempotency_repository import IdempotencyConflict
 from app.repositories.outbox_repository import OutboxRepository
 
 
@@ -127,6 +128,61 @@ async def test_idempotency_cleanup_expired(migrated_db_path):
         assert cleaned > 0
         result = await repo.get(key)
         assert result is None
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_operation_claim_is_atomic_and_replays_only_after_finalize(migrated_db_path):
+    conn = await open_db(migrated_db_path)
+    try:
+        repo = IdempotencyRepository(conn)
+        first, inserted = await repo.claim_operation(
+            actor="api", operation="task.create", scope="session-1", client_key="same-key", request_hash="hash-a",
+        )
+        assert inserted
+        second, inserted_again = await repo.claim_operation(
+            actor="api", operation="task.create", scope="session-1", client_key="same-key", request_hash="hash-a",
+        )
+        assert not inserted_again
+        assert second["state"] == "processing"
+
+        await repo.finalize_operation(first, response={"id": "task-1"}, status_code=201, resource_id="task-1")
+        completed, inserted_completed = await repo.claim_operation(
+            actor="api", operation="task.create", scope="session-1", client_key="same-key", request_hash="hash-a",
+        )
+        assert not inserted_completed
+        assert completed["state"] == "completed"
+        assert completed["resource_id"] == "task-1"
+
+        with pytest.raises(IdempotencyConflict):
+            await repo.claim_operation(
+                actor="api", operation="task.create", scope="session-1", client_key="same-key", request_hash="hash-b",
+            )
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_expired_operation_claim_is_atomically_reclaimed(migrated_db_path):
+    conn = await open_db(migrated_db_path)
+    try:
+        repo = IdempotencyRepository(conn)
+        first, inserted = await repo.claim_operation(
+            actor="api", operation="task.create", scope="session-1",
+            client_key="expired-key", request_hash="hash-a", ttl_seconds=0,
+        )
+        assert inserted
+
+        replacement, reclaimed = await repo.claim_operation(
+            actor="api", operation="task.create", scope="session-1",
+            client_key="expired-key", request_hash="hash-b",
+        )
+
+        assert reclaimed
+        assert replacement["identity"] == first["identity"]
+        assert replacement["request_hash"] == "hash-b"
+        assert replacement["state"] == "processing"
     finally:
         await conn.close()
 

@@ -180,6 +180,7 @@ async def test_n8n_webhook_retry_success(mock_session, monkeypatch):
     session_id, workspace, client, settings = mock_session
     settings.n8n_webhook_secret = "test-secret"
     settings.n8n_max_retries = 2
+    settings.n8n_retry_idempotency_confirmed = True
     
     import httpx
     class MockResponse:
@@ -187,12 +188,14 @@ async def test_n8n_webhook_retry_success(mock_session, monkeypatch):
         def raise_for_status(self): pass
         
     attempts = 0
+    idempotency_keys: list[str] = []
     original_post = httpx.AsyncClient.post
     
     async def mock_post(self, url, *args, **kwargs):
         nonlocal attempts
         if "hermes-echo" in str(url):
             attempts += 1
+            idempotency_keys.append(kwargs["headers"]["Idempotency-Key"])
             if attempts <= 2:
                 raise httpx.HTTPStatusError("503 Service Unavailable", request=None, response=httpx.Response(503, request=httpx.Request("POST", url)))
             return MockResponse()
@@ -214,8 +217,99 @@ async def test_n8n_webhook_retry_success(mock_session, monkeypatch):
     res = await call_n8n_webhook(workflow_name="echo", payload={})
     assert "Successfully triggered" in res
     assert attempts == 3
+    assert len(idempotency_keys) == 3
+    assert idempotency_keys[0]
+    assert len(set(idempotency_keys)) == 1
     
     await task
+
+
+@pytest.mark.asyncio
+async def test_n8n_webhook_does_not_retry_ambiguous_transport_failure(mock_session, monkeypatch):
+    """A receiver without a verified dedupe contract must see one request only."""
+    _session_id, _workspace, client, settings = mock_session
+    settings.n8n_webhook_secret = "test-secret"
+    settings.n8n_max_retries = 2
+    settings.n8n_retry_idempotency_confirmed = False
+
+    import httpx
+    attempts = 0
+    original_post = httpx.AsyncClient.post
+
+    async def mock_post(self, url, *args, **kwargs):
+        nonlocal attempts
+        if "hermes-echo" in str(url):
+            attempts += 1
+            raise httpx.ReadTimeout("delivery outcome unknown", request=httpx.Request("POST", url))
+        return await original_post(self, url, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    async def approve_delayed():
+        for _ in range(30):
+            await asyncio.sleep(0.1)
+            if pending_approvals:
+                approval_id = next(iter(pending_approvals))
+                await client.post(f"/api/approvals/{approval_id}", json={"decision": "allow_once"})
+                return
+
+    approval_task = asyncio.create_task(approve_delayed())
+    with pytest.raises(RuntimeError, match="Failed to trigger webhook after 1 attempts"):
+        await call_n8n_webhook(workflow_name="echo", payload={})
+    assert attempts == 1
+    await approval_task
+
+
+@pytest.mark.asyncio
+async def test_n8n_retry_uses_receiver_dedupe_after_accepted_then_timeout(mock_session, monkeypatch):
+    """The local receiver fixture performs one side effect despite a lost reply."""
+    _session_id, _workspace, client, settings = mock_session
+    settings.n8n_webhook_secret = "test-secret"
+    settings.n8n_max_retries = 1
+    settings.n8n_retry_idempotency_confirmed = True
+
+    import httpx
+
+    class MockResponse:
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+    attempts = 0
+    received_keys: list[str] = []
+    applied_side_effects: set[str] = set()
+    original_post = httpx.AsyncClient.post
+
+    async def receiver(self, url, *args, **kwargs):
+        nonlocal attempts
+        if "hermes-echo" not in str(url):
+            return await original_post(self, url, *args, **kwargs)
+        attempts += 1
+        key = kwargs["headers"]["Idempotency-Key"]
+        received_keys.append(key)
+        applied_side_effects.add(key)  # The fake receiver's durable dedupe store.
+        if attempts == 1:
+            raise httpx.ReadTimeout("receiver accepted request but reply was lost", request=httpx.Request("POST", url))
+        return MockResponse()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", receiver)
+
+    async def approve_delayed():
+        for _ in range(30):
+            await asyncio.sleep(0.1)
+            if pending_approvals:
+                approval_id = next(iter(pending_approvals))
+                await client.post(f"/api/approvals/{approval_id}", json={"decision": "allow_once"})
+                return
+
+    approval_task = asyncio.create_task(approve_delayed())
+    result = await call_n8n_webhook(workflow_name="echo", payload={"operation": "side-effect"})
+    assert "Successfully triggered" in result
+    assert attempts == 2
+    assert len(set(received_keys)) == 1
+    assert len(applied_side_effects) == 1
+    await approval_task
 
 def test_n8n_compose_validation():
     import yaml

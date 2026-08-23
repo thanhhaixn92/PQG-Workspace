@@ -66,7 +66,41 @@ def test_local_data_backup_creates_new_file_without_overwrite(client: TestClient
     assert first_path != second_path
     assert first_path.name.startswith("app-")
     assert second_path.name.startswith("app-")
+    assert len(first.json()["sha256"]) == 64
+    assert (first_path.parent / first.json()["manifest_name"]).exists()
 
     with sqlite3.connect(first_path) as db:
         row = db.execute("SELECT title FROM sessions WHERE id = ?", (session["id"],)).fetchone()
     assert row == ("Backup Me",)
+
+
+def test_backup_list_and_restore_readiness_are_read_only(client: TestClient) -> None:
+    created = client.post("/api/local-data/backup")
+    assert created.status_code == 201
+    name = Path(created.json()["backup_path"]).name
+
+    listed = client.get("/api/local-data/backups")
+    assert listed.status_code == 200
+    item = next(item for item in listed.json() if item["name"] == name)
+    assert item["integrity_status"] == "ok"
+    assert item["coverage"] == "database_only"
+    assert item["manifest_status"] == "ok"
+    assert len(item["sha256"]) == 64
+
+    readiness = client.get(f"/api/local-data/backups/{name}/restore-readiness")
+    assert readiness.status_code == 200, readiness.text
+    assert readiness.json()["integrity_status"] == "ok"
+    assert readiness.json()["schema_versions"] > 0
+    assert readiness.json()["manifest_status"] == "ok"
+
+    assert client.get("/api/local-data/backups/../app.db/restore-readiness").status_code in {404, 422}
+
+
+def test_restore_readiness_rejects_backup_whose_hash_no_longer_matches(client: TestClient) -> None:
+    created = client.post("/api/local-data/backup").json()
+    path = Path(created["backup_path"])
+    with path.open("ab") as handle:
+        handle.write(b"unexpected trailing bytes")
+
+    readiness = client.get(f"/api/local-data/backups/{path.name}/restore-readiness")
+    assert readiness.status_code == 409

@@ -1,4 +1,4 @@
-# Hermes Local Stack - Security And Permission Policy
+# DIRAP Local Workbench - Security And Permission Policy
 
 ## 1. Security Model
 
@@ -137,8 +137,8 @@ Secrets belong in:
 - Webhooks need secret header or IP whitelist.
 - Use production webhook URL only for active workflows.
 - Pin or track n8n version; do not use known vulnerable versions.
-- Persistent `/home/node/.n8n` volume required.
-- Fixed `N8N_ENCRYPTION_KEY` required.
+- n8n is optional for v2.2 and must remain loopback-only when enabled.
+- If n8n is configured, a persistent `/home/node/.n8n` volume and fixed `N8N_ENCRYPTION_KEY` are required. An unconfigured sidecar must report unavailable without a fake-ready state.
 
 ## 9. Rejection Criteria
 

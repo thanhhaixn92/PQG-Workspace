@@ -1,4 +1,6 @@
-# Hermes Local Stack - Antigravity Implementation Plan
+# DIRAP Local Workbench - Antigravity Implementation Plan
+
+> **HISTORICAL / SUPERSEDED FOR V2.2.** Tai lieu nay duoc giu lam bang chung qua trinh. Moi mau thuan ve ownership conversation, so luong MCP tool, n8n gate hoac acceptance phai theo `00_PROJECT_CANON.md`, PRD v2.2, Decision Log va checkpoint hien hanh.
 
 ## Phase 12-18 + UX Status Update - 2026-07-03
 

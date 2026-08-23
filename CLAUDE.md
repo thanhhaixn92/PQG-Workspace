@@ -4,10 +4,15 @@
 
 Claude should treat `AGENTS.md` as the shared project instruction source. This file only adds Claude-specific operating guidance.
 
+Before editing, run `powershell -ExecutionPolicy Bypass -File scripts/agent-preflight.ps1`,
+then follow the mandatory read sequence in `AGENTS.md`. The preflight is
+read-only; a passing result never overrides a closed state gate or human approval.
+
 ## Context Management
 
 - Keep `CLAUDE.md` concise; do not paste PRD or long plans here.
 - Read `docs/00_PROJECT_CANON.md` first when the task is ambiguous.
+- Read `CODEGRAPH.md` before broad file exploration; use the smallest route.
 - Read phase-specific docs only when needed.
 - Use `/clear` between unrelated tasks.
 - Use `/compact` with a focused instruction before a long continuation.

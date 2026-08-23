@@ -31,55 +31,24 @@ async def test_context_limits_and_disabled(client: TestClient, test_app: FastAPI
             "importance_score": float(i)
         })
         
-    # Override get_hermes_client and set dev_mock to bypass preflight
-    from app.dependencies import get_hermes_client, get_settings
-    from app.settings import Settings
-    class MockClient:
-        async def execute_prompt(self, *args, **kwargs):
-            pass
-    test_app.dependency_overrides[get_hermes_client] = lambda: MockClient()
-    # Override settings to enable dev_mock so preflight passes
-    current_settings = test_app.dependency_overrides.get(get_settings, Settings)()
-    mock_settings = Settings(
-        db_path=str(current_settings.db_path_resolved),
-        hermes_dev_mock=True,
-        log_level="WARNING",
-    )
-    test_app.dependency_overrides[get_settings] = lambda: mock_settings
-        
-    # 4. Trigger context injection via prompt
-    # Note: Using a testclient with a mocked Hermes client. The prompt endpoint calls build_context.
-    # To verify easily without inspecting the mock, we can check memory last_accessed_at changes!
+    # 4. Submit a legacy Work prompt.  It now uses the same GYO context pack
+    # boundary and must not auto-inject legacy memory entries.
     resp = await client.post(f"/api/sessions/{session_id}/prompt", json={"prompt": "Hello"})
     assert resp.status_code == 202
     
-    # 5. Check memory last_accessed_at
+    # 5. Legacy memories remain untouched; Memory Hub is opt-in per Work.
     resp = await client.get("/api/memory")
     memories = resp.json()
     
     # Order should be by importance_score DESC (so k11, k10, ... k0)
     assert memories[0]["key"] == "k11"
     
-    injected_count = 0
-    for mem in memories:
-        if mem["last_accessed_at"] is not None:
-            injected_count += 1
-            
-    # Max memories injected should be 10
-    assert injected_count == 10
-    
-    # The lowest importance score memories (k0, k1) should NOT be injected
-    not_injected = [m for m in memories if m["last_accessed_at"] is None]
-    assert len(not_injected) == 2
-    assert set([m["key"] for m in not_injected]) == {"k0", "k1"}
+    assert all(memory["last_accessed_at"] is None for memory in memories)
     
     # Verify audit events for injection
     audits = await get_audits()
     injected_audits = [target for action, target in audits if action == "memory.injected"]
-    assert len(injected_audits) == 10
-    
-    # Restore dependency
-    test_app.dependency_overrides.clear()
+    assert injected_audits == []
     
     # Allow background task to complete
     import asyncio

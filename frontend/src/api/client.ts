@@ -1,5 +1,5 @@
 /**
- * Base HTTP client for the Hermes Local Stack backend.
+ * Base HTTP client for the DIRAP Local Workbench backend.
  *
  * Rules:
  * - All backend calls must go through this client (never bypass to direct
@@ -10,11 +10,13 @@
 
 function defaultApiBaseUrl(): string {
   if (typeof window === "undefined") {
-    return "http://localhost:8000";
+    return "http://127.0.0.1:8000";
   }
 
-  const host = window.location.hostname || "localhost";
-  return `http://${host}:8000`;
+  // Use Vite's same-origin local proxy. Besides avoiding IPv6 localhost
+  // ambiguity, this keeps the browser from having to reach a second loopback
+  // origin directly and preserves the backend's exact-origin CORS boundary.
+  return "";
 }
 
 export const BASE_URL =
@@ -46,11 +48,11 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const response = await fetch(url, {
+    ...options,
     headers: {
       "Content-Type": "application/json",
       ...(options?.headers ?? {}),
     },
-    ...options,
   });
 
   if (!response.ok) {

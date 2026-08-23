@@ -1,4 +1,4 @@
-# Hermes Local Stack - Decision Log
+# DIRAP Local Workbench - Decision Log
 
 This file records architecture decisions that should remain stable unless explicitly changed by user approval.
 
@@ -25,13 +25,15 @@ Reason:
 
 Status: Accepted.
 
-## ADR-003 - SQLite Stores Business Metadata Only
+## ADR-003 - SQLite Stores Business Metadata Only (Superseded by ADR-008)
 
 Decision: App SQLite does not duplicate full Hermes conversation history.
 
 Reason:
 
 - Hermes owns detailed session state.
+
+Status: superseded for user-visible Work conversations by ADR-008. Historical reasoning is retained as evidence.
 - Avoids data drift.
 - Keeps MVP simple.
 
@@ -78,6 +80,20 @@ Reason:
 
 - FastAPI must remain policy/audit boundary.
 - n8n is useful for integrations, scheduled tasks, and external workflow execution.
+
+## ADR-008 - app.db Owns User-Visible Work Conversations
+
+Decision: `app.db` owns Work conversations, Assistant turns and structured parts shown to the user. Hermes state owns only ACP sessions, reasoning and internal runtime state. The application does not read, synchronize or edit Hermes `state.db` directly.
+
+## ADR-009 - n8n Is Optional For v2.2
+
+Decision: n8n remains a loopback-only sidecar. Missing configuration must return a clear graceful-unavailable state and does not block `DIRAP_V22_VALIDATED`. Live credentials or an external endpoint are not required for v2.2 acceptance.
+
+## ADR-010 - Hermes MCP Is An Exact Nine-Tool Allowlist
+
+Decision: the Hermes MCP server exposes exactly `propose_work_update`, `save_work_context_summary`, `read_workspace_file`, `write_workspace_file`, `search_workspace`, `list_skills`, `update_memory`, `run_safe_task`, and `call_n8n_webhook`.
+
+`propose_work_update` emits a validated `DIRAP_ACTION_PROPOSAL:` only. It cannot mutate Work state or create an Action Package. Persistent summary is `write_internal` and requires user approval. Adding a tenth tool requires PRD and security review.
 
 Status: Accepted.
 

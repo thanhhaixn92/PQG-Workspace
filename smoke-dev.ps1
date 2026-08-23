@@ -33,7 +33,7 @@ function Assert-Ok {
     }
 }
 
-Write-Host "Smoke test Hermes Local Stack" -ForegroundColor Cyan
+Write-Host "Smoke test DIRAP Local Workbench" -ForegroundColor Cyan
 Write-Host "Backend: $BackendUrl"
 Write-Host "Workspace: $WorkspacePath"
 

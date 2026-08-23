@@ -5,8 +5,7 @@ Architecture notes
 * ``lifespan`` handles startup (DB migration) and shutdown cleanup.
 * CORS origins come from Settings (env-configurable, never wildcard).
 * ``GET /health`` checks only the app layer (DB ping) - it does NOT
-  depend on Hermes being installed or running.  Hermes unavailability
-  is a runtime concern for Phase 1.
+  depend on an AI provider being configured or available.
 * Routes are registered inline for Phase 0 (no router needed yet).
   Phase 1 will move them to ``app/api/`` sub-modules.
 """
@@ -32,18 +31,33 @@ from app.api.local_data import router as local_data_router
 from app.api.n8n import router as n8n_router
 from app.api.tasks import router as tasks_router
 from app.api.telegram import router as telegram_router
+from app.api.dirap import router as dirap_router
+from app.api.memory_hub import router as memory_hub_router
+from app.api.artifacts import router as artifacts_router
+from app.api.overview import router as overview_router
+from app.api.context_preview import router as context_preview_router
+from app.api.works import router as works_router
+from app.api.assistant import router as assistant_router
+from app.api.action_packages import router as action_packages_router
+from app.api.marketplace import router as marketplace_router
+from app.api.model_config import router as model_config_router
+from app.api.knowledge_summary import router as knowledge_summary_router
+from app.api.gyo_learning import router as gyo_learning_router
+from app.api.workspace import router as workspace_router
 from app.db.migrations import run_migrations
 from app.dependencies import get_db, get_settings
 from app.services.deprecation import DeprecationMiddleware, metrics
-from app.services.hermes_client import HermesClientManager
+from app.services.gyo_orchestrator import GyoOrchestrator
 from app.services.outbox_dispatcher import run_outbox_dispatcher_loop
 from app.services.task_recovery import recover_stale_task_runs
+from app.services.action_packages import run_action_package_executor_loop
+from app.services.gyo_learning_worker import run_gyo_learning_worker_loop
 from app.settings import Settings, get_settings as _get_settings
-from app.mcp.server import setup_mcp, mcp_session_id_var
+from app.mcp.server import setup_mcp, mcp_server, mcp_session_id_var
 
 logger = logging.getLogger(__name__)
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "2.2.0"
 
 
 def create_app(settings_override: Settings | None = None) -> FastAPI:
@@ -54,7 +68,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         """Application lifespan: run migrations on startup, clean up on shutdown."""
         logging.basicConfig(level=settings.log_level.upper())
-        logger.info("Starting Hermes Local Stack backend v%s", APP_VERSION)
+        logger.info("Starting PQG Workspace backend v%s", APP_VERSION)
         logger.info("DB path: %s", settings.db_path_resolved)
 
         await run_migrations(settings.db_path_resolved)
@@ -63,9 +77,8 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         if recovered_tasks:
             logger.warning("Recovered %s stale task run(s).", recovered_tasks)
 
-        # Initialize Hermes client
-        client_manager = HermesClientManager(settings)
-        app.state.hermes_client = client_manager
+        # GYO is provider-neutral and does not spawn a legacy ACP process.
+        gyo_orchestrator: GyoOrchestrator = app.state.gyo_orchestrator
 
         # Outbox dispatcher background worker (if enabled)
         outbox_dispatcher_stop: asyncio.Event | None = None
@@ -78,23 +91,44 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
             logger.info("Outbox dispatcher background task started (poll interval %.1fs).",
                         settings.outbox_dispatcher_poll_seconds)
 
-        yield  # Application runs here.
+        action_executor_stop = asyncio.Event()
+        action_executor_task = asyncio.create_task(
+            run_action_package_executor_loop(settings, action_executor_stop)
+        )
+        logger.info("Durable action package executor started.")
+        learning_worker_stop = asyncio.Event()
+        learning_worker_task = asyncio.create_task(run_gyo_learning_worker_loop(settings, learning_worker_stop))
+        logger.info("GYO governed learning worker started.")
 
-        # Shutdown: stop outbox dispatcher first, then Hermes client.
+        # Mounted Starlette apps do not automatically run their own lifespan.
+        # Keep FastMCP's streamable-HTTP session manager alive explicitly.
+        async with app.state.mcp_session_manager.run():
+            yield  # Application runs here.
+
+        # Shutdown: stop background workers, then native GYO.
         if outbox_dispatcher_stop is not None:
             outbox_dispatcher_stop.set()
         if outbox_dispatcher_task is not None:
             await outbox_dispatcher_task
             logger.info("Outbox dispatcher stopped.")
-        await client_manager.stop()
-        logger.info("Shutting down Hermes Local Stack backend.")
+        action_executor_stop.set()
+        await action_executor_task
+        logger.info("Durable action package executor stopped.")
+        learning_worker_stop.set()
+        await learning_worker_task
+        logger.info("GYO governed learning worker stopped.")
+        await gyo_orchestrator.stop()
+        logger.info("Shutting down PQG Workspace backend.")
 
     app = FastAPI(
-        title="Hermes Local Stack",
+        title="PQG Workspace",
         version=APP_VERSION,
         description="Local-first AI office assistant backend.",
         lifespan=lifespan,
     )
+    # Initialise eagerly so isolated route tests can override/use the same
+    # native runner without triggering lifespan or spawning a legacy process.
+    app.state.gyo_orchestrator = GyoOrchestrator(settings)
 
     if settings_override:
         app.dependency_overrides[get_settings] = lambda: settings_override
@@ -111,6 +145,19 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     # Deprecation header injection for legacy routes.
     app.add_middleware(DeprecationMiddleware)
 
+    @app.middleware("http")
+    async def bind_local_actor_identity(request: Request, call_next):
+        """Bind the configured local actor only for loopback requests.
+
+        The value comes exclusively from server configuration. In particular,
+        this middleware never reads a browser-provided actor header, so a
+        client cannot impersonate another actor by changing a request.
+        """
+        client_host = request.client.host if request.client else ""
+        if settings.local_actor_subject and client_host in {"127.0.0.1", "::1", "localhost"}:
+            request.state.actor_subject = settings.local_actor_subject
+        return await call_next(request)
+
     # Include API Routers
     app.include_router(sessions_router)
     app.include_router(files_router)
@@ -122,6 +169,19 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     app.include_router(n8n_router)
     app.include_router(tasks_router)
     app.include_router(telegram_router)
+    app.include_router(dirap_router)
+    app.include_router(memory_hub_router, prefix="/api/memory-hub", tags=["memory-hub"])
+    app.include_router(artifacts_router)
+    app.include_router(overview_router)
+    app.include_router(context_preview_router)
+    app.include_router(works_router)
+    app.include_router(workspace_router)
+    app.include_router(assistant_router)
+    app.include_router(action_packages_router)
+    app.include_router(marketplace_router)
+    app.include_router(model_config_router)
+    app.include_router(knowledge_summary_router)
+    app.include_router(gyo_learning_router)
 
     # MCP Integration
     setup_mcp(app)
@@ -199,8 +259,8 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
 
         Checks:
         - DB connectivity (lightweight SELECT 1).
-        Does NOT check Hermes availability - Hermes is not a Phase 0
-        dependency and its absence must not make the health route fail.
+        Does NOT check model availability; an unavailable provider must not
+        make the app health route fail.
         """
         db_ok = False
         try:

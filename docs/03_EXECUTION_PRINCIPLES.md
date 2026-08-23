@@ -1,4 +1,4 @@
-# Hermes Local Stack - Execution Principles
+# DIRAP Local Workbench - Execution Principles
 
 ## 1. Engineering Principles
 
@@ -40,7 +40,7 @@
 
 ## 5. MCP/FastMCP Rules
 
-- Start with 4-6 tools only.
+- Hermes MCP exposes exactly the nine allowlisted tools named in PRD v2.2 and `app/mcp/server.py`. Adding or removing a tool requires a PRD/security review and a matching regression update.
 - Do not expose all CRUD endpoints as tools.
 - MCP tools call backend/service policy layer, not raw filesystem.
 - Tool parameters must use clear descriptions and validation constraints.
@@ -51,7 +51,7 @@
 - n8n is a sidecar, not the central orchestrator.
 - Backend calls n8n; frontend does not call n8n directly.
 - Webhook URL/secret come from env.
-- n8n data volume must persist.
+- n8n is an optional loopback-only sidecar. If it is configured, its data volume must persist; an unconfigured n8n instance must degrade gracefully and does not block v2.2 acceptance.
 - `N8N_ENCRYPTION_KEY` must be fixed for a given installation.
 - External workflow execution is `external_or_destructive` unless proven read-only.
 

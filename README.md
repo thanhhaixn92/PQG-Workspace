@@ -1,6 +1,12 @@
-# Hermes Local Stack
+# PQG Workspace — Trợ lý GYO
 
-Local-first AI office assistant. Backend: Python 3.11 + FastAPI + SQLite. Frontend: Vite + React + TypeScript.
+PQG Workspace là không gian làm việc cá nhân chạy trên máy của bạn. Ứng dụng giúp
+tạo Công việc, trao đổi với Trợ lý GYO, quản lý tài liệu/đầu ra, duyệt tri thức và
+kiểm soát bộ nhớ trong từng phạm vi rõ ràng.
+
+Đây là Local MVP cho một người dùng, không phải dịch vụ cloud hoặc hệ thống
+doanh nghiệp nhiều người dùng. FastAPI là ranh giới chính sách, SQLite lưu
+metadata nghiệp vụ và GYO là runtime tác nhân trung lập provider.
 
 ## Prerequisites
 
@@ -19,7 +25,7 @@ For the first end-to-end chat path, see `docs/11_FIRST_REAL_CHAT.md`.
 ### 1. Clone & enter the repo
 
 ```powershell
-cd C:\Users\dtron\Documents\Hermes
+cd C:\Users\dtron\Documents\DIRAP-Personal-v3
 ```
 
 ### 2. Backend
@@ -48,8 +54,8 @@ uvicorn app.main:app --reload
 ```
 INFO:     Started server process
 INFO:     Waiting for application startup.
-INFO:     Starting Hermes Local Stack backend v0.1.0
-INFO:     DB path: C:\...\Hermes\backend\app.db
+INFO:     Starting PQG Workspace backend v2.2.0
+INFO:     DB path: C:\...\<project>\backend\app.db
 INFO:     DB ready.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000
@@ -63,7 +69,7 @@ curl http://localhost:8000/health
 
 **Expected response:**
 ```json
-{"status":"ok","version":"0.1.0","db":"ok","timestamp":1750000000}
+{"status":"ok","version":"2.2.0","db":"ok","timestamp":1750000000}
 ```
 
 ### 3. Frontend
@@ -81,14 +87,12 @@ npm run dev
   -> Local:   http://localhost:5173/
 ```
 
-Open `http://localhost:5173` in a browser. The page should display:
+Open `http://localhost:5173` in a browser. The first screen should identify the
+product as **PQG Workspace — Trợ lý công việc cá nhân chạy trên máy của bạn** and
+offer these user-facing areas:
 
 ```
-Hermes Local Stack
-Status: ok
-Backend version: 0.1.0
-Database: ok
-Backend is reachable OK
+Tổng quan · Công việc · Tài liệu · Tri thức · Báo cáo · Hộp duyệt · Cài đặt
 ```
 
 ### One-command local startup
@@ -100,6 +104,18 @@ After backend and frontend dependencies are installed, you can start both dev se
 ```
 
 The script checks for `backend\.venv`, `frontend\node_modules`, and port availability before launching the servers. See [`docs/10_UX_SMOKE_TEST.md`](docs/10_UX_SMOKE_TEST.md) for the first-run product walkthrough.
+
+Use `\.\check-dev.ps1` to verify backend, database, GYO configuration and frontend.
+Technical diagnostics are intentionally kept out of the normal user journey.
+
+## Current product boundary
+
+- Controlled Knowledge Search is deterministic, task-scoped and read-only.
+- Memory Hub uses proposal/review/activation lifecycle and is not automatically
+  injected into chat.
+- Browser operator routes do not receive Credential Manager bearer tokens.
+- No cloud deployment, vector/AI search, connector package 2, legacy cutover,
+  Hub retention/delete or encrypted backup is included in this checkpoint.
 
 ---
 

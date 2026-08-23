@@ -1,8 +1,10 @@
-# Hermes Local Stack - PRD
+# DIRAP Local Workbench / DIRAP Personal v3 - PRD v2.2
+
+> Hieu luc tu 2026-08-14. Tai lieu nay thay the cac dinh nghia session-centric va n8n-bat-buoc truoc day. `sessions` chi la entity tuong thich dai dien cho Work.
 
 ## 1. Tom Tat San Pham
 
-Hermes Local Stack la tro ly van phong AI chay local, cho phep nguoi dung lam viec voi agent Hermes thong qua UI rieng. San pham tap trung vao chat streaming, thao tac file trong workspace, quan ly memory/skills, approval an toan, va automation qua n8n.
+DIRAP Local Workbench la khong gian lam viec AI ca nhan chay local. Hermes la agent/runtime ho tro ben trong. Mo hinh san pham chinh la `Work -> plan -> conversations -> Assistant turns -> documents/artifacts -> knowledge -> approvals/action packages`.
 
 MVP khong nham lam he thong multi-user production. Muc tieu la mot local workstation assistant co the quan sat, ghi audit, va kiem soat hanh dong cua agent.
 
@@ -18,17 +20,17 @@ MVP khong nham lam he thong multi-user production. Muc tieu la mot local worksta
 - File operations cua agent can gioi han trong workspace, tranh truy cap nham ra ngoai.
 - Memory/skills can co quan ly ro, khong dua toan bo lich su hoi thoai vao context.
 - Approval can phan biet hanh dong doc, ghi noi bo, va destructive/external.
-- n8n can tich hop duoc nhung khong tro thanh cua hau bao mat.
+- n8n co the tich hop nhu sidecar loopback tuy chon, unavailable phai graceful.
 - Qua trinh build can co checklist nghiem thu de Codex duyet ky thuat nhat quan.
 
 ## 4. Goals
 
 - Tao UI chat voi Hermes qua ACP.
 - Stream token va events realtime bang typed SSE.
-- Quan ly sessions, task runs, memory, skills, files.
+- Quan ly Work, plan, conversations, Assistant turns, documents/artifacts, knowledge, approvals va skills.
 - Thuc thi approval policy va audit log.
 - Gioi han file access vao workspace.
-- Cho phep n8n workflow sidecar duoc goi co kiem soat.
+- Cho phep n8n sidecar tuy chon duoc goi co kiem soat ma khong chan MVP.
 - Tao bo test/eval de Codex review tung phase.
 
 ## 5. Non-Goals
@@ -39,16 +41,18 @@ MVP khong nham lam he thong multi-user production. Muc tieu la mot local worksta
 - Agent tu tao tool moi khong qua review.
 - Vector DB/graph DB trong MVP.
 - Fine-tune model.
-- Dong bo full conversation history tu Hermes state.db sang app.db.
+- Dong bo hoac sua truc tiep Hermes `state.db`; `app.db` la source of truth cho lich su Work nguoi dung nhin thay.
 
 ## 6. User Stories MVP
 
-### Session va Chat
+### Work, Conversation va Assistant
 
-- La user, toi tao session moi gan voi workspace path.
+- La user, toi tao Work moi gan voi managed workspace va co nhieu conversation.
 - La user, toi gui prompt va nhin thay token stream realtime.
 - La user, toi thay tool call, terminal command, file diff, va plan update trong activity panel.
-- La user, toi co the tiep tuc session cu.
+- La user, toi co the tiep tuc Work/conversation cu, huy va retry ma khong lan state.
+- La user, toi thay context manifest gom nguon duoc dung/loai va ly do.
+- La user, toi nhan `action_proposal` ma khong co mutation truoc khi tao va duyet Action Package.
 
 ### Approval
 
@@ -69,7 +73,7 @@ MVP khong nham lam he thong multi-user production. Muc tieu la mot local worksta
 - La user, toi tao/sua/xoa memory entry.
 - La user, toi co the xem de xuat memory/skill update tu curator truoc khi chap nhan.
 
-### Automation
+### Automation tuy chon
 
 - La user, toi cau hinh n8n webhook local.
 - La user, toi yeu cau Hermes kich hoat workflow n8n va phai phe duyet neu co data ra ngoai.
@@ -77,7 +81,7 @@ MVP khong nham lam he thong multi-user production. Muc tieu la mot local worksta
 ## 7. Functional Requirements
 
 - Backend co `GET /health`.
-- Backend co session CRUD toi thieu.
+- Backend co Work/conversation/plan CRUD va Assistant run/turn/SSE lifecycle.
 - Backend co prompt API va SSE events.
 - Backend co file tree/read/write API.
 - Backend co skills CRUD.
@@ -108,7 +112,10 @@ MVP dat khi:
 - File editor doc/ghi trong workspace an toan.
 - Skills/memory CRUD co audit.
 - Permission model duoc enforce.
-- n8n sidecar goi duoc qua backend co approval.
+- n8n neu cau hinh thi goi qua backend co approval; khi khong cau hinh thi bao unavailable ro rang va khong chan v2.2.
+- MCP Hermes expose dung 9 tool; `propose_work_update` chi phat proposal marker, khong ghi DB.
+- Persistent summary thuoc `write_internal` va chi ghi sau approval.
+- Fidelity ledger dat gate va usability test co it nhat 4/5 nguoi dat.
 - Codex review va approve cac phase theo checklist.
 
 ## 10. Post-MVP

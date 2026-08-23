@@ -1,47 +1,46 @@
+[CmdletBinding()]
+param(
+    [switch]$Launch,
+    [string]$TaskPrompt
+)
+
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
-function Read-AIState {
-    Get-Content -Raw -LiteralPath "AI_STATE.json" | ConvertFrom-Json
+& (Join-Path $PSScriptRoot "agent-preflight.ps1")
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
 }
 
-function Write-AIState($State) {
-    $State | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath "AI_STATE.json" -Encoding UTF8
+$State = Get-Content -LiteralPath "AI_STATE.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($State.human_approval_required -eq $true) {
+    Write-Host "Stopped: the current state requires human approval before an implementation task can launch."
+    exit 3
 }
 
-$state = Read-AIState
-
-if ($state.state -eq "CP5_COMPLETE" -and $state.next_agent -eq "human") {
-    Write-Host "Stopped: CP5_COMPLETE is waiting for human approval."
-    exit 0
-}
-if ($state.state -eq "BLOCKED" -or $state.human_approval_required -eq $true -or $null -ne $state.lock) {
-    Write-Host "Stopped: state gate is closed. state=$($state.state) next_agent=$($state.next_agent) lock=$($state.lock) human_approval_required=$($state.human_approval_required)"
-    exit 0
-}
-if ($state.next_agent -ne "codex") {
-    Write-Host "Stopped: next_agent is $($state.next_agent), not codex."
+if (-not $Launch) {
+    Write-Host "Preflight complete. Review the required files, then re-run with -Launch -TaskPrompt '<approved scope>' only for an approved scoped task."
     exit 0
 }
 
-$state.lock = "codex"
-Write-AIState $state
+if ([string]::IsNullOrWhiteSpace($TaskPrompt)) {
+    Write-Host "Stopped: -TaskPrompt is required when -Launch is used."
+    exit 4
+}
 
-try {
-    $prompt = @"
-Read AGENTS.md, AI_TASK.md, AI_STATE.json, AI_HANDOFF.md, AI_CHANGELOG.md, AI_VERIFICATION.md, and AI_RISK_REGISTER.md.
-Follow only AI_HANDOFF.md.
-Never commit, push, merge, deploy, reset, clean, delete, or modify forbidden files.
-Only work on CP6 when AI_STATE.json and AI_HANDOFF.md explicitly show CP6 is approved, human_approval_required is false, and next_agent is codex.
-For the current approved CP6 task, implement only the Outbox Dispatcher scope described in AI_TASK.md and AI_HANDOFF.md.
+$Prompt = @"
+Before any edit, read AGENTS.md and run scripts/agent-preflight.ps1.
+Read PROJECT_STATE.md, AI_STATE.json, docs/implementation/CURRENT_CHECKPOINT.md,
+CODEGRAPH.md, docs/AI_AGENT_ROUTING.md and docs/14_AGENT_OPERATING_CONTRACT.md.
+State the active gate, requested scope, files inspected and focused validation
+before editing. Preserve the dirty worktree. Never commit, push, deploy, reset,
+clean, alter credentials, database files, migrations, or state/checkpoints
+without explicit human approval. Do not treat historical plans or tests as the
+current implementation scope.
+
+Approved task scope:
+$TaskPrompt
 "@
-    codex exec --sandbox workspace-write $prompt
-}
-finally {
-    $current = Read-AIState
-    if ($current.lock -eq "codex") {
-        $current.lock = $null
-        Write-AIState $current
-    }
-}
+
+codex exec --sandbox workspace-write $Prompt

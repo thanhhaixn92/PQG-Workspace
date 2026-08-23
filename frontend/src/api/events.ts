@@ -170,13 +170,16 @@ export const subscribeToSessionEvents = (sessionId: string) => {
 
       if (hermesEvent.type === 'approval_required') {
         ensureSessionTimer(sessionId);
-        store.setPendingApproval({
-          approval_id: hermesEvent.approval_id || '',
-          action: hermesEvent.action || 'approval',
-          target: hermesEvent.target || '',
-          risk_level: hermesEvent.risk_level || 'write_internal',
-          description: hermesEvent.description,
-        });
+        if (store.activeSessionId === sessionId && currentSessionId === sessionId) {
+            store.setPendingApproval({
+              approval_id: hermesEvent.approval_id || '',
+              session_id: sessionId,
+              action: hermesEvent.action || 'approval',
+            target: hermesEvent.target || '',
+            risk_level: hermesEvent.risk_level || 'write_internal',
+            description: hermesEvent.description,
+          });
+        }
         store.setSessionStatus(sessionId, 'waiting_approval');
         updateLatestTaskStatus(sessionId, 'running');
       } else if (hermesEvent.type === 'error') {
@@ -320,8 +323,21 @@ export const subscribeToTaskEvents = (sessionId: string, taskId: string) => {
       getTask(taskId)
         .then(actualTask => {
           const store = useHermesStore.getState();
-          store.setSessionStatus(sessionId, 'idle');
-          store.setSessionStartedAt(sessionId, null);
+          const active = ['queued', 'running', 'waiting_approval'].includes(actualTask.status);
+          if (active) {
+            store.setSessionStatus(
+              sessionId,
+              actualTask.status === 'waiting_approval' ? 'waiting_approval' : 'running',
+            );
+            ensureSessionTimer(sessionId);
+            store.setSessionError(
+              sessionId,
+              'Mất kết nối luồng phản hồi. Task vẫn đang chạy; trạng thái sẽ được đồng bộ lại khi kết nối trở lại.',
+            );
+          } else {
+            store.setSessionStatus(sessionId, actualTask.status === 'failed' || actualTask.status === 'cancelled' ? 'error' : 'idle');
+            store.setSessionStartedAt(sessionId, null);
+          }
 
           const latestTask = store.latestTaskBySession[sessionId];
           if (latestTask && latestTask.id === taskId) {
@@ -337,8 +353,12 @@ export const subscribeToTaskEvents = (sessionId: string, taskId: string) => {
         .catch(err => {
           console.error('Failed to refresh task status on stream end', err);
           const store = useHermesStore.getState();
-          store.setSessionStatus(sessionId, 'idle');
-          store.setSessionStartedAt(sessionId, null);
+          // Do not unlock submission while the last known task may still be
+          // running.  The user can safely retry the stream or refresh later.
+          store.setSessionError(
+            sessionId,
+            'Không thể xác nhận trạng thái task sau khi mất kết nối luồng phản hồi.',
+          );
         });
     }
   };

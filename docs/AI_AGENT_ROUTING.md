@@ -1,32 +1,55 @@
-# AI Agent Routing
+# AI agent routing
 
-Use this file to decide what to read before editing. Do not load every doc by default.
+Use this index after the mandatory preflight. Read the smallest relevant set;
+never load every project document by default.
 
-## Always Read First
+## Always read before code
 
-- `PROJECT_STATE.md`
-- `AGENTS.md`
-- `docs/implementation/CURRENT_CHECKPOINT.md` when working on checkpoints
+1. `AGENTS.md`
+2. `PROJECT_STATE.md` and `AI_STATE.json`
+3. `docs/implementation/CURRENT_CHECKPOINT.md`
+4. `CODEGRAPH.md`
+5. `docs/14_AGENT_OPERATING_CONTRACT.md`
 
-## Task Routing
+The active state files define the gate. Historical plans, historical test counts
+and older checkpoint wording do not authorize a change.
 
-| Task type | Read these first | Then inspect code |
-| --- | --- | --- |
-| CP3 legacy adapter | `docs/implementation/CURRENT_CHECKPOINT.md`, `docs/05_ACCEPTANCE_EVALUATION.md`, `docs/06_HANDOFF_REVIEW_PROTOCOL.md` | `backend/app/api/sessions.py`, task service/repository files, characterization tests |
-| TaskService/state machine | `docs/implementation/CURRENT_CHECKPOINT.md`, relevant ADR in `docs/adr/` | `backend/app/services/task_service.py`, `backend/app/services/state_machine.py`, `backend/app/repositories/task_repository.py` |
-| Idempotency | `docs/02_DATA_STORAGE_MODEL.md`, `docs/04_SECURITY_PERMISSION_POLICY.md` | `backend/app/services/idempotency_service.py`, `backend/app/repositories/idempotency_repository.py`, migrations, tests |
-| Approval/security | `docs/04_SECURITY_PERMISSION_POLICY.md`, `docs/06_HANDOFF_REVIEW_PROTOCOL.md` | `backend/app/api/approvals.py`, audit service, approval tests |
-| Session/chat routes | `docs/01_PRD.md`, `docs/02_DATA_STORAGE_MODEL.md`, `docs/05_ACCEPTANCE_EVALUATION.md` | `backend/app/api/sessions.py`, frontend chat/session components |
-| File/editor | `docs/02_DATA_STORAGE_MODEL.md`, `docs/04_SECURITY_PERMISSION_POLICY.md` | `backend/app/api/files.py`, sandbox service, editor/file explorer components |
-| Runtime/Hermes/SSE | `docs/11_FIRST_REAL_CHAT.md`, `docs/12_LOCAL_OPERATIONS.md`, `docs/04_SECURITY_PERMISSION_POLICY.md` | Hermes client, event bus, sessions API, events API |
-| n8n/MCP | `docs/04_SECURITY_PERMISSION_POLICY.md`, `docs/12_LOCAL_OPERATIONS.md` | MCP tools, n8n routes, n8n tests |
-| Frontend UX only | `DESIGN.md`, `CODEGRAPH.md` | Target component and colocated tests |
-| Documentation only | `PROJECT_STATE.md`, target doc | Related source only if statements need verification |
+## Task routing
 
-## Rules
+| Task | Read first | Inspect next | Prove with |
+| --- | --- | --- | --- |
+| Work, plan or conversation | data model, security policy | `api/works.py`, schemas, `WorkHub.tsx` | Work/scope/archive tests |
+| GYO chat, stream, retry or cancel | PRD, security policy | `api/assistant.py`, orchestrator, SSE client/panel | assistant route + UI isolation tests |
+| Provider/model/fallback | `docs/implementation/PQG_GYO_PROVIDER_CORE.md`, security | model-config, registry, resilience service | provider/secret/fallback tests |
+| Attachment/context/memory scope | data model, security policy | context builder, scope service, manifest/panel | foreign scope/exclusion/retry tests |
+| Learning candidate/worker | security policy, current checkpoint | learning API/service/worker | default-off, duplicate, cancel/archive tests |
+| Action Package or approval | security policy, data model | proposal parser, package/approval routes, UI entry point | before-approval, 409, idempotency tests |
+| Files/artifacts/reports | data model, security policy | file/artifact routes, sandbox, explorer/reports | managed-root/path-escape tests |
+| Knowledge, Skill, Memory review | PRD, security policy | source lifecycle route + Review Inbox | lifecycle/concurrency/deep-link tests |
+| App shell or responsive UI | `DESIGN.md` plus state | AppLayout, target component, CSS, focused test | loading/error/keyboard/reflow browser evidence |
+| State/checkpoint/evidence | handoff review protocol, acceptance | active state files and exact evidence scripts | actual commands/artifacts only |
+| Migration/dependency/config | data model, security policy | migration/config/package manifest | explicit approval then isolated upgrade/rollback |
 
-- Prefer `CODEGRAPH.md` for navigation before broad file searches.
-- Prefer targeted tests over full suites while iterating, then run full gates before approval.
-- Do not use long roadmap docs as active implementation scope unless `CURRENT_CHECKPOINT.md` says so.
-- If docs conflict, follow `docs/00_PROJECT_CANON.md` and `PROJECT_STATE.md`.
+## Routing guardrails
 
+- When `DESIGN.md` or a historical Hermes document conflicts with current GYO
+  route/service code, do not reintroduce old runtime behaviour. Record the
+  discrepancy and request a documentation-reconciliation scope.
+- A UI selector, model prompt, or frontend condition is not an authorization or
+  scope control. Verify the backend route/service guard.
+- For a UI change, inspect the affected async, empty and error states before
+  changing layout. Do not use visual similarity as proof of workflow safety.
+- For shared contract changes, read both producer and consumer tests before the
+  first edit.
+- Preserve the dirty worktree. Use a focused diff before and after the change.
+
+## Verification order
+
+1. Focused regression tests.
+2. Type check/build only when shared client/component contracts change.
+3. Runtime/browser proof only when a route, streaming, layout or gate is
+   affected.
+4. `git diff --check` and scoped diff review.
+
+Mark every skipped or unrun check explicitly. A successful focused check is not
+a release gate and does not promote the current checkpoint.

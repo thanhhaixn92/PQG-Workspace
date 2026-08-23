@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -145,6 +146,25 @@ class TestTelegramWebhook:
         assert data2["duplicate"]
         assert data2["task_id"] == data1["task_id"]
 
+    async def test_same_message_id_from_different_updates_remains_distinct(self, tg_client):
+        """Telegram message ids are chat-local; update_id is the durable identity."""
+        first = await _post_webhook(tg_client, {
+            "update_id": 31,
+            "message_id": "shared-message-id",
+            "from_id": 12345,
+            "text": "first chat message",
+        })
+        second = await _post_webhook(tg_client, {
+            "update_id": 32,
+            "message_id": "shared-message-id",
+            "from_id": 67890,
+            "text": "second chat message",
+        })
+        assert first.status_code == second.status_code == 200
+        assert not first.json()["duplicate"]
+        assert not second.json()["duplicate"]
+        assert first.json()["task_id"] != second.json()["task_id"]
+
     # --- Criterion 5: Callback token lifecycle ---
 
     async def test_callback_token_returned_when_requested(self, tg_client):
@@ -200,6 +220,23 @@ class TestTelegramCallback:
         resp2 = await self._post_callback(tg_client, {"token": token})
         assert resp2.status_code == 409
         assert "reused" in resp2.json()["detail"].lower()
+
+    async def test_concurrent_callback_has_exactly_one_winner(self, tg_client):
+        webhook_resp = await _post_webhook(tg_client, {
+            "update_id": 51,
+            "message_id": "501",
+            "from_id": 12345,
+            "text": "race callback",
+            "await_callback": True,
+        })
+        token = webhook_resp.json()["callback_token"]
+
+        first, second = await asyncio.gather(
+            self._post_callback(tg_client, {"token": token}),
+            self._post_callback(tg_client, {"token": token}),
+        )
+
+        assert sorted((first.status_code, second.status_code)) == [200, 409]
 
     # --- Criterion 5: Expired callback token → 410 ---
 

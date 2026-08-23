@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHermesStore } from '../store/store';
 import { fetchGlobalMemory, fetchSessionMemory, createMemory, deleteMemory } from '../api/memory';
 import type { MemoryKind } from '../api/memory';
@@ -22,6 +22,8 @@ export const MemoryPanel: React.FC = () => {
   const [newValue, setNewValue] = useState('');
   const [newKind, setNewKind] = useState<MemoryKind>('project_fact');
   const [viewMode, setViewMode] = useState<'global' | 'session'>('global');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const requestVersion = useRef(0);
 
   const filteredMemory = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -32,21 +34,28 @@ export const MemoryPanel: React.FC = () => {
     );
   }, [memory, search]);
 
-  const loadMemory = async () => {
+  const loadMemory = useCallback(async () => {
+    const version = ++requestVersion.current;
+    const sessionId = activeSessionId;
     try {
       setError(null);
+      setLoading(true);
       const data = viewMode === 'global'
         ? await fetchGlobalMemory()
-        : (activeSessionId ? await fetchSessionMemory(activeSessionId) : []);
-      setMemory(data);
+        : (sessionId ? await fetchSessionMemory(sessionId) : []);
+      if (version === requestVersion.current && (viewMode === 'global' || useHermesStore.getState().activeSessionId === sessionId)) setMemory(data);
     } catch {
-      setError('Không tải được bộ nhớ.');
+      if (version === requestVersion.current) setError('Không tải được bộ nhớ.');
+    } finally {
+      if (version === requestVersion.current) setLoading(false);
     }
-  };
+  }, [activeSessionId, setMemory, viewMode]);
 
   useEffect(() => {
+    requestVersion.current += 1;
+    setMemory([]);
     void loadMemory();
-  }, [activeSessionId, viewMode]);
+  }, [loadMemory, setMemory]);
 
   const handleCreate = async () => {
     if (!newKey.trim() || !newValue.trim()) return;
@@ -70,13 +79,17 @@ export const MemoryPanel: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, label: string) => {
+    if (deletingId || !window.confirm('Xóa mục bộ nhớ “' + label + '”? Không thể hoàn tác.')) return;
+    setDeletingId(id);
     try {
       setError(null);
       await deleteMemory(id);
       await loadMemory();
     } catch {
       setError('Không xóa được mục bộ nhớ.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -86,7 +99,7 @@ export const MemoryPanel: React.FC = () => {
         <h3 style={{ margin: 0 }}>Bộ nhớ</h3>
         <select value={viewMode} onChange={e => setViewMode(e.target.value as 'global' | 'session')} className="hermes-input" style={{ width: 'auto', padding: '2px 4px' }}>
           <option value="global">Toàn cục</option>
-          <option value="session" disabled={!activeSessionId}>Theo phiên</option>
+          <option value="session" disabled={!activeSessionId}>Theo Công việc</option>
         </select>
       </div>
 
@@ -109,7 +122,9 @@ export const MemoryPanel: React.FC = () => {
                 </div>
                 <strong>{item.key}</strong>
               </div>
-              <button onClick={() => void handleDelete(item.id)} style={{ color: 'var(--error)' }}>Xóa</button>
+              <button onClick={() => void handleDelete(item.id, item.key)} disabled={deletingId !== null} style={{ color: 'var(--error)' }}>
+                {deletingId === item.id ? 'Đang xóa...' : 'Xóa'}
+              </button>
             </div>
             <div style={{ fontSize: '12px', marginTop: '4px' }}>{item.value}</div>
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>

@@ -1,10 +1,14 @@
 {
-  "task_id": "cp10-cleanup",
-  "state": "CP10_COMPLETE",
-  "next_agent": "human",
+  "task_id": "dirap-v22-completion",
+  "state": "DIRAP_V22_IMPLEMENTATION_IN_PROGRESS",
+  "baseline": [
+    "DIRAP_V3_CONTROLLED_SEARCH_ACCEPTED",
+    "DIRAP_V3_MEMORY_HUB_4_1_VALIDATED"
+  ],
+  "next_agent": "codex",
   "lock": null,
-  "last_agent": "antigravity",
-  "last_result": "Checkpoint CP10 Cleanup verified by Antigravity (Checker). All 11 CP10 tests passed (269/269 total pass). Gate closed at CP10_COMPLETE. Decided to retain deprecated legacy session routes to keep the fallback UI working. No code removed. All V1 checkpoints are now complete.",
+  "last_agent": "codex",
+  "last_result": "Reconciliation 2026-08-22: E2 bounded real-provider PASS theo receipt package-e2-bounded-20260822-063658; F1 PASS claim hẹp, remote compute stop NOT PROVEN; G-SYNTHETIC aggregate package-g-synthetic-aggregate-20260822-0837 PASS nhưng không phải human usability. Backend focused 46 passed, frontend canonical 33 passed và type-check PASS. Giữ DIRAP_V22_IMPLEMENTATION_IN_PROGRESS/PARTIAL, không nâng DIRAP_V22_VALIDATED.",
   "human_approval_required": true,
-  "risk_level": "low"
+  "risk_level": "medium"
 }

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.api.schemas import TelegramWebhookRequest, TelegramCallbackRequest, TelegramWebhookResponse, TelegramCallbackResponse
 from app.dependencies import get_db, get_settings
 from app.repositories.telegram_repository import TelegramCallbackTokenConflict, TelegramCallbackTokenExpired, TelegramCallbackTokenNotFound
+from app.repositories.idempotency_repository import IdempotencyFailed, IdempotencyInProgress
 from app.services.audit import log_audit_event
 from app.services.telegram_service import TelegramService
 from app.settings import Settings
@@ -34,17 +35,13 @@ async def telegram_webhook(
     if not svc.check_allowlist(user_id):
         raise HTTPException(status_code=403, detail="Telegram user not in allowlist")
 
-    if parsed.message_id:
-        existing = await svc.check_idempotency(parsed.message_id)
-        if existing:
-            return TelegramWebhookResponse(
-                status="duplicate",
-                task_id=existing["task_id"],
-                duplicate=True,
-                callback_token=existing.get("callback_token"),
-            )
+    try:
+        task, token, duplicate = await svc.process_telegram_update(parsed)
+    except (IdempotencyInProgress, IdempotencyFailed) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    task, token = await svc.process_telegram_update(parsed)
+    if duplicate:
+        return TelegramWebhookResponse(status="duplicate", task_id=task["id"], duplicate=True, callback_token=token)
 
     await log_audit_event(
         conn=conn,

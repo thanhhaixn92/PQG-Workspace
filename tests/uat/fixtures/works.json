@@ -1,0 +1,24 @@
+{
+  "workA": {
+    "id": "uat-work-a",
+    "title": "Công việc A — UAT Resolver",
+    "goal": "Kiểm tra resolver canonical cho Work A",
+    "data_scope": "work_only",
+    "workspace_path": "managed",
+    "conversations": [
+      { "id": "uat-conv-a1", "title": "Phiên A1 — Trao đổi đầu tiên", "status": "active", "purpose": "GYO Panel + WorkHub cùng thread" },
+      { "id": "uat-conv-a2", "title": "Phiên A2 — Trao đổi thứ hai", "status": "active", "purpose": "Thread khác biệt với A1" }
+    ]
+  },
+  "workB": {
+    "id": "uat-work-b",
+    "title": "Công việc B — UAT Resolver",
+    "goal": "Kiểm tra resolver canonical cho Work B",
+    "data_scope": "work_only",
+    "workspace_path": "managed",
+    "conversations": [
+      { "id": "uat-conv-b1", "title": "Phiên B1 — Trao đổi đầu tiên", "status": "active", "purpose": "GYO Panel + WorkHub cùng thread" },
+      { "id": "uat-conv-b2", "title": "Phiên B2 — Trao đổi thứ hai", "status": "active", "purpose": "Thread khác biệt với B1" }
+    ]
+  }
+}

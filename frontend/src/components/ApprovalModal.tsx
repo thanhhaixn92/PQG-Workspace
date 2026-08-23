@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, Clipboard, ShieldAlert, X } from 'lucide-react';
 import { useHermesStore } from '../store/store';
-import { type ApprovalDecision, submitApprovalDecision } from '../api/approvals';
+import { fetchPendingApprovals, type ApprovalDecision, submitApprovalDecision } from '../api/approvals';
+import { ApiError } from '../api/client';
 
 function actionLabel(action: string): string {
   switch (action) {
@@ -13,10 +14,11 @@ function actionLabel(action: string): string {
       return 'Chạy lệnh cục bộ';
     case 'call_n8n_webhook':
       return 'Gọi workflow n8n';
+    case 'write_file':
     case 'write_workspace_file':
       return 'Ghi hoặc sửa tệp';
     case 'hermes.permission':
-      return 'Cấp quyền cho Hermes';
+      return 'Cấp quyền cho Trợ lý GYO';
     default:
       return action;
   }
@@ -48,7 +50,7 @@ function riskLabel(risk: string, elevated: boolean): string {
     case 'read':
       return 'Chỉ đọc';
     case 'write_internal':
-      return 'Ghi trong workspace';
+      return 'Ghi trong thư mục làm việc';
     case 'external_or_destructive':
       return 'Tác động bên ngoài hoặc rủi ro cao';
     default:
@@ -62,7 +64,7 @@ function quickReviewLabel(risk: string, elevated: boolean): string {
   }
 
   if (risk === 'write_internal') {
-    return 'Chỉ cho phép nếu đúng workspace hoặc tệp mong muốn.';
+    return 'Chỉ cho phép nếu đúng thư mục làm việc hoặc tệp mong muốn.';
   }
 
   if (risk === 'read') {
@@ -112,20 +114,26 @@ export const ApprovalModal: React.FC = () => {
   const [submittingDecision, setSubmittingDecision] = useState<ApprovalDecision | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  // Approval is scoped to the work that requested it. Never show or decide a
+  // late/stale approval after the user has selected a different work.
+  const approvalForActiveSession = pendingApproval?.session_id === activeSessionId ? pendingApproval : null;
 
-  const elevatedLocalScript = pendingApproval
-    ? isLocalScriptApproval(pendingApproval.action, pendingApproval.target, pendingApproval.description)
+  const elevatedLocalScript = approvalForActiveSession
+    ? isLocalScriptApproval(approvalForActiveSession.action, approvalForActiveSession.target, approvalForActiveSession.description)
     : false;
-  const isHighRisk = pendingApproval ? pendingApproval.risk_level === 'external_or_destructive' || elevatedLocalScript : false;
-  const allowSessionDecision = pendingApproval
-    ? isSessionScopedApprovalAllowed(pendingApproval.action, pendingApproval.risk_level, elevatedLocalScript)
+  const isHighRisk = approvalForActiveSession ? approvalForActiveSession.risk_level === 'external_or_destructive' || elevatedLocalScript : false;
+  const allowSessionDecision = approvalForActiveSession
+    ? isSessionScopedApprovalAllowed(approvalForActiveSession.action, approvalForActiveSession.risk_level, elevatedLocalScript)
     : false;
   const disableButtons = submittingDecision !== null;
 
   const copyText = async (field: string, value?: string) => {
     if (!value) return;
     try {
-      await navigator.clipboard?.writeText(value);
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(value);
       setCopiedField(field);
       window.setTimeout(() => setCopiedField(current => (current === field ? null : current)), 1500);
     } catch {
@@ -134,26 +142,42 @@ export const ApprovalModal: React.FC = () => {
   };
 
   const handleDecision = async (decision: ApprovalDecision) => {
-    if (!pendingApproval) return;
+    if (!approvalForActiveSession) return;
     setSubmittingDecision(decision);
     setError(null);
     try {
-      const response = await submitApprovalDecision(pendingApproval.approval_id, decision);
-      const sessionId = response.session_id || activeSessionId;
+      const response = await submitApprovalDecision(approvalForActiveSession.approval_id, decision);
+      const sessionId = response.session_id;
+      if (sessionId !== approvalForActiveSession.session_id) {
+        throw new Error('Approval session mismatch');
+      }
       if (sessionId) {
         addEvent(sessionId, {
-          id: `approval-${pendingApproval.approval_id}-${decision}`,
+          id: `approval-${approvalForActiveSession.approval_id}-${decision}`,
           type: 'approval_decision',
           decision,
           audit_action: response.audit_action,
-          message: `${decisionLabel(decision)}: ${actionLabel(pendingApproval.action)}`,
+          message: `${decisionLabel(decision)}: ${actionLabel(approvalForActiveSession.action)}`,
         });
         setSessionStatus(sessionId, decision === 'deny' ? 'idle' : 'running');
       }
       requestAuditRefresh();
       setPendingApproval(null);
     } catch (err) {
-      setError(approvalErrorMessage(err));
+      if (err instanceof ApiError && err.status === 409) {
+        setPendingApproval(null);
+        setError('Yêu cầu phê duyệt đã được xử lý ở nơi khác. Danh sách đang được làm mới.');
+        try {
+          const latestApprovals = await fetchPendingApprovals(approvalForActiveSession.session_id);
+          if (useHermesStore.getState().activeSessionId === approvalForActiveSession.session_id) {
+            setPendingApproval(latestApprovals[0] ?? null);
+          }
+        } catch {
+          // Keep stale approval actions unavailable when the authoritative reload fails.
+        }
+      } else {
+        setError(approvalErrorMessage(err));
+      }
     } finally {
       setSubmittingDecision(null);
     }
@@ -161,7 +185,7 @@ export const ApprovalModal: React.FC = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!pendingApproval) return;
+      if (!approvalForActiveSession) return;
       if (e.altKey && e.key === 'a') {
         e.preventDefault();
         if (!submittingDecision) void handleDecision('allow_once');
@@ -179,28 +203,56 @@ export const ApprovalModal: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  if (!pendingApproval) return null;
+  useEffect(() => {
+    if (!approvalForActiveSession) return;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const timer = window.setTimeout(() => modalRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      previousFocusRef.current?.focus();
+    };
+  }, [approvalForActiveSession]);
+
+  const trapFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Tab' || !modalRef.current) return;
+    const nodes = modalRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    const focusable = Array.from(nodes);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  if (!approvalForActiveSession) {
+    return error ? <div className="inline-error" role="status">{error}</div> : null;
+  }
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="approval-title">
-      <div className="modal-content approval-modal">
+      <div className="modal-content approval-modal" ref={modalRef} onKeyDown={trapFocus}>
         <div className="approval-header">
           <ShieldAlert size={22} />
           <div>
             <h2 id="approval-title">Cần phê duyệt</h2>
-            <p>Hermes đang yêu cầu quyền trước khi tiếp tục.</p>
+            <p>Trợ lý GYO đang yêu cầu quyền trước khi tiếp tục.</p>
           </div>
         </div>
 
         <div className={`approval-risk ${isHighRisk ? 'high' : ''}`}>
           <AlertTriangle size={16} />
-          {riskLabel(pendingApproval.risk_level, elevatedLocalScript)}
+          {riskLabel(approvalForActiveSession.risk_level, elevatedLocalScript)}
         </div>
 
         <div className="approval-details">
           <div>
             <span>Hành động</span>
-            <strong>{actionLabel(pendingApproval.action)}</strong>
+            <strong>{actionLabel(approvalForActiveSession.action)}</strong>
           </div>
           <div>
             <span className="approval-detail-header">
@@ -208,35 +260,35 @@ export const ApprovalModal: React.FC = () => {
               <button
                 type="button"
                 className="detail-copy-button"
-                onClick={() => void copyText('target', pendingApproval.target)}
+                onClick={() => void copyText('target', approvalForActiveSession.target)}
                 title="Copy đối tượng"
               >
                 <Clipboard size={13} />
                 {copiedField === 'target' ? 'Đã copy' : 'Copy'}
               </button>
             </span>
-            <strong>{targetLabel(pendingApproval.target)}</strong>
+            <strong>{targetLabel(approvalForActiveSession.target)}</strong>
           </div>
-          {pendingApproval.description && (
+          {approvalForActiveSession.description && (
             <div>
               <span className="approval-detail-header">
                 Mô tả
                 <button
                   type="button"
                   className="detail-copy-button"
-                  onClick={() => void copyText('description', pendingApproval.description)}
+                  onClick={() => void copyText('description', approvalForActiveSession.description)}
                   title="Copy mô tả"
                 >
                   <Clipboard size={13} />
                   {copiedField === 'description' ? 'Đã copy' : 'Copy'}
                 </button>
               </span>
-              <strong>{pendingApproval.description}</strong>
+              <strong>{approvalForActiveSession.description}</strong>
             </div>
           )}
           <div>
             <span>Đánh giá nhanh</span>
-            <strong>{quickReviewLabel(pendingApproval.risk_level, elevatedLocalScript)}</strong>
+            <strong>{quickReviewLabel(approvalForActiveSession.risk_level, elevatedLocalScript)}</strong>
           </div>
         </div>
 

@@ -35,6 +35,18 @@ frontend/build/
 frontend/.vite/
 *.tsbuildinfo
 
+# Local runtime and browser-test artifacts (regenerable; keep outside commits)
+.dev/dev-state.json
+/.playwright-cli/
+/frontend/.playwright-cli/
+/output/
+/workspace_outputs/
+/backend/backups/
+/tests/uat/artifacts/
+/tests/uat/uat/artifacts/
+/_tmp_*.js
+/gyo-workspace-audit-*.png
+
 # OS
 .DS_Store
 Thumbs.db

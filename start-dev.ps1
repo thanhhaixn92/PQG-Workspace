@@ -1,6 +1,11 @@
 param(
     [int]$BackendPort = 8000,
     [int]$FrontendPort = 5173,
+    # Restrict this local-only subject to a command-safe identifier before it
+    # is passed to the child PowerShell process. The backend independently
+    # validates the configured value and never accepts it from browser input.
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._:@-]{0,199}$')]
+    [string]$LocalActorSubject = "local-dev-user",
     [switch]$Fresh,
     [switch]$NoReload
 )
@@ -68,7 +73,7 @@ function Write-DevState {
 "@ | Set-Content -Path (Join-Path $DevDir "dev-state.json") -Encoding UTF8
 }
 
-Write-Host "Khoi dong moi truong phat trien Hermes Local Stack" -ForegroundColor Cyan
+Write-Host "Khoi dong moi truong phat trien DIRAP Local Workbench" -ForegroundColor Cyan
 
 if (-not (Test-Path $PythonExe)) {
     Write-Host "Chua co moi truong Python: backend\.venv" -ForegroundColor Yellow
@@ -136,7 +141,9 @@ if (-not (Test-PortAvailable $FrontendPort)) {
 if (-not $BackendAlreadyRunning) {
     Write-Host "Dang chay backend tai http://127.0.0.1:$BackendPort"
     $reloadFlag = if ($NoReload) { "" } else { " --reload" }
-    $backendCommand = "`$env:CORS_ORIGINS='http://localhost:$FrontendPort'; .\.venv\Scripts\python.exe -m uvicorn app.main:app$reloadFlag --host 127.0.0.1 --port $BackendPort"
+    # This value is injected only into the local loopback server process.
+    # It is never read from browser headers or written to backend\.env.
+    $backendCommand = "`$env:CORS_ORIGINS='http://localhost:$FrontendPort'; `$env:LOCAL_ACTOR_SUBJECT='$LocalActorSubject'; .\.venv\Scripts\python.exe -m uvicorn app.main:app$reloadFlag --host 127.0.0.1 --port $BackendPort"
     $backendProcess = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $BackendDir -PassThru -ArgumentList @(
         "-NoExit",
         "-Command",
@@ -149,7 +156,9 @@ Start-Sleep -Seconds 2
 
 if (-not $FrontendAlreadyRunning) {
     Write-Host "Dang chay frontend tai http://localhost:$FrontendPort"
-    $frontendCommand = "`$env:VITE_API_BASE_URL='http://localhost:$BackendPort'; npm run dev -- --host 127.0.0.1 --port $FrontendPort"
+    # The frontend calls the same-origin /api proxy. This avoids browser
+    # localhost/IPv6 ambiguity while keeping the backend loopback-only.
+    $frontendCommand = "Remove-Item Env:VITE_API_BASE_URL -ErrorAction SilentlyContinue; `$env:VITE_API_PROXY_TARGET='http://127.0.0.1:$BackendPort'; npm run dev -- --host 127.0.0.1 --port $FrontendPort"
     $frontendProcess = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $FrontendDir -PassThru -ArgumentList @(
         "-NoExit",
         "-Command",

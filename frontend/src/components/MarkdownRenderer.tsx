@@ -120,7 +120,8 @@ const DesktopFileCard: React.FC<{ file: DesktopLocalFile }> = ({ file }) => {
 
   const copyPath = async () => {
     try {
-      await navigator.clipboard?.writeText(file.localPath);
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(file.localPath);
       setCopied(true);
       setCopyError(false);
       window.setTimeout(() => setCopied(false), 1500);
@@ -138,7 +139,7 @@ const DesktopFileCard: React.FC<{ file: DesktopLocalFile }> = ({ file }) => {
     try {
       setOpenError(null);
       const fileContent = await fetchFileContent(activeSessionId, relativePath);
-      openFile(relativePath, fileContent.content, { mtime: fileContent.mtime, size: fileContent.size });
+      openFile(relativePath, fileContent.content, { mtime: fileContent.mtime, size: fileContent.size, hash: fileContent.hash });
       setSidebarTab('files');
     } catch {
       setOpenError('Không mở được tệp trong tab Tệp. Hãy copy đường dẫn hoặc làm mới cây tệp rồi thử lại.');

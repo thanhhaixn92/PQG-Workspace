@@ -40,6 +40,7 @@ describe('EditorPanel', () => {
   it('renders correctly with open file', () => {
     render(<EditorPanel />);
     expect(screen.getByText('test.txt')).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'test.txt' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getByText('Đã lưu')).toBeDefined();
     expect(screen.getByTestId('monaco-mock')).toHaveProperty('value', 'initial content');
   });

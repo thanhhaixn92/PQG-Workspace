@@ -23,6 +23,7 @@ export const EditorPanel: React.FC = () => {
     setFileMetadata,
     markFileClean,
     requestAuditRefresh,
+    theme,
   } = useHermesStore();
 
   const [error, setError] = useState<string | null>(null);
@@ -76,14 +77,19 @@ export const EditorPanel: React.FC = () => {
       return;
     }
 
+    const sessionId = activeSessionId;
     const contentToSave = fileContents[path] || '';
+    const expectedHash = fileMetadata[path]?.hash;
     setSaveStates(state => ({ ...state, [path]: 'saving' }));
 
     try {
-      const result = await saveFileContent(activeSessionId, path, contentToSave, fileMetadata[path]?.mtime, force);
-      if (!unmounted.current) {
+      const result = expectedHash
+        ? await saveFileContent(sessionId, path, contentToSave, fileMetadata[path]?.mtime, force, expectedHash)
+        : await saveFileContent(sessionId, path, contentToSave, fileMetadata[path]?.mtime, force);
+      const currentState = useHermesStore.getState();
+      if (!unmounted.current && currentState.activeSessionId === sessionId && currentState.fileContents[path] === contentToSave) {
         markFileClean(path);
-        setFileMetadata(path, { mtime: result.mtime, size: result.size });
+        setFileMetadata(path, { mtime: result.mtime, size: result.size, hash: result.hash });
         setSavedSnapshots(state => ({ ...state, [path]: contentToSave }));
         setSaveStates(state => ({ ...state, [path]: 'saved' }));
         setConflictPath(null);
@@ -118,14 +124,20 @@ export const EditorPanel: React.FC = () => {
       return;
     }
 
-    const file = await fetchFileContent(activeSessionId, conflictPath);
-    setFileContent(conflictPath, file.content);
-    markFileClean(conflictPath);
-    setFileMetadata(conflictPath, { mtime: file.mtime, size: file.size });
-    setSavedSnapshots(state => ({ ...state, [conflictPath]: file.content }));
-    setSaveStates(state => ({ ...state, [conflictPath]: 'saved' }));
-    setConflictPath(null);
-    setError(null);
+    try {
+      const file = await fetchFileContent(activeSessionId, conflictPath);
+      if (useHermesStore.getState().activeSessionId !== activeSessionId) return;
+      setFileContent(conflictPath, file.content);
+      markFileClean(conflictPath);
+      setFileMetadata(conflictPath, { mtime: file.mtime, size: file.size, hash: file.hash });
+      setSavedSnapshots(state => ({ ...state, [conflictPath]: file.content }));
+      setSaveStates(state => ({ ...state, [conflictPath]: 'saved' }));
+      setConflictPath(null);
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'lỗi không xác định';
+      setError(`Không thể tải lại ${conflictPath}: ${message}`);
+    }
   };
 
   const handleEditorChange = useCallback((value: string | undefined) => {
@@ -153,6 +165,16 @@ export const EditorPanel: React.FC = () => {
     setSaveStates(state => ({ ...state, [activeFile]: 'saved' }));
     setError(null);
   };
+
+  const handleClose = useCallback((path: string) => {
+    if (dirtyFiles.has(path)) {
+      const confirmed = window.confirm('Tệp này còn thay đổi chưa lưu. Đóng tệp và bỏ thay đổi?');
+      if (!confirmed) {
+        return;
+      }
+    }
+    closeFile(path);
+  }, [closeFile, dirtyFiles]);
 
   useEffect(() => {
     if (!activeSessionId || !activeFile || !dirtyFiles.has(activeFile)) {
@@ -184,17 +206,7 @@ export const EditorPanel: React.FC = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeFile, saveFile, setSidebarTab]);
-
-  const handleClose = (path: string) => {
-    if (dirtyFiles.has(path)) {
-      const confirmed = window.confirm('Tệp này còn thay đổi chưa lưu. Đóng tệp và bỏ thay đổi?');
-      if (!confirmed) {
-        return;
-      }
-    }
-    closeFile(path);
-  };
+  }, [activeFile, handleClose, saveFile, setSidebarTab]);
 
   if (openFiles.length === 0 || !activeFile) {
     return (
@@ -220,13 +232,20 @@ export const EditorPanel: React.FC = () => {
           <div
             key={path}
             className={`editor-tab ${path === activeFile ? 'active' : ''}`}
-            onClick={() => setActiveFile(path)}
           >
-            <span title={path}>{path.split('/').pop()}</span>
-            {dirtyFiles.has(path) && <span style={{ color: 'var(--accent-primary)' }}>*</span>}
             <button
-              onClick={event => {
-                event.stopPropagation();
+              type="button"
+              className="editor-tab-select"
+              role="tab"
+              aria-selected={path === activeFile}
+              onClick={() => setActiveFile(path)}
+            >
+              <span title={path}>{path.split('/').pop()}</span>
+              {dirtyFiles.has(path) && <span style={{ color: 'var(--accent-primary)' }}>*</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 handleClose(path);
               }}
               title="Đóng tệp"
@@ -281,7 +300,7 @@ export const EditorPanel: React.FC = () => {
         <Editor
           height="100%"
           language={getLanguageFromPath(activeFile)}
-          theme="vs-dark"
+          theme={theme === 'light' ? 'vs' : 'vs-dark'}
           value={currentContent}
           onChange={handleEditorChange}
           options={{

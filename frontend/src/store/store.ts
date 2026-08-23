@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getSidebarTabFromLocation, navigateToSidebarTab } from '../navigation';
 import type { FileNode } from '../api/files';
 import type { Skill } from '../api/skills';
 import type { MemoryEntry } from '../api/memory';
@@ -10,6 +11,9 @@ export interface Session {
   created_at: number;
   updated_at?: number;
   archived?: number;
+  goal?: string | null;
+  data_scope?: 'work_only' | 'approved_library';
+  last_opened_at?: number | null;
 }
 
 export type HermesEventType =
@@ -45,6 +49,7 @@ export interface HermesEvent {
 
 export interface ApprovalRequest {
   approval_id: string;
+  session_id: string;
   action: string;
   target: string;
   risk_level: 'read' | 'write_internal' | 'external_or_destructive';
@@ -64,38 +69,42 @@ export interface TaskRun {
 export interface FileMetadata {
   mtime: number;
   size: number;
+  hash?: string;
 }
 
 export type SessionRuntimeStatus = 'idle' | 'queued' | 'running' | 'waiting_approval' | 'error';
-export type SidebarTab = 'sessions' | 'files' | 'skills' | 'memory' | 'data';
+export type SidebarTab = 'hermes' | 'overview' | 'sessions' | 'files' | 'skills' | 'memory' | 'memory-hub' | 'reports' | 'data' | 'dirap' | 'review' | 'settings';
 export type ThemeMode = 'dark' | 'light';
 
+export type AssistantSidebarMode = 'expanded' | 'collapsed' | 'hidden';
+
+const initialAssistantSidebarMode: AssistantSidebarMode =
+  typeof window !== 'undefined' && window.innerWidth >= 1200 ? 'expanded' : 'collapsed';
+
 interface HermesStore {
-  // Session State
   sessions: Session[];
   activeSessionId: string | null;
   sidebarTab: SidebarTab;
   setSessions: (sessions: Session[]) => void;
   setActiveSession: (id: string | null) => void;
   setSidebarTab: (tab: SidebarTab) => void;
+  syncSidebarTabFromLocation: () => void;
   addSession: (session: Session) => void;
   updateSession: (id: string, updates: Partial<Session>) => void;
   removeSession: (id: string) => void;
-  
-  // Chat / Event State
-  events: Record<string, HermesEvent[]>; // mapped by session ID
+
+  events: Record<string, HermesEvent[]>;
   latestTaskBySession: Record<string, TaskRun | null>;
   auditRefreshVersion: number;
   addEvent: (sessionId: string, event: HermesEvent) => void;
+  removeEvent: (sessionId: string, eventId: string) => void;
   setEvents: (sessionId: string, events: HermesEvent[]) => void;
   setLatestTask: (sessionId: string, task: TaskRun | null) => void;
   requestAuditRefresh: () => void;
-  
-  // Approvals State
+
   pendingApproval: ApprovalRequest | null;
   setPendingApproval: (approval: ApprovalRequest | null) => void;
-  
-  // File Editor State
+
   fileTree: FileNode[];
   openFiles: string[];
   activeFile: string | null;
@@ -103,7 +112,6 @@ interface HermesStore {
   fileMetadata: Record<string, FileMetadata>;
   dirtyFiles: Set<string>;
 
-  // Activity / Status State
   appError: string | null;
   sessionStatusById: Record<string, SessionRuntimeStatus>;
   sessionErrorById: Record<string, string | null>;
@@ -112,8 +120,7 @@ interface HermesStore {
   setSessionStatus: (sessionId: string, status: SessionRuntimeStatus) => void;
   setSessionError: (sessionId: string, error: string | null) => void;
   setSessionStartedAt: (sessionId: string, timestamp: number | null) => void;
-  
-  // File Actions
+
   setFileTree: (tree: FileNode[]) => void;
   openFile: (path: string, content: string, metadata?: FileMetadata) => void;
   closeFile: (path: string) => void;
@@ -123,27 +130,34 @@ interface HermesStore {
   markFileClean: (path: string) => void;
   resetFileState: () => void;
 
-  // Theme State
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
   toggleTheme: () => void;
 
-  // Skills State
   skills: Skill[];
   setSkills: (skills: Skill[]) => void;
-  
-  // Memory State
+
   memory: MemoryEntry[];
   setMemory: (memory: MemoryEntry[]) => void;
+
+  assistantSidebarMode: AssistantSidebarMode;
+  assistantSidebarWidth: number;
+  setAssistantSidebarMode: (mode: AssistantSidebarMode) => void;
+  toggleAssistantSidebar: () => void;
+  setAssistantSidebarWidth: (width: number) => void;
 }
 
 export const useHermesStore = create<HermesStore>((set) => ({
   sessions: [],
   activeSessionId: null,
-  sidebarTab: 'sessions',
+  sidebarTab: typeof window === 'undefined' ? 'overview' : getSidebarTabFromLocation(),
   setSessions: (sessions) => set({ sessions }),
   setActiveSession: (id) => set({ activeSessionId: id }),
-  setSidebarTab: (tab) => set({ sidebarTab: tab }),
+  setSidebarTab: (tab) => {
+    navigateToSidebarTab(tab);
+    set({ sidebarTab: tab });
+  },
+  syncSidebarTabFromLocation: () => set({ sidebarTab: getSidebarTabFromLocation() }),
   addSession: (session) => set((state) => ({ sessions: [...state.sessions, session] })),
   updateSession: (id, updates) => set((state) => ({
     sessions: state.sessions.map(s => s.id === id ? { ...s, ...updates } : s)
@@ -153,13 +167,13 @@ export const useHermesStore = create<HermesStore>((set) => ({
     const activeSessionId = state.activeSessionId === id ? (sessions[0]?.id ?? null) : state.activeSessionId;
     return { sessions, activeSessionId };
   }),
-  
+
   events: {},
   latestTaskBySession: {},
   auditRefreshVersion: 0,
   addEvent: (sessionId, event) => set((state) => {
     const sessionEvents = state.events[sessionId] || [];
-    
+
     if (event.type === 'token' && sessionEvents.length > 0) {
       const lastEvent = sessionEvents[sessionEvents.length - 1];
       if (lastEvent.type === 'token') {
@@ -173,11 +187,20 @@ export const useHermesStore = create<HermesStore>((set) => ({
         };
       }
     }
-    
+
     return {
       events: {
         ...state.events,
         [sessionId]: [...sessionEvents, event]
+      }
+    };
+  }),
+  removeEvent: (sessionId, eventId) => set((state) => {
+    const sessionEvents = state.events[sessionId] || [];
+    return {
+      events: {
+        ...state.events,
+        [sessionId]: sessionEvents.filter((event) => event.id !== eventId),
       }
     };
   }),
@@ -194,10 +217,10 @@ export const useHermesStore = create<HermesStore>((set) => ({
     }
   })),
   requestAuditRefresh: () => set((state) => ({ auditRefreshVersion: state.auditRefreshVersion + 1 })),
-  
+
   pendingApproval: null,
   setPendingApproval: (approval) => set({ pendingApproval: approval }),
-  
+
   fileTree: [],
   openFiles: [],
   activeFile: null,
@@ -214,21 +237,18 @@ export const useHermesStore = create<HermesStore>((set) => ({
     sessionStatusById: {
       ...state.sessionStatusById,
       [sessionId]: status,
-    },
+    }
   })),
   setSessionError: (sessionId, error) => set((state) => ({
     sessionErrorById: {
       ...state.sessionErrorById,
       [sessionId]: error,
-    },
+    }
   })),
   setSessionStartedAt: (sessionId, timestamp) => set((state) => {
     const sessionStartedAtById = { ...state.sessionStartedAtById };
-    if (timestamp === null) {
-      delete sessionStartedAtById[sessionId];
-    } else {
-      sessionStartedAtById[sessionId] = timestamp;
-    }
+    if (timestamp === null) delete sessionStartedAtById[sessionId];
+    else sessionStartedAtById[sessionId] = timestamp;
     return { sessionStartedAtById };
   }),
 
@@ -251,12 +271,12 @@ export const useHermesStore = create<HermesStore>((set) => ({
     delete fileContents[path];
     const fileMetadata = { ...state.fileMetadata };
     delete fileMetadata[path];
-    
+
     let activeFile = state.activeFile;
     if (activeFile === path) {
       activeFile = openFiles.length > 0 ? openFiles[openFiles.length - 1] : null;
     }
-    
+
     return { openFiles, activeFile, fileContents, fileMetadata, dirtyFiles };
   }),
   setActiveFile: (path) => set({ activeFile: path }),
@@ -271,11 +291,9 @@ export const useHermesStore = create<HermesStore>((set) => ({
   setFileMetadata: (path, metadata) => set((state) => ({
     fileMetadata: { ...state.fileMetadata, [path]: metadata }
   })),
-  markFileClean: (path) => set((state) => {
-    const dirtyFiles = new Set(state.dirtyFiles);
-    dirtyFiles.delete(path);
-    return { dirtyFiles };
-  }),
+  markFileClean: (path) => set((state) => ({
+    dirtyFiles: new Set([...state.dirtyFiles].filter(p => p !== path))
+  })),
   resetFileState: () => set({
     fileTree: [],
     openFiles: [],
@@ -284,7 +302,7 @@ export const useHermesStore = create<HermesStore>((set) => ({
     fileMetadata: {},
     dirtyFiles: new Set()
   }),
-  
+
   theme: (window.localStorage.getItem('hermes.theme') as ThemeMode) || 'dark',
   setTheme: (theme) => {
     window.localStorage.setItem('hermes.theme', theme);
@@ -298,7 +316,15 @@ export const useHermesStore = create<HermesStore>((set) => ({
 
   skills: [],
   setSkills: (skills) => set({ skills }),
-  
+
   memory: [],
   setMemory: (memory) => set({ memory }),
+
+  assistantSidebarMode: initialAssistantSidebarMode,
+  assistantSidebarWidth: 380,
+  setAssistantSidebarMode: (mode: AssistantSidebarMode) => set({ assistantSidebarMode: mode }),
+  toggleAssistantSidebar: () => set((state) => ({
+    assistantSidebarMode: state.assistantSidebarMode === 'expanded' ? 'collapsed' : 'expanded'
+  })),
+  setAssistantSidebarWidth: (width: number) => set({ assistantSidebarWidth: Math.max(320, Math.min(520, width)) }),
 }));

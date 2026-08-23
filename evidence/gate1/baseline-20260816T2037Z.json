@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "timestamp_utc": "2026-08-16T13:37:23.516036+00:00",
+  "read_only": {
+    "sqlite_uri_mode": "ro",
+    "pragma_query_only": true
+  },
+  "hashes": {
+    "baseline_script_sha256": "22c85833aa908f1cc0fa0b5509765269ce04a155e29367ff01be5562c195c3c9",
+    "query_manifest_sha256": "bd9994e6362aab56d2a13853b38986fce964996c5fc66ff78cf110fee0ef85c8",
+    "worktree_manifest_sha256": "6cccddffff8597c0a479d1f5b0307e10010f846b5bce5ace54b34deba9fe0547",
+    "db_identity_sha256": "4b94901d39bcd2683e09a690d4f5577885a0439f038a81c83612de81409a043e"
+  },
+  "db_identity": {
+    "redacted": true,
+    "size_bytes": 733184
+  },
+  "worktree_identity": {
+    "modified": 113,
+    "untracked": 111,
+    "total": 224,
+    "manifest_values_redacted": true
+  },
+  "classifier": {
+    "version": "gate1-title-workspace-marker-v1",
+    "reads_title_and_workspace_path_markers": true,
+    "marker_values_redacted": true
+  },
+  "aggregates": {
+    "assistant_threads_total": 5,
+    "assistant_threads_bound": 1,
+    "assistant_threads_unbound": 4,
+    "assistant_turns_total": 4,
+    "work_scoped_turns_unbound": 2,
+    "active_works": 9
+  }
+}

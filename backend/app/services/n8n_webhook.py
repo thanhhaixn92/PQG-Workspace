@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -39,19 +40,21 @@ async def trigger_n8n_webhook(
     session_id: str | None,
     workflow_name: str,
     payload: dict[str, Any],
+    idempotency_key: str | None = None,
 ) -> N8nWebhookResult:
     """Call an allowlisted n8n webhook and write redacted audit metadata."""
     target_url = validate_n8n_workflow(settings, workflow_name)
     payload_size = len(json.dumps(payload, ensure_ascii=False))
     top_keys = sorted(payload.keys())
 
+    operation_key = idempotency_key or f"n8n-{uuid.uuid4().hex}"
     async with httpx.AsyncClient(timeout=settings.n8n_timeout_seconds) as client:
         for attempt in range(settings.n8n_max_retries + 1):
             try:
                 response = await client.post(
                     target_url,
                     json=payload,
-                    headers={"X-Hermes-Secret": settings.n8n_webhook_secret},
+                    headers={"X-Hermes-Secret": settings.n8n_webhook_secret, "Idempotency-Key": operation_key},
                 )
                 response.raise_for_status()
 
@@ -66,6 +69,7 @@ async def trigger_n8n_webhook(
                             "payload_size_bytes": payload_size,
                             "payload_top_level_keys": top_keys,
                             "response_status": response.status_code,
+                            "idempotency_key": operation_key,
                         },
                     )
                     await db.commit()
@@ -79,7 +83,8 @@ async def trigger_n8n_webhook(
                 is_5xx = isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code >= 500
                 is_retryable_request = isinstance(exc, httpx.RequestError)
 
-                if (is_5xx or is_retryable_request) and attempt < settings.n8n_max_retries:
+                retry_is_safe = settings.n8n_retry_idempotency_confirmed and (is_5xx or is_retryable_request)
+                if retry_is_safe and attempt < settings.n8n_max_retries:
                     await asyncio.sleep(2 ** attempt)
                     continue
 

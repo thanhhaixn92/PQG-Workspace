@@ -1,160 +1,109 @@
-# AGENTS.md
+# AGENTS.md — Mandatory pre-code contract
 
-## Project Identity
+## Applies to every coding agent
 
-Hermes Local Stack is a local-first AI office assistant.
+Before inspecting broadly, changing code, tests, schemas, migrations, or state,
+read this file and run:
 
-Canonical docs:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/agent-preflight.ps1
+```
 
-- `docs/00_PROJECT_CANON.md` - source of truth and conflict order.
-- `docs/01_PRD.md` - product scope and MVP.
-- `docs/02_DATA_STORAGE_MODEL.md` - data ownership and schema rules.
-- `docs/03_EXECUTION_PRINCIPLES.md` - engineering rules.
-- `docs/04_SECURITY_PERMISSION_POLICY.md` - security, approval, audit.
-- `docs/05_ACCEPTANCE_EVALUATION.md` - acceptance gates and tests.
-- `docs/06_HANDOFF_REVIEW_PROTOCOL.md` - review protocol.
-- `docs/07_DECISION_LOG.md` - accepted architecture decisions.
-- `docs/08_TEST_DATA_SCENARIOS.md` - reusable validation scenarios.
-- `docs/ANTIGRAVITY_IMPLEMENTATION_PLAN.md` - phased build plan.
+The preflight is read-only. It cannot prove that an agent read a file; this
+contract makes the following read sequence mandatory. In the first work update,
+state the active gate and the files inspected. Do not begin edits until this is
+done.
 
-Read only the docs needed for the current task. Do not load every file by default.
+## Required read sequence
 
-## Agent Roles
+1. `PROJECT_STATE.md` and `AI_STATE.json` — live stage, blockers and approval.
+2. `docs/implementation/CURRENT_CHECKPOINT.md` — active gate and exclusions.
+3. `CODEGRAPH.md` — smallest source/test route for the task.
+4. `docs/AI_AGENT_ROUTING.md` and the task-specific canon/security document.
+5. The target source, its public contract, and its focused tests.
+6. `docs/14_AGENT_OPERATING_CONTRACT.md` for any implementation, schema,
+   runtime, security, UX or checkpoint change.
 
-- Codex role: implementation engineer and reviewer when explicitly assigned by the user.
-- Antigravity role: coordinator and verifier for approved handoff workflows.
-- One-agent-at-a-time rule: only one agent may edit product code at a time.
-- State-file rule: agents must obey `AI_STATE.json`.
-- Handoff rule: agents must update `AI_HANDOFF.md`, `AI_CHANGELOG.md`, `AI_VERIFICATION.md`, and `AI_RISK_REGISTER.md` as applicable.
-- User approval is required for external/destructive actions, credentials, public exposure, scope expansion, and any checkpoint transition.
+Do not use a historical handoff, old roadmap, test count, or an older checkpoint
+as active scope. If sources conflict, follow the precedence in the operating
+contract and report the discrepancy instead of silently choosing one.
 
-## Current Gate
+## Current operational boundary
 
-- V1 implementation is complete. State: `CP10_COMPLETE`.
-- CP5 (Frontend Migration), CP6 (Outbox Dispatcher), CP7 (Telegram Channel),
-  CP8 (Model Fallback & Resilience), CP9 (Skill Version), and CP10 (Cleanup)
-  are all verified and closed.
-- Awaiting human final sign-off before V1 packaging.
-- Do not expand to CP11, deployment, vector search, Excalidraw, auth expansion,
-  or any new feature scope without human approval and doc update.
-- Keep existing legacy session routes and `USE_TASK_API=false` fallback intact.
-- Keep automation state in `AI_STATE.json`; only one agent may run at a time.
+- Product name: **PQG Workspace**; in-web assistant: **Trợ lý GYO**.
+- Current state is `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS` / `PARTIAL`.
+  Do not promote `DIRAP_V22_VALIDATED` without every recorded gate and evidence.
+- The current web runtime uses `GyoOrchestrator` behind FastAPI. Do not restore a
+  legacy Hermes/ACP fallback from historical documentation without explicit
+  architecture approval.
+- `app.db` owns user-visible Work, conversation and Assistant history. A Work,
+  conversation, thread and plan step are separate scope boundaries.
+- Browser code talks only to backend REST/SSE. FastAPI enforces validation,
+  permissions, audit, archive guards and provider/secret boundaries.
+- Every governed write, approval, destructive or external action needs a
+  redacted audit event; managed file operations stay within allowed roots.
+- GYO may propose only; Work mutation remains Action Package → explicit approval
+  → idempotent executor. Memory/Skill candidates remain reviewable and are never
+  auto-activated by a model response.
+- Memory is not implicitly shared across Work. Active Work memory requires a
+  saved plan-step policy; preference, restricted, draft and unrelated records
+  stay excluded.
 
-## Hard Rules
+## Stop and ask before changing
 
-- FastAPI is the policy boundary.
-- Frontend must not call Hermes, n8n, MCP tools, or the file system directly.
-- SQLite `app.db` stores business metadata only; do not duplicate full Hermes conversation history.
-- Every write, external action, destructive action, approval, and policy decision must create an audit event.
-- All file operations must stay inside the session `workspace_path`.
-- Treat Hermes/LLM/MCP/n8n input as untrusted.
-- No hardcoded secrets.
-- No `allow always` for `external_or_destructive` actions.
-- Do not expand beyond MVP without updating docs and getting user approval.
-- Never auto commit, push, merge, or deploy.
-- Never run destructive commands.
+- `.env*`, credentials, billing, deployment/public exposure, database files, or
+  real user data.
+- A migration, dependency, provider credential, network integration, public API
+  breaking change, retention/delete policy, or checkpoint/state promotion.
+- Authentication/authorization, sandbox/path checks, audit/approval behaviour,
+  or any Action Package execution semantics.
+- Scope not named by the user or not permitted by the current checkpoint.
 
-## Protected Files And Areas
+Never commit, push, merge, deploy, reset, clean, stash, rebase, amend a commit,
+delete a branch, delete broadly, print a secret, or use a permission/sandbox
+bypass. Preserve the dirty worktree, distinguish pre-existing changes from your
+own, and do not overwrite existing state merely to make the worktree clean.
 
-Do not edit without explicit human approval:
+## Change-scope safeguards
 
-- `.env`
-- `.env.local`
-- `.env.production`
-- secrets
-- deployment config
-- billing config
-- production database settings
-- database files
-- database migrations
+- Treat existing code, configuration, generated state and uncommitted changes as
+  intentional unless the task or current evidence says otherwise.
+- Edit generated output only when its source cannot be changed or the task
+  explicitly requires the generated artifact. Do not update dependencies,
+  lockfiles or tool versions unless the task requires it or the change is
+  unavoidable and reported.
+- Local development is not production, but local scope does not waive the
+  protected-file and approval boundaries above. Within an approved local scope,
+  agents may run relevant development servers, tests and reversible temporary
+  artifacts without treating routine execution as a production action.
+- Use one agent for tightly coupled work. Parallelize only independent,
+  separately verifiable branches with isolated write scopes; one owner must
+  integrate and validate the final result.
 
-## Safe Commands
+## Required working pattern
 
-- `git status --short`
-- `git diff`
-- `git diff --check`
-- `python -m json.tool AI_STATE.json`
-- `codex --version`
-- `agy --version`
-- `agy --help`
-- `antigravity --version`
-- `ag --version`
-- `bash --version`
-- `node --version`
-- `npm --version`
-- `python --version`
+1. Read-only triage: preflight, focused `git status`/diff, contract and tests.
+2. Name the narrow scope and acceptance criteria before editing.
+3. Edit the smallest coherent set; preserve compatibility unless approved.
+4. Add/update focused regression tests for changed behaviour.
+5. Prefer a validation command prescribed by the repository when it covers the
+   change. Otherwise run focused checks first, then type/build/runtime checks
+   only for affected contracts and surfaces. For UI/API work, check the
+   loading, empty, error, success, interaction, authorization, schema,
+   compatibility or data-integrity cases that the change can affect. Always run
+   `git diff --check` for changed text/code.
+6. Review the final diff for scope, secret and state-file leakage.
+7. Report changed files, evidence actually run, limitations and the next gate.
 
-Frontend checks only when explicitly needed:
+Never fake success, weaken tests or security to make a check pass, or represent
+`NOT RUN`, warnings, focused tests, or old evidence as a full acceptance pass.
 
-- `cd frontend; npm run lint`
-- `cd frontend; npm run type-check`
-- `cd frontend; npm run test -- --run`
-- `cd frontend; npm run build`
+## Canonical references
 
-Backend checks only when explicitly needed:
-
-- `cd backend; .\.venv\Scripts\pytest`
-
-## Approval-Required Commands
-
-- Package installation.
-- Dependency changes.
-- Database migration changes.
-- Docker or container changes.
-- Network-heavy commands.
-- Any command that modifies project state outside automation files.
-- `git commit`
-- `git push`
-- merge
-- deploy
-
-## Forbidden Commands
-
-- `git reset --hard`
-- `git clean -fdx`
-- `rm -rf`
-- `del /s /q`
-- `rmdir /s /q`
-- deploy or publish commands
-- database drop/reset
-- editing env/secrets/billing/deployment/production database files
-- `codex --dangerously-bypass-approvals-and-sandbox`
-- `agy --dangerously-skip-permissions`
-
-## Implementation Defaults
-
-- Backend: Python 3.11+, FastAPI, Pydantic, SQLite WAL.
-- Frontend: Vite, React, TypeScript, Zustand.
-- Agent runtime: Hermes ACP.
-- MCP: FastMCP, selected tools only.
-- Automation: n8n sidecar, called through backend only.
-- Editor: Monaco.
-- Diagrams: Mermaid first; Excalidraw conversion later.
-
-## Work Pattern
-
-1. Read `PROJECT_STATE.md` first for the current checkpoint, gates, and blockers.
-2. If the task is checkpoint-related, read `docs/implementation/CURRENT_CHECKPOINT.md`.
-3. Use `docs/AI_AGENT_ROUTING.md` to choose the smallest relevant doc/code set.
-4. Do not treat long-term roadmap docs as active scope unless the current checkpoint says so.
-5. Inspect existing files before editing.
-6. Make scoped changes only.
-7. Add or update tests for behavior changed.
-8. Run relevant checks.
-9. Report commands, results, risks, and next step.
-
-## Review Pattern
-
-When reviewing output:
-
-1. Compare against PRD, data model, security policy, and phase acceptance criteria.
-2. Prioritize findings by severity.
-3. Include file/line references when code exists.
-4. Approve only when acceptance criteria pass and security invariants hold.
-
-## Context Budget
-
-- Keep this file small and stable.
-- Put long procedures in `docs/` or future skills, not here.
-- Use `CODEGRAPH.md` to navigate code once implementation exists.
-- Use `HEADROOM.md` to decide what to load, summarize, or ignore.
+- `docs/00_PROJECT_CANON.md` — product/security decisions; use with current code
+  and state when historical runtime wording differs.
+- `docs/04_SECURITY_PERMISSION_POLICY.md` — approval, audit, secrets and paths.
+- `docs/02_DATA_STORAGE_MODEL.md` — ownership and migration boundaries.
+- `docs/05_ACCEPTANCE_EVALUATION.md` — acceptance conditions.
+- `docs/14_AGENT_OPERATING_CONTRACT.md` — enforced working agreement.
+- `HEADROOM.md` — context discipline; keep `AGENTS.md` and `CODEGRAPH.md` short.

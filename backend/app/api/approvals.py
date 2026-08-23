@@ -15,6 +15,30 @@ router = APIRouter(prefix="/api/approvals", tags=["Approvals"])
 pending_approvals: dict[str, dict] = {}
 
 
+@router.get("")
+async def list_pending_approvals(
+    session_id: str,
+    settings: Settings = Depends(get_settings),
+) -> list[dict]:
+    """Return safe, durable approval metadata for the active session only."""
+    async with get_db_connection(settings.db_path_resolved) as db:
+        async with db.execute(
+            """SELECT id, session_id, action, target, risk_level, description, created_at, expires_at
+               FROM approval_requests
+               WHERE session_id = ? AND status = 'pending'
+               ORDER BY created_at DESC""",
+            (session_id,),
+        ) as cur:
+            rows = await cur.fetchall()
+    return [
+        {
+            "approval_id": row[0], "session_id": row[1], "action": row[2], "target": row[3],
+            "risk_level": row[4], "description": row[5], "created_at": row[6], "expires_at": row[7],
+        }
+        for row in rows
+    ]
+
+
 EXTERNAL_OR_DESTRUCTIVE_ACTIONS = {
     "run_safe_task",
     "call_n8n_webhook",
@@ -296,25 +320,41 @@ async def submit_approval(
             action = "mcp.memory.denied"
 
     async with get_db_connection(settings.db_path_resolved) as db:
-        if request_data.decision in ("allow_once", "allow_for_session"):
-            await _apply_curator_memory_if_needed(db, session_id, approval_id, pending_data)
-        await db.execute(
-            """
-            UPDATE approval_requests
-            SET status = ?, decision = ?, resolved_at = ?
-            WHERE id = ?
-            """,
-            ("resolved", request_data.decision, int(time.time()), approval_id),
+        claim = await db.execute(
+            """UPDATE approval_requests
+               SET status = 'processing'
+               WHERE id = ? AND status = 'pending'""",
+            (approval_id,),
         )
-        await log_audit_event(
-            conn=db,
-            session_id=session_id,
-            actor="user",
-            action=action,
-            target=approval_id,
-            payload=request_data.model_dump()
-        )
+        if claim.rowcount != 1:
+            raise HTTPException(status_code=409, detail="Approval has already been decided")
         await db.commit()
+        try:
+            if request_data.decision in ("allow_once", "allow_for_session"):
+                await _apply_curator_memory_if_needed(db, session_id, approval_id, pending_data)
+            await db.execute(
+                """UPDATE approval_requests
+                   SET status = 'resolved', decision = ?, resolved_at = ?
+                   WHERE id = ? AND status = 'processing'""",
+                (request_data.decision, int(time.time()), approval_id),
+            )
+            await log_audit_event(
+                conn=db,
+                session_id=session_id,
+                actor="user",
+                action=action,
+                target=approval_id,
+                payload=request_data.model_dump()
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            await db.execute(
+                "UPDATE approval_requests SET status = 'pending' WHERE id = ? AND status = 'processing'",
+                (approval_id,),
+            )
+            await db.commit()
+            raise
 
     # Notify waiters only after durable state and audit rows have been committed.
     pending_data["decision"] = request_data.decision

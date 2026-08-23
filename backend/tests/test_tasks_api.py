@@ -65,6 +65,23 @@ async def test_public_task_create_idempotency_conflict(client):
 
 
 @pytest.mark.asyncio
+async def test_task_input_validation_and_archived_session_blocks_mutation(client):
+    for payload in (
+        {"title": "   "},
+        {"description": "   "},
+        {"task_type": "   "},
+    ):
+        assert (await client.post("/api/tasks", json=payload)).status_code == 422
+
+    session_id = await _create_session(client, "Archive task")
+    created = await client.post("/api/tasks", json={"session_id": session_id, "title": "Queued"})
+    task_id = created.json()["id"]
+    assert (await client.delete(f"/api/sessions/{session_id}")).status_code == 200
+    assert (await client.post(f"/api/tasks/{task_id}/start")).status_code == 409
+    assert (await client.post(f"/api/tasks/{task_id}/actions", json={"tool_name": "x", "description": "x"})).status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_public_task_lifecycle_events_stream_and_cancel(client):
     created = await client.post("/api/tasks", json={"title": "Lifecycle"})
     assert created.status_code == 201

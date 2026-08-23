@@ -4,7 +4,12 @@ import hashlib
 import json
 from typing import Optional
 
-from app.repositories.idempotency_repository import IdempotencyConflict, IdempotencyRepository
+from app.repositories.idempotency_repository import (
+    IdempotencyConflict,
+    IdempotencyFailed,
+    IdempotencyInProgress,
+    IdempotencyRepository,
+)
 from app.repositories.outbox_repository import OutboxRepository
 from app.repositories.task_repository import TaskRepository
 from app.services.state_machine import TaskStateMachine
@@ -54,22 +59,43 @@ class TaskService:
         parent_task_id: Optional[str] = None,
         idempotency_key: Optional[str] = None,
     ) -> tuple[dict, bool]:
+        claim: dict | None = None
         if idempotency_key:
             req_hash = _request_hash(session_id, title, description, task_type, parent_task_id)
-            existing = await self._idempotency.check_key(idempotency_key, request_hash=req_hash)
-            if existing is not None:
-                return json.loads(existing["response_json"]), True
+            claim, inserted = await self._idempotency.claim_operation(
+                actor="api",
+                operation="task.create",
+                scope=session_id or "global",
+                client_key=idempotency_key,
+                request_hash=req_hash,
+            )
+            if not inserted:
+                if claim["state"] == "completed":
+                    return json.loads(claim["response_json"]), True
+                if claim["state"] == "processing":
+                    raise IdempotencyInProgress("A request with this Idempotency-Key is still processing")
+                raise IdempotencyFailed("A previous request with this Idempotency-Key failed; use a new key to retry")
 
-        task = await self._task_repo.create_task(
-            session_id=session_id,
-            title=title,
-            description=description,
-            task_type=task_type,
-            parent_task_id=parent_task_id,
-        )
-        if idempotency_key:
-            req_hash = _request_hash(session_id, title, description, task_type, parent_task_id)
-            await self._idempotency.set(idempotency_key, json.dumps(task, default=str), 200, request_hash=req_hash)
+        try:
+            task = await self._task_repo.create_task(
+                session_id=session_id,
+                title=title,
+                description=description,
+                task_type=task_type,
+                parent_task_id=parent_task_id,
+            )
+            if claim is not None:
+                await self._idempotency.finalize_operation(
+                    claim,
+                    response=task,
+                    status_code=201,
+                    resource_id=task["id"],
+                )
+        except Exception:
+            if claim is not None:
+                await self._db.rollback()
+                await self._idempotency.fail_operation(claim)
+            raise
         return task, False
 
     async def start_task(self, task_id: str, run_id: Optional[str] = None) -> dict:

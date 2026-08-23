@@ -22,7 +22,7 @@ from app.api.schemas import (
     PublicTaskResponse,
 )
 from app.dependencies import get_db
-from app.repositories.idempotency_repository import IdempotencyConflict
+from app.repositories.idempotency_repository import IdempotencyConflict, IdempotencyFailed, IdempotencyInProgress
 from app.repositories.task_repository import TaskRepository
 from app.services.audit import log_audit_event
 from app.services.state_machine import TransitionError
@@ -48,6 +48,18 @@ async def _get_task_or_404(db: aiosqlite.Connection, task_id: str) -> dict:
     return task
 
 
+async def _require_task_session_mutable(db: aiosqlite.Connection, task: dict) -> None:
+    session_id = task.get("session_id")
+    if session_id is None:
+        return
+    async with db.execute("SELECT archived FROM sessions WHERE id = ?", (session_id,)) as cur:
+        session = await cur.fetchone()
+    if session is None:
+        raise HTTPException(status_code=404, detail="Task session not found")
+    if session[0]:
+        raise HTTPException(status_code=409, detail="Session is archived")
+
+
 @router.post("", response_model=PublicTaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     request: PublicTaskCreateRequest,
@@ -60,6 +72,18 @@ async def create_task(
     Idempotency-Key is optional. If provided, the same key with the same payload
     returns the original task; the same key with a different payload returns 409.
     """
+    if request.session_id is not None:
+        async with conn.execute("SELECT archived FROM sessions WHERE id = ?", (request.session_id,)) as cur:
+            session = await cur.fetchone()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if session[0]:
+            raise HTTPException(status_code=409, detail="Session is archived")
+    if request.parent_task_id is not None:
+        parent = await _get_task_or_404(conn, request.parent_task_id)
+        if parent.get("session_id") != request.session_id:
+            raise HTTPException(status_code=422, detail="Parent task must belong to the same session")
+
     service = TaskService(conn)
     try:
         task, duplicate = await service.create_task(
@@ -70,7 +94,7 @@ async def create_task(
             parent_task_id=request.parent_task_id,
             idempotency_key=idempotency_key,
         )
-    except IdempotencyConflict as exc:
+    except (IdempotencyConflict, IdempotencyInProgress, IdempotencyFailed) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     await log_audit_event(
@@ -189,6 +213,7 @@ async def start_task(
     task_id: str,
     conn: aiosqlite.Connection = Depends(get_db),
 ) -> PublicTaskResponse:
+    await _require_task_session_mutable(conn, await _get_task_or_404(conn, task_id))
     service = TaskService(conn)
     try:
         task = await service.start_task(task_id)
@@ -206,6 +231,7 @@ async def cancel_task(
     task_id: str,
     conn: aiosqlite.Connection = Depends(get_db),
 ) -> PublicTaskResponse:
+    await _require_task_session_mutable(conn, await _get_task_or_404(conn, task_id))
     service = TaskService(conn)
     try:
         task = await service.cancel_task(task_id)
@@ -224,6 +250,7 @@ async def request_task_action(
     request: PublicTaskActionCreateRequest,
     conn: aiosqlite.Connection = Depends(get_db),
 ) -> PublicTaskActionResponse:
+    await _require_task_session_mutable(conn, await _get_task_or_404(conn, task_id))
     service = TaskService(conn)
     try:
         task = await service.request_approval(
@@ -260,6 +287,7 @@ async def decide_task_action(
     request: PublicTaskActionDecisionRequest,
     conn: aiosqlite.Connection = Depends(get_db),
 ) -> PublicTaskResponse:
+    await _require_task_session_mutable(conn, await _get_task_or_404(conn, task_id))
     service = TaskService(conn)
     try:
         task = await service.resolve_approval(
