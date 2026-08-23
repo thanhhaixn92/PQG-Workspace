@@ -70,6 +70,15 @@ def _require_revision(row: aiosqlite.Row, expected_revision: int) -> None:
         )
 
 
+def _require_update_rowcount(cursor: aiosqlite.Cursor) -> None:
+    if cursor.rowcount != 1:
+        raise ModuleAdminError(
+            409,
+            "MODULE_REVISION_CONFLICT",
+            "Module changed while the update was being applied; reload before saving",
+        )
+
+
 async def set_module_attached(
     conn: aiosqlite.Connection,
     *,
@@ -93,12 +102,13 @@ async def set_module_attached(
             ) as cur:
                 next_order = int((await cur.fetchone())[0])
         now = int(time.time())
-        await conn.execute(
+        cursor = await conn.execute(
             """UPDATE module_instances
                SET attached = ?, sort_order = ?, revision = revision + 1, updated_at = ?
                WHERE module_id = ? AND revision = ?""",
             (int(attached), next_order, now, module_id, expected_revision),
         )
+        _require_update_rowcount(cursor)
         await log_audit_event(
             conn,
             None,
@@ -135,12 +145,13 @@ async def rename_module(
             await conn.commit()
             return _module(row)
         now = int(time.time())
-        await conn.execute(
+        cursor = await conn.execute(
             """UPDATE module_instances
                SET display_name = ?, revision = revision + 1, updated_at = ?
                WHERE module_id = ? AND revision = ?""",
             (normalized, now, module_id, expected_revision),
         )
+        _require_update_rowcount(cursor)
         await log_audit_event(
             conn,
             None,
@@ -193,12 +204,13 @@ async def reorder_attached_modules(
             if int(row["sort_order"]) == new_order:
                 continue
             changed = True
-            await conn.execute(
+            cursor = await conn.execute(
                 """UPDATE module_instances
                    SET sort_order = ?, revision = revision + 1, updated_at = ?
                    WHERE module_id = ? AND revision = ?""",
                 (new_order, now, module_id, int(row["revision"])),
             )
+            _require_update_rowcount(cursor)
         if changed:
             await log_audit_event(
                 conn,
