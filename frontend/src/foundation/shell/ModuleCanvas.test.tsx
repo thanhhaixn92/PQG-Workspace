@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModuleInstance } from '../../api/modules';
 import { useHermesStore } from '../../store/store';
@@ -77,7 +77,9 @@ describe('ModuleCanvas', () => {
     const { rerender } = render(<ModuleCanvas activeTab="files" activeWorkId={null} assistantFocusRoute={false} />);
     expect(screen.getByText('Chọn một Công việc để quản lý tài liệu.')).toBeDefined();
 
-    useHermesStore.setState({ activeFile: 'note.md', openFiles: ['note.md'] });
+    act(() => {
+      useHermesStore.setState({ activeFile: 'note.md', openFiles: ['note.md'] });
+    });
     rerender(<ModuleCanvas activeTab="files" activeWorkId="work-1" assistantFocusRoute={false} />);
     expect(screen.getByText('File explorer')).toBeDefined();
     expect(screen.getByText('Editor content')).toBeDefined();
