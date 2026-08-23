@@ -46,6 +46,7 @@ async def _running_uat_client(db_path, workspace, port: int):
         db_path=str(db_path), default_workspace_root=str(workspace),
         cors_origins=["http://localhost:5173"], hermes_dev_mock=True,
         hermes_executable_path="", log_level="WARNING", outbox_dispatcher_enabled=False,
+        local_actor_subject="user",
     )
     app = create_app(settings_override=settings)
     from app.dependencies import get_db, get_settings
