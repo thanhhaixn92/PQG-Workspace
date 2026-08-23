@@ -73,3 +73,16 @@
 
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Explicit human approval cần trước migrations/schema, dependencies/tool versions, auth/security boundary, provider/network/credentials, Action Package execution semantics, retention/delete, checkpoint/state promotion, deployment/public exposure, secrets hoặc real user data.
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Lệnh chung `Tiếp tục` không mở protected gate mới.
+
+## Latest full Smoke Test rerun
+
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] User explicitly requested re-running the existing GitHub `Smoke Test` so lint, tests, type-check, build and runtime validation execute on GitHub without requiring a local command.
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] Assistant created empty validation commit `75ebb845bc67bb2d798b345473830f9ec8a8be7c` (`ci: rerun full smoke validation`) on `pqg-workspace`; it points to the same tree `1dec4efd0490ed5fb877dbb6e056a90ac67a6a48` as parent `78a1b9552cd10f2e46dc8a88a29b665822d35f81`, so no repository file/content changed for the validation trigger itself.
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] GitHub Actions `Smoke Test` Run #104, ID `32668775604`, event `push`, exact HEAD `75ebb845bc67bb2d798b345473830f9ec8a8be7c`, completed `success`; combined commit status is `pqg/smoke=success`.
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] Run #104 backend result: 516 passed, 81 skipped, 2 warnings.
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] Run #104 frontend focused result: 4 files / 30 tests PASS; `npm run lint` executed `oxlint` and reported `Found 0 warnings and 0 errors`, scanning 144 files with 103 rules; TypeScript `tsc -b` PASS; production Vite build PASS.
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] Run #104 runtime result: migrations through `0038_durable_assistant_runs` PASS; health/runtime PASS; `SMOKE OK — 7 readiness checks, workspace ready`; cleanup PASS with 1 smoke session archived.
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] Run #104 `smoke-real=SKIPPED`; this is not PASS evidence.
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] Known non-blockers observed again: npm audit 6 vulnerabilities (3 moderate, 3 high), Vite >500 kB chunk warning, the 2 backend warnings, and GitHub Actions Node-20 deprecation notices for `actions/checkout@v4` and `actions/setup-python@v5`; no dependency/tool-version change was made.
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] Tooling correction: while preparing the CI trigger, the assistant accidentally created branch `ci-validation-temp-ignore` at `78a1b9552cd10f2e46dc8a88a29b665822d35f81`. It does not affect `pqg-workspace` or Run #104. The available connector exposed no delete-ref operation, and current `AGENTS.md` prohibits branch deletion, so the branch was intentionally left untouched rather than silently forcing cleanup.
+- [2026-08-24 04:56:34 UTC+07:00][recorded_at] Gate effect: no implementation/source, schema/migration, auth/security, provider/network, dependency/tool-version, deployment, F9 or checkpoint/state change occurred. Overall state remains `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED.
