@@ -7,6 +7,7 @@
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Timestamp format bắt buộc: `[YYYY-MM-DD HH:MM:SS UTC±HH:MM] Nội dung cập nhật`.
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Mỗi fact/decision/status/test/approval/gate/limitation mới hoặc sửa phải có timestamp riêng; không dùng một timestamp cấp file để đại diện cho nhiều facts.
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Correction/supersession dùng timestamp mới; không thay timestamp cũ để làm dữ liệu trông mới hơn.
+- [2026-08-23 23:53:22 UTC+07:00][recorded_at] Memory-maintenance writes chỉ để đồng bộ snapshot/ledger không tự kích hoạt vòng lặp cập nhật memory vô hạn; phải ghi underlying project event và commit/evidence liên quan khi biết.
 
 ## Current identity
 
@@ -50,6 +51,13 @@
 
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] F7 writes chỉ được bắt đầu sau explicit approval tương đương: `Phê duyệt F7 Resource Catalog + Context Broker, cho phép thay đổi security/data-access boundary theo thiết kế đã khóa; chưa mở F9 Data Egress.`
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Sau F7 approval cần fresh preflight trên đúng branch/worktree, đọc state/checkpoint/canon/security, inspect current context builder/APIs/DB/tests, xác định exact protected scope, thêm leakage/classification/deterministic broker tests và không mở F9.
+
+## Latest documentation/memory governance update
+
+- [2026-08-23 23:53:22 UTC+07:00][recorded_at] `docs/project-memory/PROJECT_CONTEXT.md`, `PROJECT_MEMORY.md` và `PROJECT_CHANGELOG.md` đã được persist trên repo branch hiện tại.
+- [2026-08-23 23:53:22 UTC+07:00][recorded_at] `AGENTS.md` đã được cập nhật để coding agents đọc/cập nhật cross-session Project Memory và bắt buộc timestamp từng nội dung đến giây; governance commit: `9dc4ffbddff067ba43dd94ed44dcafd13133f069`.
+- [2026-08-23 23:53:22 UTC+07:00][recorded_at] `PROJECT_CONTEXT.md` bổ sung non-recursive memory synchronization rule; commit: `a7aa3a2fbcfb6f14b4ddb51a528e6af2ba707447`.
+- [2026-08-23 23:53:22 UTC+07:00][recorded_at] Scope của các thay đổi trên là docs/memory governance only; không thay đổi runtime/schema/security boundary, không mở F7/F9 và không promote checkpoint/state.
 
 ## End-of-session update requirements
 
