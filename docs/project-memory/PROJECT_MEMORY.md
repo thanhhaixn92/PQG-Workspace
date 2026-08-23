@@ -91,6 +91,17 @@
 - [2026-08-24 01:34:40 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F7 remains unopened and F9 remains CLOSED / NOT APPROVED.
 - [2026-08-24 01:34:40 UTC+07:00][recorded_at] Next gate: explicit approval to integrate the validated remediation into `pqg-workspace`; branch-protection/required-status configuration remains a separate repository-governance action, and protected admin human-presence hardening requires its own explicit approval.
 
+## Integration PR gate
+
+- [2026-08-24 01:42:35 UTC+07:00][recorded_at] User replied `Đồng ý và tiếp tục` to the integration gate; this authorizes proceeding with the integration workflow toward `pqg-workspace`, but does not silently expand into branch protection, auth/security hardening, migration/dependency changes, F7/F9, deployment or checkpoint promotion.
+- [2026-08-24 01:42:35 UTC+07:00][recorded_at] Live topology check found `pqg-workspace` still at `af58b6f68abcdbe6344d68c126113b7191f0a9a5`, while remediation HEAD before this memory repair was `b6f2e4298a88e0f843b6b70b1024b4a6cd5e4532`; compare is ahead 98 / behind 0 with merge-base exactly `af58b6f68abcdbe6344d68c126113b7191f0a9a5`.
+- [2026-08-24 01:42:35 UTC+07:00][recorded_at] Because the integration branch contains the accumulated Foundation F1–F6 + R1 implementation and memory governance, a direct merge would integrate substantially more than the narrow remediation files; the agent therefore did not silently merge the default branch under the narrower interpretation.
+- [2026-08-24 01:42:35 UTC+07:00][recorded_at] Pull request #1 `Integrate Foundation/R1 remediation into pqg-workspace` was opened with base `pqg-workspace`, head `remediation-r1-ci-module-failclosed-20260824`; at creation it contained 98 commits, 53 changed files, 6973 additions and 2198 deletions and later became mergeable=true.
+- [2026-08-24 01:42:35 UTC+07:00][recorded_at] PR integration CI is NOT RUN / not observed: no PR-triggered workflow run was returned for head `b6f2e4298a88e0f843b6b70b1024b4a6cd5e4532` or synthetic merge commit `a70aba4a4ff63daa59230ab5751a125282ad0705`, and combined status on that merge commit was empty at verification time.
+- [2026-08-24 01:42:35 UTC+07:00][recorded_at] Merge of PR #1 is WITHHELD pending explicit acceptance of the full accumulated Foundation/F1–F6/R1 + remediation integration scope; source-branch CI evidence remains Run #83 on source-validation HEAD `0c096d88f467d57aea19ded31e4cec258844557b` and must not be mislabeled as PR integration CI.
+- [2026-08-24 01:42:35 UTC+07:00][recorded_at] QA found the prior memory-maintenance writes had truncated the leading history of `PROJECT_MEMORY.md` and `PROJECT_CHANGELOG.md` by replacing each file with a tail excerpt. This is a docs/memory-only defect; runtime/source code is unaffected. The current memory-maintenance action restores the complete earlier contents and appends the remediation/integration events atomically.
+- [2026-08-24 01:42:35 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F7 unopened; F9 CLOSED / NOT APPROVED.
+
 ## End-of-session update requirements
 
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Sau project-relevant change, phiên hiện tại phải cập nhật branch/HEAD, state/checkpoint, changed scope/files, approvals, tests/results, limitations, gate state, next action và provenance; từng nội dung mới/sửa phải có timestamp riêng đến giây.
