@@ -1,0 +1,25 @@
+name: Agent Preflight
+
+on:
+  push:
+    branches:
+      - remediation-r1-ci-module-failclosed-20260824
+    paths:
+      - .github/workflows/agent-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run mandatory agent preflight
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/agent-preflight.ps1
