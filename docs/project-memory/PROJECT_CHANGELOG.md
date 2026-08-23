@@ -37,3 +37,13 @@
 - [2026-08-23 23:53:22 UTC+07:00][recorded_at] Result: PASS for docs/memory governance persistence only; no runtime/test/security acceptance claim is introduced.
 - [2026-08-23 23:53:22 UTC+07:00][recorded_at] Gate effect: F7 remains unopened; F9 remains closed; checkpoint/state unchanged.
 - [2026-08-23 23:53:22 UTC+07:00][recorded_at] Provenance: explicit user request in current ChatGPT Project session.
+
+### [2026-08-24 01:02:02 UTC+07:00] Remediation branch created; implementation blocked by mandatory preflight runtime mismatch
+
+- [2026-08-24 01:02:02 UTC+07:00][recorded_at] Source/actor: ChatGPT Project session following explicit user request to proceed with remediation edits.
+- [2026-08-24 01:02:02 UTC+07:00][recorded_at] Intended non-protected scope: CI topology remediation plus Foundation Module projection fail-closed UX/tests; auth/security-boundary, migration, dependency/tool-version, F7 and F9 changes remain outside scope.
+- [2026-08-24 01:02:02 UTC+07:00][recorded_at] Created remote branch `remediation-r1-ci-module-failclosed-20260824` from `cbd4d899ca30e8d2585917447858a225574af17a`; no runtime/source/test file was modified before the blocker was detected.
+- [2026-08-24 01:02:02 UTC+07:00][recorded_at] Mandatory `scripts/agent-preflight.ps1` was NOT RUN because the available execution runtime has neither PowerShell nor `cmd.exe`; the agent did not substitute an emulated check or silently bypass the repository contract.
+- [2026-08-24 01:02:02 UTC+07:00][recorded_at] Result: implementation NOT STARTED; focused tests, lint, type-check, build and `git diff --check` for the intended remediation are NOT RUN.
+- [2026-08-24 01:02:02 UTC+07:00][recorded_at] Gate effect: state remains `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F7 remains unopened; F9 remains CLOSED / NOT APPROVED; no checkpoint/state promotion.
+- [2026-08-24 01:02:02 UTC+07:00][recorded_at] Next exact action: run the mandatory preflight from a Windows-capable checkout of `remediation-r1-ci-module-failclosed-20260824`, then implement only the approved non-protected remediation scope and validate it before any PASS claim.
