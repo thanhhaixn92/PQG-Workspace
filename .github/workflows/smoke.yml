@@ -4,7 +4,10 @@ on:
   pull_request:
     branches: [main, develop]
   push:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
+      - foundation-v2-f6-capability-registry-20260823
   workflow_dispatch:
 
 env:
@@ -50,42 +53,49 @@ jobs:
 
       - name: Smoke test — create session + submit prompt
         run: |
-          python -c "
-import httpx, json, time
+          python - <<'PY'
+          import httpx
+          import time
 
-base = 'http://127.0.0.1:8000'
+          base = "http://127.0.0.1:8000"
 
-# Create session
-r = httpx.post(f'{base}/api/sessions', json={'title': 'Smoke Test CI'})
-assert r.status_code == 201, r.text
-sid = r.json()['id']
+          # Create session
+          response = httpx.post(f"{base}/api/sessions", json={"title": "Smoke Test CI"})
+          assert response.status_code == 201, response.text
+          session_id = response.json()["id"]
 
-# Submit prompt
-r = httpx.post(f'{base}/api/sessions/{sid}/prompt', json={'prompt': 'Xin chào'})
-assert r.status_code == 202, r.text
-task_id = r.json()['id']
+          # Submit prompt
+          response = httpx.post(
+              f"{base}/api/sessions/{session_id}/prompt",
+              json={"prompt": "Xin chào"},
+          )
+          assert response.status_code == 202, response.text
 
-# Read SSE stream until done
-with httpx.stream('GET', f'{base}/api/sessions/{sid}/events', timeout=15) as sse:
-    for line in sse.iter_lines():
-        if line.startswith('event: done') or line.startswith('event: error'):
-            break
+          # Read SSE stream until done
+          with httpx.stream(
+              "GET",
+              f"{base}/api/sessions/{session_id}/events",
+              timeout=15,
+          ) as stream:
+              for line in stream.iter_lines():
+                  if line.startswith("event: done") or line.startswith("event: error"):
+                      break
 
-# Verify task completed
-time.sleep(0.5)
-r = httpx.get(f'{base}/api/sessions/{sid}/task-runs/latest')
-assert r.status_code == 200
-task = r.json()
-assert task['status'] == 'completed', f'Expected completed, got {task}'
+          # Verify task completed
+          time.sleep(0.5)
+          response = httpx.get(f"{base}/api/sessions/{session_id}/task-runs/latest")
+          assert response.status_code == 200
+          task = response.json()
+          assert task["status"] == "completed", f"Expected completed, got {task}"
 
-# Verify messages
-r = httpx.get(f'{base}/api/sessions/{sid}/messages')
-msgs = r.json()
-assert len(msgs) == 2
-assert msgs[0]['role'] == 'user'
-assert msgs[1]['role'] == 'assistant'
-print(f'SMOKE OK — {len(msgs)} messages, task {task[\"status\"]}')
-"
+          # Verify messages
+          response = httpx.get(f"{base}/api/sessions/{session_id}/messages")
+          messages = response.json()
+          assert len(messages) == 2
+          assert messages[0]["role"] == "user"
+          assert messages[1]["role"] == "assistant"
+          print(f"SMOKE OK — {len(messages)} messages, task {task['status']}")
+          PY
 
       - name: Cleanup smoke test sessions
         run: |
@@ -124,44 +134,57 @@ print(f'SMOKE OK — {len(msgs)} messages, task {task[\"status\"]}')
 
       - name: Smoke test with real Hermes
         run: |
-          python -c "
-import httpx, json, time
+          python - <<'PY'
+          import httpx
+          import time
 
-base = 'http://127.0.0.1:8001'
+          base = "http://127.0.0.1:8001"
 
-# Check preflight
-r = httpx.get(f'{base}/api/runtime/status')
-hermes = r.json()['hermes']
-assert hermes['status'] == 'ready' or hermes['status'] == 'auth_expired', f'Expected ready/auth_expired, got {hermes[\"status\"]}'
-print(f'Hermes status: {hermes[\"status\"]}, auth: {hermes[\"auth_status\"]}')
+          # Check preflight
+          response = httpx.get(f"{base}/api/runtime/status")
+          hermes = response.json()["hermes"]
+          assert hermes["status"] in {"ready", "auth_expired"}, (
+              f"Expected ready/auth_expired, got {hermes['status']}"
+          )
+          print(f"Hermes status: {hermes['status']}, auth: {hermes['auth_status']}")
 
-if hermes['status'] != 'ready':
-    print('SKIP: Hermes not ready — auth may need manual setup')
-    exit(0)
+          if hermes["status"] != "ready":
+              print("SKIP: Hermes not ready — auth may need manual setup")
+              raise SystemExit(0)
 
-# Create session
-r = httpx.post(f'{base}/api/sessions', json={'title': 'CI Real Hermes Smoke'})
-sid = r.json()['id']
+          # Create session
+          response = httpx.post(
+              f"{base}/api/sessions",
+              json={"title": "CI Real Hermes Smoke"},
+          )
+          assert response.status_code == 201, response.text
+          session_id = response.json()["id"]
 
-# Submit prompt
-r = httpx.post(f'{base}/api/sessions/{sid}/prompt', json={'prompt': 'Trả lời ngắn gọn: 2+2 bằng mấy?'})
-assert r.status_code == 202
-task_id = r.json()['id']
+          # Submit prompt
+          response = httpx.post(
+              f"{base}/api/sessions/{session_id}/prompt",
+              json={"prompt": "Trả lời ngắn gọn: 2+2 bằng mấy?"},
+          )
+          assert response.status_code == 202, response.text
 
-# Read SSE
-with httpx.stream('GET', f'{base}/api/sessions/{sid}/events', timeout=60) as sse:
-    for line in sse.iter_lines():
-        if 'done' in line or 'error' in line:
-            break
+          # Read SSE
+          with httpx.stream(
+              "GET",
+              f"{base}/api/sessions/{session_id}/events",
+              timeout=60,
+          ) as stream:
+              for line in stream.iter_lines():
+                  if "done" in line or "error" in line:
+                      break
 
-time.sleep(1)
-r = httpx.get(f'{base}/api/sessions/{sid}/task-runs/latest')
-task = r.json()
-assert task['status'] == 'completed', f'Expected completed, got {task}'
+          time.sleep(1)
+          response = httpx.get(f"{base}/api/sessions/{session_id}/task-runs/latest")
+          task = response.json()
+          assert task["status"] == "completed", f"Expected completed, got {task}"
 
-r = httpx.get(f'{base}/api/sessions/{sid}/messages')
-msgs = r.json()
-print(f'REAL SMOKE OK — {len(msgs)} messages')
-for m in msgs:
-    print(f'  [{m[\"role\"]}] {m[\"content\"][:100]}')
-"
+          response = httpx.get(f"{base}/api/sessions/{session_id}/messages")
+          messages = response.json()
+          print(f"REAL SMOKE OK — {len(messages)} messages")
+          for message in messages:
+              print(f"  [{message['role']}] {message['content'][:100]}")
+          PY
