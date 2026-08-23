@@ -15,8 +15,10 @@ from typing import Any
 
 import aiosqlite
 
+from app.api.schemas import SseDoneEvent
 from app.db.connection import get_db_connection
 from app.services.audit import log_audit_event
+from app.services.event_bus import event_bus
 from app.settings import Settings
 
 
@@ -263,6 +265,14 @@ async def _ensure_cancel_part(conn: aiosqlite.Connection, assistant_turn_id: str
     )
 
 
+async def _publish_cancel_done(thread_id: str, assistant_turn_id: str) -> None:
+    """Notify subscribers only after durable cancellation is locally terminal."""
+    await event_bus.publish(
+        f"assistant:{thread_id}",
+        SseDoneEvent(assistant_turn_id=assistant_turn_id, thread_id=thread_id),
+    )
+
+
 async def _finalize_cancel_row(conn: aiosqlite.Connection, row: aiosqlite.Row, now: int) -> None:
     message = "Bạn đã hủy phản hồi này. Nội dung đến muộn sẽ không được lưu hoặc hiển thị."
     await conn.execute(
@@ -298,6 +308,7 @@ async def finalize_cancel_requested_runs(settings: Settings) -> int:
     """Finalize cancellation once no live lease can still own local completion."""
     now = int(time.time())
     finalized = 0
+    terminal_events: list[tuple[str, str]] = []
     async with get_db_connection(settings.db_path_resolved) as conn:
         await conn.execute("BEGIN IMMEDIATE")
         try:
@@ -311,11 +322,14 @@ async def finalize_cancel_requested_runs(settings: Settings) -> int:
                 rows = await cur.fetchall()
             for row in rows:
                 await _finalize_cancel_row(conn, row, now)
+                terminal_events.append((row["thread_id"], row["assistant_turn_id"]))
                 finalized += 1
             await conn.commit()
         except Exception:
             await conn.rollback()
             raise
+    for thread_id, assistant_turn_id in terminal_events:
+        await _publish_cancel_done(thread_id, assistant_turn_id)
     return finalized
 
 
@@ -366,6 +380,7 @@ async def recover_stale_assistant_runs(settings: Settings) -> int:
 async def _mark_run_failed(settings: Settings, claim: AssistantRunClaim, error_code: str) -> None:
     now = int(time.time())
     failure_text = "Trợ lý GYO không thể hoàn tất yêu cầu này. Không có thay đổi nào được thực hiện."
+    cancelled_event: tuple[str, str] | None = None
     async with get_db_connection(settings.db_path_resolved) as conn:
         await conn.execute("BEGIN IMMEDIATE")
         try:
@@ -376,6 +391,7 @@ async def _mark_run_failed(settings: Settings, claim: AssistantRunClaim, error_c
                 return
             if row["status"] == "cancel_requested":
                 await _finalize_cancel_row(conn, row, now)
+                cancelled_event = (row["thread_id"], row["assistant_turn_id"])
             elif row["status"] == "running":
                 await conn.execute(
                     """UPDATE assistant_turns
@@ -420,6 +436,8 @@ async def _mark_run_failed(settings: Settings, claim: AssistantRunClaim, error_c
         except Exception:
             await conn.rollback()
             raise
+    if cancelled_event is not None:
+        await _publish_cancel_done(*cancelled_event)
 
 
 async def _reconcile_claim_result(settings: Settings, claim: AssistantRunClaim) -> str:
@@ -435,6 +453,7 @@ async def _reconcile_claim_result(settings: Settings, claim: AssistantRunClaim) 
             if run["status"] == "cancel_requested":
                 await _finalize_cancel_row(conn, run, now)
                 await conn.commit()
+                await _publish_cancel_done(run["thread_id"], run["assistant_turn_id"])
                 return "cancelled"
             async with conn.execute(
                 "SELECT status FROM assistant_turns WHERE id = ?",
