@@ -14,7 +14,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Central configuration object for the DIRAP Local Workbench backend."""
+    """Central configuration object for the PQG Workspace backend."""
 
     model_config = SettingsConfigDict(
         env_file=".env",

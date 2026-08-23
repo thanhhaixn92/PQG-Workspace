@@ -1,4 +1,4 @@
-# DIRAP Local Workbench - Decision Log
+# PQG Workspace - Decision Log
 
 This file records architecture decisions that should remain stable unless explicitly changed by user approval.
 

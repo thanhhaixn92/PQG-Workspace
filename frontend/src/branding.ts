@@ -1,5 +1,5 @@
 /**
- * User-facing identity. Hermes remains the internal ACP/runtime identifier.
+ * User-facing identity. Legacy Hermes identifiers remain compatibility-only.
  */
 export const PRODUCT_NAME = 'PQG Workspace';
 export const PRODUCT_SHORT_NAME = 'PQG';

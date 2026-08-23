@@ -1,4 +1,4 @@
-# DIRAP Local Workbench - Acceptance And Evaluation
+# PQG Workspace - Acceptance And Evaluation
 
 ## 1. Evaluation Philosophy
 

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hermes-local-stack"
 version = "2.2.0"
-description = "DIRAP Local Workbench - local-first AI office assistant backend"
+description = "PQG Workspace - local-first AI office assistant backend"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.111.0",

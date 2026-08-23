@@ -1,6 +1,6 @@
 # First Real Chat
 
-Tài liệu này giúp đưa DIRAP Local Workbench từ trạng thái “webapp đã mở” sang “Trợ lý Hermes stream hoạt động”.
+Tài liệu này giúp đưa PQG Workspace từ trạng thái “webapp đã mở” sang “Trợ lý GYO stream hoạt động”.
 
 ## Cách A - Chạy Thử Ngay Bằng Dev Mock
 

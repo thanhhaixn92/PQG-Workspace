@@ -1,7 +1,7 @@
 /**
  * Health endpoint client.
  *
- * Calls GET /health on the DIRAP Local Workbench backend.
+ * Calls GET /health on the PQG Workspace backend.
  */
 import { apiFetch } from "./client";
 

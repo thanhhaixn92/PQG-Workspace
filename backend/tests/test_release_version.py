@@ -25,10 +25,11 @@ def test_product_branding_is_separate_from_hermes_runtime() -> None:
     repository = Path(__file__).resolve().parents[2]
     index_html = (repository / "frontend" / "index.html").read_text(encoding="utf-8")
     app_layout = (repository / "frontend" / "src" / "components" / "AppLayout.tsx").read_text(encoding="utf-8")
+    branding = (repository / "frontend" / "src" / "branding.ts").read_text(encoding="utf-8")
 
     assert app.title == "PQG Workspace"
     assert "<title>PQG Workspace — Trợ lý GYO</title>" in index_html
     assert 'aria-label={PRODUCT_NAME}' in app_layout
-    assert "ASSISTANT_LABEL" in app_layout
+    assert "ASSISTANT_LABEL" in branding
     assert "Hermes Local" not in index_html
     assert "Hermes Local" not in app_layout

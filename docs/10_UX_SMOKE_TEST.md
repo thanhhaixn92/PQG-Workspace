@@ -7,7 +7,7 @@ Checklist này dùng để xác nhận webapp local mở được, không crash,
 Từ thư mục dự án:
 
 ```powershell
-cd C:\Users\dtron\Documents\DIRAP-Personal-v3
+cd C:\Users\dtron\Documents\PQG Workspace
 .\start-dev.ps1 -NoReload
 ```
 

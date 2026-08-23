@@ -30,7 +30,7 @@ if ((Test-Path $StatePath) -and ($BackendPort -eq 0 -or $FrontendPort -eq 0)) {
 if ($BackendPort -eq 0) { $BackendPort = 8000 }
 if ($FrontendPort -eq 0) { $FrontendPort = 5173 }
 
-Write-Host "Kiem tra DIRAP Local Workbench" -ForegroundColor Cyan
+Write-Host "Kiem tra PQG Workspace" -ForegroundColor Cyan
 
 if (Test-Path $PythonExe) {
     Write-Host "OK  backend\.venv ton tai" -ForegroundColor Green

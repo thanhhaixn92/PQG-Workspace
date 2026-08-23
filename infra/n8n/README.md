@@ -1,6 +1,6 @@
 # n8n Automation Sidecar
 
-This directory contains the infrastructure configuration for running n8n locally as part of DIRAP Local Workbench.
+This directory contains the infrastructure configuration for running n8n locally as part of PQG Workspace.
 
 ## Setup Instructions
 

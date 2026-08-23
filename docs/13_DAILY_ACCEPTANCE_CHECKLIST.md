@@ -1,6 +1,6 @@
 # Checklist Kiểm Tra Hằng Ngày
 
-Dùng checklist này sau mỗi lần chỉnh UX/runtime hoặc trước khi dùng DIRAP Local Workbench cho công việc thật.
+Dùng checklist này sau mỗi lần chỉnh UX/runtime hoặc trước khi dùng PQG Workspace cho công việc thật.
 
 ## Khởi Động
 

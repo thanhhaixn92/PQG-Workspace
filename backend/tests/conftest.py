@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for Hermes Local Stack backend tests.
+"""Shared pytest fixtures for PQG Workspace backend tests.
 
 Key design decisions
 ---------------------

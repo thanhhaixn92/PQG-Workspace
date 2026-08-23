@@ -1,4 +1,4 @@
-# DIRAP Local Workbench - Data And Storage Model
+# PQG Workspace - Data And Storage Model
 
 ## 1. Nguyen Tac Luu Tru
 
@@ -12,7 +12,7 @@
 | Storage | Owner | Noi dung | Ghi chu |
 |---|---|---|---|
 | Hermes state.db | Hermes | ACP sessions, reasoning, internal runtime/recall | Khong doc, sua hoac dong bo truc tiep tu app |
-| app.db | DIRAP Local Workbench | Work, plan, conversations, Assistant turns/parts, task runs, approvals/action packages, knowledge, memory, skills, audit | SQLite WAL |
+| app.db | PQG Workspace | Work, plan, conversations, Assistant turns/parts, task runs, approvals/action packages, knowledge, memory, skills, audit | SQLite WAL |
 | workspace files | User/project | source docs, output files, editor content | Chi truy cap trong workspace path |
 | n8n data volume | n8n | workflows, credentials, settings neu sidecar duoc cau hinh | Tuy chon, loopback-only |
 | `.env` | Operator | secrets, webhook URLs, keys | Khong commit |

@@ -557,7 +557,7 @@ class TestContextInjection:
 
     def test_compose_includes_guidance(self) -> None:
         prompt = _compose_hermes_prompt("Hello")
-        assert "=== DIRAP LOCAL WORKBENCH RESPONSE GUIDE ===" in prompt
+        assert "=== PQG WORKSPACE RESPONSE GUIDE ===" in prompt
         assert "Kết quả" in prompt
         assert "File đầu ra" in prompt
         assert "Cần kiểm tra" in prompt

@@ -1,4 +1,4 @@
-# DIRAP Local Workbench - Security And Permission Policy
+# PQG Workspace - Security And Permission Policy
 
 ## 1. Security Model
 

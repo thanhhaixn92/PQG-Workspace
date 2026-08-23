@@ -7,19 +7,22 @@
 - Does NOT modify any repository source file; the override is applied at runtime
   via dependency_overrides only, on an isolated app instance.
 
-This file lives OUTSIDE the repository (under %TEMP%/uat-codex-*).
+This file lives in the repository and resolves the repository root from its
+own location, so the isolated UAT harness remains portable after a local move
+or rename.
 """
 from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 # Ensure the backend package is importable without touching the repo venv.
-REPO = os.path.abspath(r"C:\Users\dtron\Documents\DIRAP-Personal-v3")
-BACKEND = os.path.join(REPO, "backend")
-if BACKEND not in sys.path:
-    sys.path.insert(0, BACKEND)
+REPO = Path(__file__).resolve().parent.parent
+BACKEND = REPO / "backend"
+if str(BACKEND) not in sys.path:
+    sys.path.insert(0, str(BACKEND))
 
 from app.main import APP_VERSION, create_app  # noqa: E402
 from app.settings import Settings  # noqa: E402

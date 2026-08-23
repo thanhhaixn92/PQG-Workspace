@@ -1,4 +1,4 @@
-# DIRAP Local Workbench - Test Data And Evaluation Scenarios
+# PQG Workspace - Test Data And Evaluation Scenarios
 
 ## 1. Purpose
 
@@ -24,7 +24,7 @@ Sample `README.md`:
 ```text
 # Test Workspace
 
-This workspace is used for DIRAP Local Workbench validation.
+This workspace is used for PQG Workspace validation.
 ```
 
 Sample `notes/project.md`:

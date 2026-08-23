@@ -2,7 +2,8 @@
 
 ## Architecture Snapshot
 
-DIRAP Local Workbench is a local-first single-user assistant. Hermes is its internal agent/runtime.
+PQG Workspace is a local-first single-user assistant. Trợ lý GYO is its
+user-facing assistant surface, backed by the provider-neutral GyoOrchestrator.
 
 ```text
 React/Zustand UI

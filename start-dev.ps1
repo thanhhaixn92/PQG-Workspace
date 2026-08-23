@@ -73,7 +73,7 @@ function Write-DevState {
 "@ | Set-Content -Path (Join-Path $DevDir "dev-state.json") -Encoding UTF8
 }
 
-Write-Host "Khoi dong moi truong phat trien DIRAP Local Workbench" -ForegroundColor Cyan
+Write-Host "Khoi dong moi truong phat trien PQG Workspace" -ForegroundColor Cyan
 
 if (-not (Test-Path $PythonExe)) {
     Write-Host "Chua co moi truong Python: backend\.venv" -ForegroundColor Yellow

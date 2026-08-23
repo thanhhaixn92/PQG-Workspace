@@ -1,4 +1,4 @@
-# DIRAP Local Workbench - Execution Principles
+# PQG Workspace - Execution Principles
 
 ## 1. Engineering Principles
 

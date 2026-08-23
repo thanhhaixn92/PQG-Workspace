@@ -25,7 +25,7 @@ For the first end-to-end chat path, see `docs/11_FIRST_REAL_CHAT.md`.
 ### 1. Clone & enter the repo
 
 ```powershell
-cd C:\Users\dtron\Documents\DIRAP-Personal-v3
+cd C:\Users\dtron\Documents\PQG Workspace
 ```
 
 ### 2. Backend

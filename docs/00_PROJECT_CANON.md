@@ -1,6 +1,6 @@
-# DIRAP Local Workbench / DIRAP Personal v3 - Project Canon v2.2
+# PQG Workspace - Project Canon v2.2
 
-File nay la muc luc va nguon tham chieu chinh cho Antigravity va Codex trong qua trinh xay dung DIRAP Local Workbench. Hermes la agent/runtime ben trong san pham.
+File nay la muc luc va nguon tham chieu chinh cho Antigravity va Codex trong qua trinh xay dung PQG Workspace. Hermes la agent/runtime ben trong san pham.
 
 ## Bo Tai Lieu Chuan
 

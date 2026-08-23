@@ -1,5 +1,5 @@
 /**
- * Base HTTP client for the DIRAP Local Workbench backend.
+ * Base HTTP client for the PQG Workspace backend.
  *
  * Rules:
  * - All backend calls must go through this client (never bypass to direct

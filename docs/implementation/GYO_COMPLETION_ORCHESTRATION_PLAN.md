@@ -2,7 +2,7 @@
 
 ## Trạng thái điều hành
 
-- Repository: `C:\Users\dtron\Documents\DIRAP-Personal-v3`
+- Repository: `C:\Users\dtron\Documents\PQG Workspace`
 - Checkpoint bắt buộc giữ nguyên: `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`
 - Product: **PQG Workspace**; trợ lý trong web: **Trợ lý GYO**.
 - Phạm vi sản phẩm: Local MVP/Pilot có kiểm soát cho một người dùng.

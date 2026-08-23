@@ -1,10 +1,10 @@
-# DIRAP Local Workbench / DIRAP Personal v3 - PRD v2.2
+# PQG Workspace - PRD v2.2
 
 > Hieu luc tu 2026-08-14. Tai lieu nay thay the cac dinh nghia session-centric va n8n-bat-buoc truoc day. `sessions` chi la entity tuong thich dai dien cho Work.
 
 ## 1. Tom Tat San Pham
 
-DIRAP Local Workbench la khong gian lam viec AI ca nhan chay local. Hermes la agent/runtime ho tro ben trong. Mo hinh san pham chinh la `Work -> plan -> conversations -> Assistant turns -> documents/artifacts -> knowledge -> approvals/action packages`.
+PQG Workspace la khong gian lam viec AI ca nhan chay local. Hermes la agent/runtime ho tro ben trong. Mo hinh san pham chinh la `Work -> plan -> conversations -> Assistant turns -> documents/artifacts -> knowledge -> approvals/action packages`.
 
 MVP khong nham lam he thong multi-user production. Muc tieu la mot local workstation assistant co the quan sat, ghi audit, va kiem soat hanh dong cua agent.
 

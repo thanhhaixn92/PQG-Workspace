@@ -8,7 +8,7 @@
 
 ## Objective
 
-Hoàn thiện DIRAP Local Workbench thành không gian làm việc đáng tin cho một người dùng local, với Trợ lý Hermes là agent/runtime bên trong: quản lý Công việc, tài liệu, đầu ra, tri thức có nguồn và bộ nhớ có lifecycle; sau đó chứng minh bằng UAT cô lập rằng các luồng ghi, duyệt và scope không làm lộ, ghi nhầm hoặc nhân đôi dữ liệu.
+Hoàn thiện PQG Workspace thành không gian làm việc đáng tin cho một người dùng local, với Trợ lý GYO là agent/runtime bên trong: quản lý Công việc, tài liệu, đầu ra, tri thức có nguồn và bộ nhớ có lifecycle; sau đó chứng minh bằng UAT cô lập rằng các luồng ghi, duyệt và scope không làm lộ, ghi nhầm hoặc nhân đôi dữ liệu.
 
 ## Gate result (2026-08-12)
 

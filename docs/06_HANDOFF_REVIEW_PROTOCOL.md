@@ -1,4 +1,4 @@
-# DIRAP Local Workbench - Handoff And Review Protocol
+# PQG Workspace - Handoff And Review Protocol
 
 ## 1. Antigravity Handoff Template
 
