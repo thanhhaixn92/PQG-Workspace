@@ -3,11 +3,40 @@
 ## Applies to every coding agent
 
 Before inspecting broadly, changing code, tests, schemas, migrations, or state,
-read this file and run:
+read this file and obtain a fresh preflight receipt for the exact target
+branch/ref using the execution mode that matches the environment.
+
+### Local checkout / local machine
+
+Run from the repository root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/agent-preflight.ps1
 ```
+
+### ChatGPT Project / GitHub-connected environment
+
+Do **not** attempt or claim that the local PowerShell command ran when there is
+no writable local repository shell. Instead, run the repository GitHub Actions
+workflow **Agent Preflight** (`.github/workflows/agent-preflight.yml`) on the
+exact target branch/ref. That workflow must execute the same
+`scripts/agent-preflight.ps1` on a Windows runner.
+
+Before implementation edits in this environment, require a fresh completed
+GitHub preflight for the intended target ref and verify its run/job conclusion
+is `success`; when the workflow publishes `pqg/preflight`, verify that status is
+`success` as well. A run from another branch/ref or an older unrelated HEAD is
+not a substitute. `pqg/smoke` is not a substitute for `pqg/preflight`.
+
+If the connected GitHub tooling cannot dispatch `workflow_dispatch`, request
+that the user run **Actions → Agent Preflight → Run workflow** for the target
+branch/ref, then verify the resulting GitHub evidence before implementation
+writes. Do not fall back to pretending the local command ran.
+
+A user may explicitly approve a narrow bootstrap exception whose sole purpose
+is to establish or repair this preflight execution path or its governance docs.
+Such an exception does not authorize application/runtime implementation edits;
+a fresh successful preflight is still required before those edits begin.
 
 The preflight is read-only. It cannot prove that an agent read a file; this
 contract makes the following read sequence mandatory. In the first work update,
@@ -104,7 +133,8 @@ own, and do not overwrite existing state merely to make the worktree clean.
 
 ## Required working pattern
 
-1. Read-only triage: preflight, focused `git status`/diff, contract and tests.
+1. Read-only triage: environment-appropriate fresh preflight receipt, focused
+   `git status`/diff when a local checkout exists, contract and tests.
 2. Name the narrow scope and acceptance criteria before editing.
 3. Edit the smallest coherent set; preserve compatibility unless approved.
 4. Add/update focused regression tests for changed behaviour.
@@ -113,7 +143,8 @@ own, and do not overwrite existing state merely to make the worktree clean.
    only for affected contracts and surfaces. For UI/API work, check the
    loading, empty, error, success, interaction, authorization, schema,
    compatibility or data-integrity cases that the change can affect. Always run
-   `git diff --check` for changed text/code.
+   `git diff --check` for changed text/code when a writable checkout is
+   available; otherwise report it as `NOT RUN` and review the exact GitHub diff.
 6. Review the final diff for scope, secret and state-file leakage.
 7. Report changed files, evidence actually run, limitations and the next gate.
 
