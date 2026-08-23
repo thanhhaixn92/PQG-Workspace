@@ -34,7 +34,23 @@ export function ModuleCanvas({ activeTab, activeWorkId, assistantFocusRoute }: M
   if (assistantFocusRoute) return <AssistantChatSidebar surfaceMode="focus" />;
 
   const moduleDefinition = getModuleDefinitionByTab(activeTab);
-  if (moduleDefinition && moduleProjectionStatus === 'ready') {
+  if (moduleDefinition) {
+    if (moduleProjectionStatus !== 'ready') {
+      const waitingForProjection = moduleProjectionStatus === 'idle' || moduleProjectionStatus === 'loading';
+      return (
+        <div className="full-surface">
+          <div className="empty-state centered-empty-state" role="status">
+            <div className="empty-state-title">Chưa thể xác minh trạng thái Module</div>
+            <div className="empty-state-text">
+              {waitingForProjection
+                ? 'PQG Workspace đang tải trạng thái gắn Module. Module chỉ mở sau khi trạng thái được xác minh.'
+                : 'Không tải được trạng thái gắn Module. Để tránh hiển thị lại Module đã tháo, nội dung Module tạm thời bị khóa.'}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const instance = moduleInstances.find(item => item.module_id === moduleDefinition.id);
     if (!instance?.attached) {
       return (
