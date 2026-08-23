@@ -106,3 +106,16 @@
 
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Sau project-relevant change, phiên hiện tại phải cập nhật branch/HEAD, state/checkpoint, changed scope/files, approvals, tests/results, limitations, gate state, next action và provenance; từng nội dung mới/sửa phải có timestamp riêng đến giây.
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Nếu không có persistence capability, không được nói memory đã cập nhật; phải báo `Memory update prepared but not persisted.`
+
+## Current integration validation and merge gate
+
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] Memory truncation repair was persisted in docs-only commit `0b3af21d319fd36fc41876fa997f116af921d29d`; both `PROJECT_MEMORY.md` and `PROJECT_CHANGELOG.md` were subsequently re-read from line 1 and confirmed to contain their restored leading history.
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] PR #1 current validated integration head is `365077d0c751326c6defb3c2ea12556189a9d625`; before this memory-maintenance commit GitHub reported PR #1 open, unmerged, mergeable=true, 100 commits, 53 changed files, base `pqg-workspace` at `af58b6f68abcdbe6344d68c126113b7191f0a9a5`.
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] Current-head push validation: GitHub Actions Smoke Test Run ID `32659047749` on exact HEAD `365077d0c751326c6defb3c2ea12556189a9d625` completed `success`; combined commit status `pqg/smoke=success`.
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] Run `32659047749` backend result: 507 passed, 81 skipped, 2 warnings; frontend focused: 4 files / 30 tests PASS; lint 0 warnings/0 errors; TypeScript type-check PASS; production build PASS.
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] Run `32659047749` runtime result: startup migrations through `0038_durable_assistant_runs` PASS; health/runtime checks PASS; readiness smoke 7 checks PASS; cleanup PASS with 1 smoke session archived.
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] Run `32659047749` `smoke-real` = SKIPPED and is not PASS evidence. Existing HermesAssistantPanel React `act(...)`, npm 6 vulnerabilities (3 moderate, 3 high), Vite >500 kB, two backend warnings and GitHub Actions Node-version warnings remain non-blocking evidence; no dependency/tool-version change was performed.
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] Validation Run `32659047749` is push-triggered validation of the exact integration-head tree; PR-event CI remains NOT OBSERVED and must not be relabeled as PR CI.
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] PR #1 description was updated to disclose the broad scope and current-head validation evidence. Full merge scope is Foundation F1–F6 + R1 + project-memory governance + CI/Module remediation; it is not a narrow remediation-only patch.
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] Merge remains WITHHELD pending explicit acceptance of the full accumulated scope. Branch protection/required-status configuration, auth/human-presence hardening, migration/dependency/tool changes, deployment, F7/F9 and checkpoint/state promotion remain outside this gate.
+- [2026-08-24 01:50:00 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F7 remains unopened; F9 remains CLOSED / NOT APPROVED. Later memory-only HEADs must not be represented as inheriting CI validation from `365077d0c751326c6defb3c2ea12556189a9d625`.
