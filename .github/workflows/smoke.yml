@@ -51,50 +51,44 @@ jobs:
         run: |
           curl -sf http://127.0.0.1:8000/api/runtime/status | python -c "import sys,json; d=json.load(sys.stdin); assert d['backend']=='ok'; assert d['hermes']['status']=='mock'"
 
-      - name: Smoke test — create session + submit prompt
+      - name: Smoke test — create session + runtime readiness
         run: |
           python - <<'PY'
           import httpx
-          import time
 
           base = "http://127.0.0.1:8000"
 
-          # Create session
+          # Create a managed local session so workspace readiness is exercised.
           response = httpx.post(f"{base}/api/sessions", json={"title": "Smoke Test CI"})
           assert response.status_code == 201, response.text
           session_id = response.json()["id"]
 
-          # Submit prompt
+          # Use the current provider-independent runtime smoke contract. This
+          # validates local readiness without pretending a model is configured.
           response = httpx.post(
-              f"{base}/api/sessions/{session_id}/prompt",
-              json={"prompt": "Xin chào"},
+              f"{base}/api/runtime/smoke",
+              json={"session_id": session_id},
           )
-          assert response.status_code == 202, response.text
+          assert response.status_code == 200, response.text
+          checks = {item["key"]: item for item in response.json()["checks"]}
 
-          # Read SSE stream until done
-          with httpx.stream(
-              "GET",
-              f"{base}/api/sessions/{session_id}/events",
-              timeout=15,
-          ) as stream:
-              for line in stream.iter_lines():
-                  if line.startswith("event: done") or line.startswith("event: error"):
-                      break
+          required_ready = {"backend", "db", "hermes", "sse", "workspace", "memory_approval"}
+          missing = required_ready - checks.keys()
+          assert not missing, f"Missing smoke checks: {sorted(missing)}"
+          failures = {
+              key: checks[key]
+              for key in required_ready
+              if checks[key]["status"] != "ready"
+          }
+          assert not failures, f"Runtime smoke not ready: {failures}"
+          assert checks["n8n"]["status"] in {"ready", "skipped"}, checks["n8n"]
 
-          # Verify task completed
-          time.sleep(0.5)
-          response = httpx.get(f"{base}/api/sessions/{session_id}/task-runs/latest")
-          assert response.status_code == 200
-          task = response.json()
-          assert task["status"] == "completed", f"Expected completed, got {task}"
-
-          # Verify messages
+          # The readiness smoke must not synthesize model/chat output.
           response = httpx.get(f"{base}/api/sessions/{session_id}/messages")
-          messages = response.json()
-          assert len(messages) == 2
-          assert messages[0]["role"] == "user"
-          assert messages[1]["role"] == "assistant"
-          print(f"SMOKE OK — {len(messages)} messages, task {task['status']}")
+          assert response.status_code == 200, response.text
+          assert response.json() == []
+
+          print(f"SMOKE OK — {len(checks)} readiness checks, workspace ready")
           PY
 
       - name: Cleanup smoke test sessions
