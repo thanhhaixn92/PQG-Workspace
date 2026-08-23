@@ -20,9 +20,13 @@ Before the first implementation edit, an agent must:
      verify the workflow/job result is `success` plus `pqg/preflight=success`
      when that status is published.
    A preflight from another branch/ref, an unrelated older HEAD, or `pqg/smoke`
-   does not satisfy this receipt. If connected tooling cannot dispatch the
-   workflow, the user must trigger `workflow_dispatch` in GitHub and the agent
-   must verify the resulting evidence before implementation writes.
+   does not satisfy this receipt. If the connector cannot dispatch
+   `workflow_dispatch` but can write repository files, the agent must update
+   `.github/agent-preflight-trigger.txt` on the exact target branch/ref to
+   self-trigger the workflow. Do not ask the user to perform the GitHub click
+   when the agent has sufficient write access to trigger it itself. Only when
+   neither dispatch nor trigger-file write is available may the agent request a
+   manual GitHub Actions run from the user.
 2. Read `PROJECT_STATE.md`, `AI_STATE.json`, the active checkpoint and
    `CODEGRAPH.md`.
 3. Read the route-selected canon/security document and the target source,
