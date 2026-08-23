@@ -56,10 +56,18 @@
 - [2026-08-23 23:51:19 UTC+07:00][imported_at] Sensitivity classes: public, internal, sensitive, restricted.
 - [2026-08-23 23:51:19 UTC+07:00][imported_at] Trust classes: canonical_user_data, verified_knowledge, derived_text, external_unverified, agent_generated_draft.
 
+## F7 current status
+
+- [2026-08-24 04:36:02 UTC+07:00][recorded_at] Supersession of the earlier unopened-F7 status: user explicitly approved F7 Resource Catalog + Context Broker security/data-access boundary; F9 Data Egress was explicitly kept closed.
+- [2026-08-24 04:36:02 UTC+07:00][recorded_at] F7 model-context policy boundary is `backend/app/services/context_broker.py`; required order is `discover metadata → SECURITY FILTER → deterministic relevance/ranking → hydrate → pack`, and `assistant_context.py` is a compatibility facade rather than a second selection policy.
+- [2026-08-24 04:36:02 UTC+07:00][recorded_at] F7 source-validation HEAD is `efe0a35aaf8d80b6187e63dda4cc7d47c1ece388`; Smoke Test Run ID `32667595588` completed success with backend 516 passed / 81 skipped / 2 warnings, F7 focused 5/5 PASS, frontend focused 30/30 PASS, lint 0/0, type-check/build/runtime readiness PASS, and `smoke-real=SKIPPED`.
+- [2026-08-24 04:36:02 UTC+07:00][recorded_at] F7 scoped validation does not promote the project checkpoint; current state remains `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`.
+
 ## F9 boundary
 
 - [2026-08-23 23:51:19 UTC+07:00][imported_at] F9 Data Egress chưa được mở và cần approval riêng.
 - [2026-08-23 23:51:19 UTC+07:00][imported_at] Local read permission không đồng nghĩa external-send permission; web-search query tự nó là data egress; LLM không phải authorization authority.
+- [2026-08-24 04:36:02 UTC+07:00][recorded_at] F7 approval/implementation did not open F9; no web-search query, connector send, upload/export or new external data destination is authorized by F7.
 
 ## Protected change boundary
 
