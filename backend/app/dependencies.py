@@ -108,7 +108,9 @@ def require_interactive_local_user_admin(
     }
     host_header = request.headers.get("host")
     if host_header:
-        configured_origins.add(f"{request.url.scheme}://{host_header}".rstrip("/"))
+        self_origin = _canonical_loopback_origin(f"{request.url.scheme}://{host_header}")
+        if self_origin is not None:
+            configured_origins.add(self_origin)
 
     if origin is None or origin not in configured_origins:
         raise HTTPException(
