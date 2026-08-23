@@ -14,6 +14,8 @@ import { ReportsPanel } from '../../components/ReportsPanel';
 import { ReviewInboxPanel } from '../../components/ReviewInboxPanel';
 import { SettingsPanel } from '../../components/SettingsPanel';
 import { WorkWorkspace } from '../../components/WorkWorkspace';
+import { getModuleDefinitionByTab } from '../modules/registry';
+import { useModuleProjectionStore } from '../modules/store';
 
 export interface ModuleCanvasProps {
   activeTab: SidebarTab;
@@ -21,16 +23,32 @@ export interface ModuleCanvasProps {
   assistantFocusRoute: boolean;
 }
 
-/**
- * Transitional first-party ModuleCanvas. Rendering is still static in Wave 1;
- * registry-backed persistence/attachment is intentionally deferred to F5.
- */
+/** First-party ModuleCanvas with persisted attachment eligibility. */
 export function ModuleCanvas({ activeTab, activeWorkId, assistantFocusRoute }: ModuleCanvasProps) {
   const activeFile = useHermesStore(state => state.activeFile);
   const openFiles = useHermesStore(state => state.openFiles);
+  const setSidebarTab = useHermesStore(state => state.setSidebarTab);
+  const moduleInstances = useModuleProjectionStore(state => state.instances);
+  const moduleProjectionStatus = useModuleProjectionStore(state => state.status);
   const showEditor = Boolean(activeWorkId && activeFile && openFiles.length > 0);
 
   if (assistantFocusRoute) return <AssistantChatSidebar surfaceMode="focus" />;
+
+  const moduleDefinition = getModuleDefinitionByTab(activeTab);
+  if (moduleDefinition && moduleProjectionStatus === 'ready') {
+    const instance = moduleInstances.find(item => item.module_id === moduleDefinition.id);
+    if (!instance?.attached) {
+      return (
+        <div className="full-surface">
+          <div className="empty-state centered-empty-state" role="status">
+            <div className="empty-state-title">Module đang được tháo khỏi điều hướng</div>
+            <div className="empty-state-text">Dữ liệu vẫn được giữ nguyên. Bạn có thể gắn lại Module trong Cài đặt.</div>
+            <button className="btn-primary" type="button" onClick={() => setSidebarTab('settings')}>Mở Cài đặt Modules</button>
+          </div>
+        </div>
+      );
+    }
+  }
 
   if (activeTab === 'overview') return <OverviewPanel />;
   if (activeTab === 'sessions') return <WorkWorkspace />;
