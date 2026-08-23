@@ -1,9 +1,32 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ModuleInstance } from '../../api/modules';
+import { useModuleProjectionStore } from '../modules/store';
 import { LeftNavigation } from './LeftNavigation';
 
+const projected = (overrides: Partial<ModuleInstance> & Pick<ModuleInstance, 'module_id' | 'display_name'>): ModuleInstance => ({
+  id: `builtin:${overrides.module_id}`,
+  module_id: overrides.module_id,
+  source_kind: 'builtin',
+  package_id: null,
+  display_name: overrides.display_name,
+  attached: true,
+  sort_order: 10,
+  config: {},
+  config_version: 1,
+  health_state: 'ready',
+  revision: 1,
+  created_at: 1,
+  updated_at: 1,
+  ...overrides,
+});
+
 describe('LeftNavigation', () => {
-  it('keeps Home fixed, projects primary Modules, and pins Settings outside the Module list', () => {
+  beforeEach(() => {
+    useModuleProjectionStore.setState({ instances: [], status: 'error', error: 'test fallback' });
+  });
+
+  it('keeps Home fixed, falls back to static primary Modules, and pins Settings outside the Module list', () => {
     const onSelectTab = vi.fn();
     render(
       <LeftNavigation
@@ -28,6 +51,37 @@ describe('LeftNavigation', () => {
     expect(settings.closest('.foundation-sidebar-footer')).not.toBeNull();
     fireEvent.click(settings);
     expect(onSelectTab).toHaveBeenCalledWith('settings');
+  });
+
+  it('uses persisted attachment, order and display names when the projection is ready', () => {
+    useModuleProjectionStore.setState({
+      status: 'ready',
+      error: null,
+      instances: [
+        projected({ module_id: 'reports', display_name: 'Báo cáo quản trị', sort_order: 20 }),
+        projected({ module_id: 'documents', display_name: 'Hồ sơ', sort_order: 10 }),
+        projected({ module_id: 'knowledge', display_name: 'Không hiển thị', attached: false, sort_order: 30 }),
+      ],
+    });
+
+    render(
+      <LeftNavigation
+        activeTab="files"
+        currentWorkTitle="Work A"
+        mobileMenuOpen={false}
+        activityOpen={false}
+        onSelectTab={vi.fn()}
+        onOpenMobileMenu={vi.fn()}
+        onCloseMobileMenu={vi.fn()}
+        onOpenActivity={vi.fn()}
+      />,
+    );
+
+    const buttons = screen.getAllByRole('button');
+    const labels = buttons.map(button => button.textContent?.trim()).filter(Boolean);
+    expect(labels.indexOf('Hồ sơ')).toBeLessThan(labels.indexOf('Báo cáo quản trị'));
+    expect(screen.queryByRole('button', { name: 'Không hiển thị' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Cài đặt' })).toBeDefined();
   });
 
   it('keeps the current Work and context drawer action visible independently of Module selection', () => {
