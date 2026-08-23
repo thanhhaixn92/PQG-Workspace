@@ -17,6 +17,8 @@
 - [2026-08-24 03:06:08 UTC+07:00][recorded_at] In ChatGPT Project/GitHub-connected environments without a writable local repository shell, do not attempt or claim the local PowerShell command ran; instead run GitHub Actions workflow `Agent Preflight` (`.github/workflows/agent-preflight.yml`) on the exact target branch/ref and verify a fresh successful run before implementation writes.
 - [2026-08-24 03:06:08 UTC+07:00][recorded_at] A preflight from another branch/ref, an unrelated older HEAD, or `pqg/smoke` is not a substitute for the required `Agent Preflight` receipt. If connected tooling cannot dispatch `workflow_dispatch`, the user must trigger the GitHub workflow and the agent must verify its evidence before implementation writes.
 - [2026-08-24 03:06:08 UTC+07:00][recorded_at] A narrow explicit bootstrap approval may establish or repair the GitHub preflight path or governance documents before a new receipt exists; it does not authorize application/runtime/schema/security/feature implementation edits, which still require a fresh successful preflight.
+- [2026-08-24 03:35:25 UTC+07:00][recorded_at] Supersession of the prior manual-trigger fallback: when ChatGPT Project/GitHub tooling can write repository files but cannot dispatch `workflow_dispatch`, the agent must self-trigger `Agent Preflight` by updating `.github/agent-preflight-trigger.txt` on the exact target branch/ref. Do not ask the user to click GitHub Actions when the agent has enough repository write access to trigger it itself.
+- [2026-08-24 03:35:25 UTC+07:00][recorded_at] Manual user triggering is now fallback-only: request **Actions → Agent Preflight → Run workflow** only when connected tooling can neither dispatch the workflow nor write the trigger file.
 
 ## Project identity
 
