@@ -21,7 +21,8 @@ and older checkpoint wording do not authorize a change.
 | Work, plan or conversation | data model, security policy | `api/works.py`, schemas, `WorkHub.tsx` | Work/scope/archive tests |
 | GYO chat, stream, retry or cancel | PRD, security policy | `api/assistant.py`, orchestrator, SSE client/panel | assistant route + UI isolation tests |
 | Provider/model/fallback | `docs/implementation/PQG_GYO_PROVIDER_CORE.md`, security | model-config, registry, resilience service | provider/secret/fallback tests |
-| Attachment/context/memory scope | data model, security policy | context builder, scope service, manifest/panel | foreign scope/exclusion/retry tests |
+| F7 Resource Catalog / Context Broker | `docs/implementation/F7_RESOURCE_CATALOG_CONTEXT_BROKER.md`, data model, security policy | `services/context_broker.py`, compatibility context builder, assistant manifest/provider boundary | security-filter-before-rank, foreign/restricted/path-redaction/provider-context tests |
+| Attachment/context/memory scope | data model, security policy | Context Broker, scope service, manifest/panel | foreign scope/exclusion/retry tests |
 | Learning candidate/worker | security policy, current checkpoint | learning API/service/worker | default-off, duplicate, cancel/archive tests |
 | Action Package or approval | security policy, data model | proposal parser, package/approval routes, UI entry point | before-approval, 409, idempotency tests |
 | Files/artifacts/reports | data model, security policy | file/artifact routes, sandbox, explorer/reports | managed-root/path-escape tests |
@@ -32,6 +33,8 @@ and older checkpoint wording do not authorize a change.
 
 ## Routing guardrails
 
+- F7 Context Broker changes must preserve the hard ordering `discover metadata → SECURITY FILTER → relevance/ranking → hydrate → pack`. A ranker, model or model-facing selector must never receive a resource descriptor that failed authorization. Denied resource IDs, titles, backend locators and content remain outside model-visible catalog/context.
+- F7 does not authorize F9 Data Egress. Local read authorization is not permission to send data to a provider other than the already-approved local GYO provider boundary, web search, connectors, upload/export or any other external destination.
 - When `DESIGN.md` or a historical Hermes document conflicts with current GYO
   route/service code, do not reintroduce old runtime behaviour. Record the
   discrepancy and request a documentation-reconciliation scope.
