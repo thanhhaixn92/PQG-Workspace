@@ -70,7 +70,7 @@ export const SettingsPanel: React.FC = () => {
           <section className="model-settings-panel" aria-labelledby="privacy-settings-title">
             <header>
               <h2 id="privacy-settings-title">Quyền Agent & Riêng tư</h2>
-              <p>Khu vực này là điểm neo cho Data Egress và permission control sau này. F5 không tạo toggle giả hoặc thay đổi security policy ngoài user-only Module administration.</p>
+              <p>Các chính sách gửi dữ liệu ra dịch vụ ngoài sẽ chỉ xuất hiện khi backend thực sự hỗ trợ. Ứng dụng không tạo toggle giả hoặc ngầm nới quyền hiện hành.</p>
             </header>
             <div className="runtime-guidance">
               <strong>Boundary hiện hành</strong>
