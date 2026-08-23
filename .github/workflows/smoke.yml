@@ -56,6 +56,17 @@ jobs:
         run: |
           pytest -v --tb=short
 
+      - name: Validate R1 frontend
+        working-directory: frontend
+        run: |
+          node --version
+          npm --version
+          npm ci
+          npm run test -- src/components/assistant/AssistantTurn.test.tsx src/components/HermesAssistantPanel.test.tsx
+          npm run lint
+          npm run type-check
+          npm run build
+
       - name: Start backend server
         run: |
           uvicorn app.main:app --host 127.0.0.1 --port 8000 &
