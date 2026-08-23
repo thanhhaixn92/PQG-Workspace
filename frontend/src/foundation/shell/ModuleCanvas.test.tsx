@@ -1,6 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ModuleInstance } from '../../api/modules';
 import { useHermesStore } from '../../store/store';
+import { useModuleProjectionStore } from '../modules/store';
 import { ModuleCanvas } from './ModuleCanvas';
 
 vi.mock('../../components/AssistantChatSidebar', () => ({ AssistantChatSidebar: ({ surfaceMode }: { surfaceMode?: string }) => <div>GYO {surfaceMode ?? 'drawer'}</div> }));
@@ -17,9 +19,26 @@ vi.mock('../../components/MemoryHubPanel', () => ({ MemoryHubPanel: () => <div>M
 vi.mock('../../components/LocalDataPanel', () => ({ LocalDataPanel: () => <div>Local data content</div> }));
 vi.mock('../../components/DirapPanel', () => ({ DirapPanel: () => <div>Research content</div> }));
 
+const documentsInstance = (attached: boolean): ModuleInstance => ({
+  id: 'builtin:documents',
+  module_id: 'documents',
+  source_kind: 'builtin',
+  package_id: null,
+  display_name: 'Tài liệu',
+  attached,
+  sort_order: 20,
+  config: {},
+  config_version: 1,
+  health_state: 'ready',
+  revision: 1,
+  created_at: 1,
+  updated_at: 1,
+});
+
 describe('ModuleCanvas', () => {
   beforeEach(() => {
-    useHermesStore.setState({ activeFile: null, openFiles: [] });
+    useHermesStore.setState({ activeFile: null, openFiles: [], sidebarTab: 'overview' });
+    useModuleProjectionStore.setState({ instances: [], status: 'error', error: 'test fallback' });
   });
 
   it('renders the fixed Home surface outside the optional Module registry', () => {
@@ -32,7 +51,7 @@ describe('ModuleCanvas', () => {
     expect(screen.getByText('GYO focus')).toBeDefined();
   });
 
-  it('keeps document editing guarded by Work and open-file state', () => {
+  it('keeps document editing guarded by Work and open-file state when projection fallback is active', () => {
     const { rerender } = render(<ModuleCanvas activeTab="files" activeWorkId={null} assistantFocusRoute={false} />);
     expect(screen.getByText('Chọn một Công việc để quản lý tài liệu.')).toBeDefined();
 
@@ -40,6 +59,20 @@ describe('ModuleCanvas', () => {
     rerender(<ModuleCanvas activeTab="files" activeWorkId="work-1" assistantFocusRoute={false} />);
     expect(screen.getByText('File explorer')).toBeDefined();
     expect(screen.getByText('Editor content')).toBeDefined();
+  });
+
+  it('does not render a detached Module from a legacy deep link and points to Settings', () => {
+    useModuleProjectionStore.setState({
+      instances: [documentsInstance(false)],
+      status: 'ready',
+      error: null,
+    });
+    render(<ModuleCanvas activeTab="files" activeWorkId="work-1" assistantFocusRoute={false} />);
+
+    expect(screen.getByText('Module đang được tháo khỏi điều hướng')).toBeDefined();
+    expect(screen.queryByText('File explorer')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Mở Cài đặt Modules' }));
+    expect(useHermesStore.getState().sidebarTab).toBe('settings');
   });
 
   it('keeps Settings as a Foundation surface rendered by the canvas switch', () => {
