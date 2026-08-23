@@ -5,6 +5,7 @@ import pytest
 from fastapi import FastAPI
 
 from app.mcp.server import HERMES_MCP_TOOL_ALLOWLIST, mcp_server, setup_mcp
+import app.mcp.tools  # noqa: F401 - registers the existing compatibility tool surface
 from app.services.action_packages import P0_INTERNAL_CAPABILITIES
 from app.services.capabilities import (
     ACTION_PACKAGE_CAPABILITY_IDS,
