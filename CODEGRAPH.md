@@ -11,6 +11,7 @@ React/Vite UI
   -> typed REST + SSE client
   -> FastAPI policy boundary
       -> SQLite app.db (user-visible Work/Assistant history)
+      -> F7 Context Broker (discover metadata -> SECURITY FILTER -> rank -> hydrate -> pack)
       -> managed workspace sandbox
       -> GyoOrchestrator -> enabled provider/model profiles
       -> governed Memory/Skill learning outbox
@@ -29,7 +30,8 @@ permission to reintroduce an ACP fallback.
 | Work, plan, conversations | `backend/app/api/works.py` | `api/schemas.py`, `services/work_memory_scope.py`, `tests/test_works.py` |
 | GYO turn/SSE/retry/cancel | `backend/app/api/assistant.py` | `services/gyo_orchestrator.py`, `gyo_registry.py`, `frontend/src/api/events.ts`, assistant tests |
 | Provider/model/routing | `backend/app/api/model_config.py` | `services/model_resilience.py`, `services/gyo_registry.py`, `tests/test_gyo_provider_core.py` |
-| Context/attachments/memory | `backend/app/services/assistant_context.py` | `api/context_preview.py`, `api/gyo_learning.py`, `tests/test_work_memory_learning.py` |
+| F7 resource/context authorization | `backend/app/services/context_broker.py` | `services/assistant_context.py`, `api/assistant.py`, `tests/test_context_broker.py` |
+| Attachment/context/memory scope | `backend/app/services/context_broker.py` | `services/work_memory_scope.py`, `api/context_preview.py`, `api/gyo_learning.py`, focused context tests |
 | Learning worker | `backend/app/services/gyo_learning_worker.py` | `services/learning.py`, `tests/test_governed_learning.py` |
 | Action proposal/approval | `backend/app/api/action_packages.py` | `api/approvals.py`, `services/action_packages.py`, focused tests |
 | Managed files/artifacts/reports | `backend/app/api/files.py`, `api/artifacts.py` | `services/sandbox.py`, `tests/test_files.py`, `test_artifacts.py` |
@@ -52,6 +54,12 @@ db/*       -X-> services/*
 - `backend/app/api/schemas.py` is the public REST/SSE schema boundary.
 - `backend/app/db/migrations.py` is additive SQLite schema evolution; never edit
   it or a database file without explicit approval.
+- `backend/app/services/context_broker.py` is the F7 model-context policy
+  boundary. It may discover backend-only resource metadata, but authorization
+  must complete before relevance/ranking and hydration. Denied resource IDs,
+  titles, locators and content must not enter model-visible catalog/context.
+- `backend/app/services/assistant_context.py` is a compatibility facade over the
+  F7 Context Broker; do not add a second independent context-selection policy.
 - `assistant_threads`, `assistant_turns`, parts and run metadata are durable
   Assistant records. Their Work + conversation bindings must be enforced in the
   backend, not just selected in the UI.
@@ -82,8 +90,9 @@ db/*       -X-> services/*
 | --- | --- | --- |
 | Active scope/gate | `PROJECT_STATE.md`, `AI_STATE.json`, checkpoint | targeted tests + evidence, no status inference |
 | REST/SSE contract | schemas + route + client + focused tests | request/error/stale-response coverage |
+| F7 context/resource access | Context Broker + Work/Memory scope + security policy | denied resources absent before rank; no denied IDs/path/content in model context |
 | Work mutation | route/service + Action Package lifecycle | no mutation before approval; idempotency test |
-| Memory scope | policy route + context builder | wrong Work/step/restricted record excluded |
+| Memory scope | policy route + Context Broker | wrong Work/step/restricted record excluded |
 | Filesystem | file route + sandbox | managed roots and path-escape rejection |
 | Provider/model | model-config + registry/orchestrator | no secret response; unavailable fails clearly |
 | UI/accessibility | target component + colocated test + browser check | loading/empty/error/success, keyboard/focus/reflow |
@@ -93,6 +102,7 @@ db/*       -X-> services/*
 | Change type | Start with |
 | --- | --- |
 | Backend behaviour | relevant `backend/tests/test_*.py`, then `backend/.venv/Scripts/python.exe -m pytest ...` |
+| F7 Context Broker | `backend/tests/test_context_broker.py` + existing assistant/context/memory scope regressions, then full backend smoke |
 | Frontend behaviour | colocated `*.test.tsx`, then `npm run type-check` when types/contracts change |
 | Shared UI/theme/layout | focused Vitest + browser viewport check |
 | Schema/migration | migration-specific test, upgrade/idempotency/rollback evidence only if approved |
