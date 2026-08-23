@@ -59,6 +59,16 @@
 - [2026-08-23 23:53:22 UTC+07:00][recorded_at] `PROJECT_CONTEXT.md` bổ sung non-recursive memory synchronization rule; commit: `a7aa3a2fbcfb6f14b4ddb51a528e6af2ba707447`.
 - [2026-08-23 23:53:22 UTC+07:00][recorded_at] Scope của các thay đổi trên là docs/memory governance only; không thay đổi runtime/schema/security boundary, không mở F7/F9 và không promote checkpoint/state.
 
+## Current remediation session
+
+- [2026-08-24 01:02:43 UTC+07:00][recorded_at] User authorized proceeding with remediation edits derived from the F6/R1 assessment; this authorization is treated as limited to non-protected remediation scope already identified, not auth/security-boundary, migration, dependency/tool-version, F7 or F9 work.
+- [2026-08-24 01:02:43 UTC+07:00][recorded_at] Remote remediation branch `remediation-r1-ci-module-failclosed-20260824` was created from docs/memory branch HEAD `cbd4d899ca30e8d2585917447858a225574af17a` to isolate intended CI-topology and Module projection fail-closed changes.
+- [2026-08-24 01:02:43 UTC+07:00][recorded_at] Mandatory preflight `powershell -ExecutionPolicy Bypass -File scripts/agent-preflight.ps1` is NOT RUN in this session because the available execution environment lacks PowerShell and `cmd.exe`; repository contract was not bypassed or emulated.
+- [2026-08-24 01:02:43 UTC+07:00][recorded_at] No application/runtime/test/workflow source remediation has been written; intended focused tests, lint, type-check, build, CI validation and `git diff --check` are NOT RUN.
+- [2026-08-24 01:02:43 UTC+07:00][recorded_at] Project changelog blocker entry was persisted on the remediation branch via docs-only commit `93c8689ec30c7b0337444eb9f47ae38c657654ab`; this commit is not R1 code-validation evidence.
+- [2026-08-24 01:02:43 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F7 remains unopened and F9 remains CLOSED / NOT APPROVED.
+- [2026-08-24 01:02:43 UTC+07:00][recorded_at] Next exact action is to run mandatory preflight from a Windows-capable checkout of `remediation-r1-ci-module-failclosed-20260824`, then implement only CI topology + Module projection fail-closed remediation with focused regression tests and validation before any PASS claim.
+
 ## End-of-session update requirements
 
 - [2026-08-23 23:51:19 UTC+07:00][recorded_at] Sau project-relevant change, phiên hiện tại phải cập nhật branch/HEAD, state/checkpoint, changed scope/files, approvals, tests/results, limitations, gate state, next action và provenance; từng nội dung mới/sửa phải có timestamp riêng đến giây.
