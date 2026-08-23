@@ -111,7 +111,25 @@ jobs:
 
       - name: Cleanup smoke test sessions
         run: |
-          curl -s -X POST http://127.0.0.1:8000/api/sessions/cleanup-smoke-tests
+          python - <<'PY'
+          import httpx
+
+          base = "http://127.0.0.1:8000"
+          preview = httpx.get(f"{base}/api/sessions/cleanup-smoke-tests/preview")
+          assert preview.status_code == 200, preview.text
+          payload = preview.json()
+          token = payload.get("confirmation_token")
+          assert isinstance(token, str) and token, payload
+
+          response = httpx.post(
+              f"{base}/api/sessions/cleanup-smoke-tests",
+              json={"confirmation_token": token},
+          )
+          assert response.status_code == 200, response.text
+          archived_count = response.json().get("archived_count")
+          assert isinstance(archived_count, int) and archived_count >= 1, response.text
+          print(f"CLEANUP OK — archived {archived_count} smoke session(s)")
+          PY
 
       - name: Publish pqg/smoke final status
         if: always()
