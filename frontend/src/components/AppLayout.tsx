@@ -1,30 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BriefcaseBusiness, ClipboardCheck, FileChartColumn, History, LayoutDashboard, Library, Menu, Moon, Settings, Sun } from 'lucide-react';
 import { useHermesStore } from '../store/store';
 import { getLatestSessionTaskRun, getSessionMessages, getSessions } from '../api/sessions';
 import { fetchHealth } from '../api/health';
-import { isTestWork } from './workTestVisibility';
-import { ApprovalModal } from './ApprovalModal';
-import { FileExplorer } from './FileExplorer';
-import { EditorPanel } from './EditorPanel';
-import { MemoryPanel } from './MemoryPanel';
-import { MemoryHubPanel } from './MemoryHubPanel';
-import { LocalDataPanel } from './LocalDataPanel';
-import { DirapPanel } from './DirapPanel';
-import { ReportsPanel } from './ReportsPanel';
-import { OverviewPanel } from './OverviewPanel';
-import { KnowledgePanel } from './KnowledgePanel';
-import { ReviewInboxPanel } from './ReviewInboxPanel';
-import { SettingsPanel } from './SettingsPanel';
-import { WorkWorkspace } from './WorkWorkspace';
-import { WorkContextDrawer } from './WorkContextDrawer';
-import { AssistantChatSidebar } from './AssistantChatSidebar';
-import { ContextDrawer } from './ui/ContextDrawer';
-import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from '../branding';
-import { AppShell } from './ui/AppShell';
 import { subscribeToSessionEvents, unsubscribeFromSessionEvents } from '../api/events';
 import { fetchPendingApprovals } from '../api/approvals';
 import { isGyoAssistantRoute } from '../navigation';
+import { ApprovalModal } from './ApprovalModal';
+import { AssistantChatSidebar } from './AssistantChatSidebar';
+import { WorkContextDrawer } from './WorkContextDrawer';
+import { ContextDrawer } from './ui/ContextDrawer';
+import { AppShell } from './ui/AppShell';
+import { isTestWork } from './workTestVisibility';
+import { FoundationHeader } from '../foundation/shell/FoundationHeader';
+import { LeftNavigation } from '../foundation/shell/LeftNavigation';
+import { ModuleCanvas } from '../foundation/shell/ModuleCanvas';
 
 function taskRunToSessionStatus(status?: string) {
   switch (status) {
@@ -54,8 +43,6 @@ async function fetchHealthWithStartupRetry() {
 export const AppLayout: React.FC = () => {
   const activeSessionId = useHermesStore(state => state.activeSessionId);
   const sessions = useHermesStore(state => state.sessions);
-  const activeFile = useHermesStore(state => state.activeFile);
-  const openFiles = useHermesStore(state => state.openFiles);
   const activeTab = useHermesStore(state => state.sidebarTab);
   const setSessions = useHermesStore(state => state.setSessions);
   const setActiveSession = useHermesStore(state => state.setActiveSession);
@@ -83,8 +70,8 @@ export const AppLayout: React.FC = () => {
   const [locationKey, setLocationKey] = useState(() => `${window.location.pathname}${window.location.search}`);
   const drawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const bootstrapVersion = useRef(0);
-  const showEditor = Boolean(activeSessionId && activeFile && openFiles.length > 0);
   const assistantFocusRoute = isGyoAssistantRoute(locationKey);
+  const currentWorkTitle = sessions.find(session => session.id === activeSessionId)?.title || 'Chưa chọn';
 
   const selectSidebarTab = (tab: typeof activeTab) => { setActiveTab(tab); setMobileMenuOpen(false); };
   const openActivityDrawer = (event: React.MouseEvent<HTMLButtonElement>) => { drawerReturnFocusRef.current = event.currentTarget; setActivityOpen(true); };
@@ -139,80 +126,42 @@ export const AppLayout: React.FC = () => {
   }, [activeSessionId, setEvents, setLatestTask, setSessionStatus, setSessionError, setSessionStartedAt, setPendingApproval]);
 
   return (
-    <AppShell className={`${activityOpen ? 'activity-open' : ''} ${assistantSidebarMode === 'expanded' ? 'assistant-expanded' : assistantSidebarMode === 'collapsed' ? 'assistant-collapsed' : ''}`} style={{ '--assistant-panel-width': `${assistantSidebarWidth}px` } as React.CSSProperties}>
-      <div className={`panel sidebar-panel ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-        <div className="product-identity" aria-label={PRODUCT_NAME}>
-          <strong><span className="product-name-full">{PRODUCT_NAME}</span><span className="product-name-compact" aria-hidden="true">{PRODUCT_SHORT_NAME}</span></strong>
-          <span>Trợ lý công việc cá nhân chạy trên máy của bạn</span>
-        </div>
-        <div className="sidebar-tabs">
-          <button className={`sidebar-tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => selectSidebarTab('overview')} title="Tổng quan">
-            <LayoutDashboard aria-hidden="true" /><span className="nav-label">Tổng quan</span>
-          </button>
-          <button className={`sidebar-tab ${activeTab === 'sessions' ? 'active' : ''}`} onClick={() => selectSidebarTab('sessions')} title="Công việc">
-            <BriefcaseBusiness aria-hidden="true" /><span className="nav-label">Công việc</span>
-          </button>
-          <button className={`sidebar-tab ${activeTab === 'skills' ? 'active' : ''}`} onClick={() => selectSidebarTab('skills')} title="Thư viện tri thức">
-            <Library aria-hidden="true" /><span className="nav-label">Thư viện</span>
-          </button>
-          <button className={`sidebar-tab advanced-tab ${activeTab === 'review' ? 'active' : ''}`} onClick={() => selectSidebarTab('review')} title="Hộp duyệt">
-            <ClipboardCheck aria-hidden="true" /><span className="nav-label">Hộp duyệt</span>
-          </button>
-          <button className={`sidebar-tab advanced-tab ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => selectSidebarTab('reports')} title="Báo cáo">
-            <FileChartColumn aria-hidden="true" /><span className="nav-label">Báo cáo</span>
-          </button>
-          <button className={`sidebar-tab advanced-tab ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => selectSidebarTab('settings')} title="Cài đặt">
-            <Settings aria-hidden="true" /><span className="nav-label">Cài đặt</span>
-          </button>
-          <button className="sidebar-tab mobile-more" onClick={() => setMobileMenuOpen(true)}>
-            <Menu aria-hidden="true" /><span className="nav-label">Thêm</span>
-          </button>
-          <button className="sidebar-tab mobile-close" onClick={() => setMobileMenuOpen(false)}>
-            <Menu aria-hidden="true" /><span className="nav-label">Đóng</span>
-          </button>
-        </div>
-        <div className="navigation-context">
-          <span className="navigation-context-label">Công việc hiện tại</span>
-          <strong className="navigation-context-work">{sessions.find(s => s.id === activeSessionId)?.title || 'Chưa chọn'}</strong>
-          <button className="btn-secondary compact-button context-drawer-trigger" type="button" onClick={openActivityDrawer} aria-expanded={activityOpen} title="Lịch sử & ngữ cảnh">
-            <History aria-hidden="true" /><span>Lịch sử & ngữ cảnh</span>
-          </button>
-        </div>
-      </div>
+    <AppShell
+      className={`${activityOpen ? 'activity-open' : ''} ${assistantSidebarMode === 'expanded' ? 'assistant-expanded' : assistantSidebarMode === 'collapsed' ? 'assistant-collapsed' : ''}`}
+      style={{ '--assistant-panel-width': `${assistantSidebarWidth}px` } as React.CSSProperties}
+    >
+      <LeftNavigation
+        activeTab={activeTab}
+        currentWorkTitle={currentWorkTitle}
+        mobileMenuOpen={mobileMenuOpen}
+        activityOpen={activityOpen}
+        onSelectTab={selectSidebarTab}
+        onOpenMobileMenu={() => setMobileMenuOpen(true)}
+        onCloseMobileMenu={() => setMobileMenuOpen(false)}
+        onOpenActivity={openActivityDrawer}
+      />
 
       <main className="panel workspace-panel">
-        <div className="workspace-header">
-          <div className="header-left">
-            <button className="btn-secondary global-theme-toggle" type="button" aria-label={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} title={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} onClick={toggleTheme}>
-              {theme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
-            </button>
-            <button className="btn-secondary context-drawer-mobile-trigger" type="button" onClick={openActivityDrawer} aria-expanded={activityOpen}>
-              <History aria-hidden="true" /> Ngữ cảnh
-            </button>
-          </div>
-          <div className="header-center">
-            <h1 className="workspace-title">{activeTab === 'sessions' ? 'Công việc' : sessions.find(s => s.id === activeSessionId)?.title || 'Chọn một Công việc'}</h1>
-          </div>
-        </div>
+        <FoundationHeader
+          activeTab={activeTab}
+          currentWorkTitle={currentWorkTitle}
+          theme={theme}
+          activityOpen={activityOpen}
+          onToggleTheme={toggleTheme}
+          onOpenActivity={openActivityDrawer}
+        />
+
         {(backendState === 'offline' || workListError) && (
           <div className="app-status-banner" role="status">
-            <div><strong>{backendState === 'offline' ? 'Backend chưa sẵn sàng' : 'Cần chú ý'}</strong><span>{backendState === 'offline' ? healthError : workListError}</span></div>
+            <div>
+              <strong>{backendState === 'offline' ? 'Backend chưa sẵn sàng' : 'Cần chú ý'}</strong>
+              <span>{backendState === 'offline' ? healthError : workListError}</span>
+            </div>
             <button className="btn-secondary" onClick={() => void bootstrap()}>Kiểm tra lại</button>
           </div>
         )}
-        {assistantFocusRoute ? <AssistantChatSidebar surfaceMode="focus" /> : <>
-        {activeTab === 'overview' && <OverviewPanel />}
-        {activeTab === 'sessions' && <WorkWorkspace />}
-        {activeTab === 'files' && <div className="documents-surface"><aside className="documents-rail">{activeSessionId ? <FileExplorer /> : <div className="empty-state">Chọn một Công việc để quản lý tài liệu.</div>}</aside><section className="document-editor-surface">{showEditor ? <EditorPanel /> : <div className="empty-state centered-empty-state"><div className="empty-state-title">Tài liệu của Công việc</div><div className="empty-state-text">Nhập, tạo hoặc chọn một tệp ở bên trái để xem và chỉnh sửa.</div></div>}</section></div>}
-        {activeTab === 'skills' && <div className="full-surface"><KnowledgePanel /></div>}
-        {activeTab === 'reports' && <div className="full-surface"><ReportsPanel /></div>}
-        {activeTab === 'review' && <div className="full-surface"><ReviewInboxPanel /></div>}
-        {activeTab === 'settings' && <div className="full-surface"><SettingsPanel /></div>}
-        {activeTab === 'memory' && <div className="full-surface"><MemoryPanel /></div>}
-        {activeTab === 'memory-hub' && <div className="full-surface"><MemoryHubPanel /></div>}
-        {activeTab === 'data' && <div className="full-surface"><LocalDataPanel /></div>}
-        {activeTab === 'dirap' && <div className="full-surface">{activeSessionId ? <DirapPanel /> : <div className="empty-state">Chọn một Công việc để duyệt tri thức.</div>}</div>}
-        </>}
+
+        <ModuleCanvas activeTab={activeTab} activeWorkId={activeSessionId} assistantFocusRoute={assistantFocusRoute} />
       </main>
 
       <ContextDrawer open={activityOpen} title="Lịch sử & ngữ cảnh" onClose={closeActivityDrawer} returnFocusRef={drawerReturnFocusRef}>
@@ -220,8 +169,6 @@ export const AppLayout: React.FC = () => {
       </ContextDrawer>
 
       <ApprovalModal />
-
-      {/* Assistant Chat Sidebar */}
       {!assistantFocusRoute && <AssistantChatSidebar />}
     </AppShell>
   );

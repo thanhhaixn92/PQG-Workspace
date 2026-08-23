@@ -19,10 +19,15 @@ export function AssistantTurn({ turn, streamedText, sending, onOpenReview, onCre
   onRetrySame?: (turnId: string) => void;
   onRetryAuto?: (turnId: string) => void;
 }) {
+  const cancelRequested = turn.role === 'assistant' && turn.status === 'running' && turn.run_status === 'cancel_requested';
+
   return <article className={`assistant-turn ${turn.role}`}>
     <div className="assistant-turn-label"><span>{turn.role === 'user' ? 'Bạn' : turn.model_id === 'local-summary' ? 'Tóm tắt local' : ASSISTANT_NAME}</span><time>{dateText(turn.created_at)}</time></div>
     {turn.parts.map(part => <TurnPartRenderer key={part.id} part={part} onOpenReview={onOpenReview} onCreateProposal={onCreateProposal} proposalBusy={proposalBusy === part.id} proposalCreated={Boolean(proposalCreated?.[part.id])} />)}
-    {turn.role === 'assistant' && turn.status === 'running' && <div className="assistant-live-response"><p>{streamedText || `${ASSISTANT_NAME} đang trả lời…`}</p>{onCancel && <button className="btn-secondary compact-button" type="button" onClick={() => onCancel(turn.id)} disabled={sending}><Square size={14} /> Hủy phản hồi</button>}</div>}
+    {turn.role === 'assistant' && turn.status === 'running' && <div className="assistant-live-response" aria-live="polite">
+      <p>{cancelRequested ? 'Đang hủy phản hồi…' : streamedText || `${ASSISTANT_NAME} đang trả lời…`}</p>
+      {!cancelRequested && onCancel && <button className="btn-secondary compact-button" type="button" onClick={() => onCancel(turn.id)} disabled={sending}><Square size={14} /> Hủy phản hồi</button>}
+    </div>}
     {turn.role === 'assistant' && turn.status === 'failed' && <div className="assistant-retry-actions">
       {onRetrySame && <button className="btn-secondary compact-button" type="button" onClick={() => onRetrySame(turn.id)} disabled={sending}>Thử lại</button>}
       {onRetryAuto && <button className="btn-secondary compact-button" type="button" onClick={() => onRetryAuto(turn.id)} disabled={sending}>Thử lại tự động</button>}

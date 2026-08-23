@@ -1,5 +1,5 @@
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from fastapi import HTTPException
 from aiosqlite import Connection
 
@@ -32,7 +32,16 @@ def resolve_and_validate_path(
     """
     try:
         workspace = Path(workspace).resolve()
-        target = Path(target_path_str)
+        # User-controlled paths must be interpreted consistently across host OSes.
+        # On POSIX, pathlib treats a backslash as an ordinary filename character;
+        # accepting that would make Windows-style traversal such as ``..\\x`` pass
+        # lexical validation in CI even though it escapes on Windows. Reject Windows
+        # absolute/drive forms first, then normalize both separator styles before
+        # applying the normal sandbox checks.
+        windows_target = PureWindowsPath(target_path_str)
+        if windows_target.is_absolute() or windows_target.drive:
+            raise HTTPException(status_code=403, detail="Path traversal detected: absolute paths are not allowed")
+        target = Path(target_path_str.replace("\\", "/"))
         if target.is_absolute():
             raise HTTPException(status_code=403, detail="Path traversal detected: absolute paths are not allowed")
         if any(part == ".." for part in target.parts):

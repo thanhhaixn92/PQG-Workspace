@@ -28,6 +28,28 @@ Do not use a historical handoff, old roadmap, test count, or an older checkpoint
 as active scope. If sources conflict, follow the precedence in the operating
 contract and report the discrepancy instead of silently choosing one.
 
+## Cross-session project memory
+
+For PQG Workspace work that may continue across chat/agent sessions, also read:
+
+1. `docs/project-memory/PROJECT_CONTEXT.md` — stable cross-session context.
+2. `docs/project-memory/PROJECT_MEMORY.md` — current continuity snapshot.
+3. The latest entries in `docs/project-memory/PROJECT_CHANGELOG.md`.
+
+These files are continuity aids, not higher authority than the live state,
+checkpoint, canon, current source or evidence above. If memory conflicts with a
+higher-authority source, follow the higher-authority source and reconcile the
+memory after verification.
+
+After any project-relevant change that is actually performed, update project
+memory in the same work session when write access exists. Every new or modified
+memory fact, decision, status, test result, approval, gate or limitation must
+carry its own timestamp precise to seconds using
+`[YYYY-MM-DD HH:MM:SS UTC±HH:MM]`. Do not rewrite an old timestamp to make a
+historical event appear newer; append a timestamped correction/supersession.
+Do not store secrets, credential values, raw database content, raw audit dumps
+or chain-of-thought in project memory.
+
 ## Current operational boundary
 
 - Product name: **PQG Workspace**; in-web assistant: **Trợ lý GYO**.

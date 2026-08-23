@@ -46,6 +46,7 @@ async def _running_uat_client(db_path, workspace, port: int):
         db_path=str(db_path), default_workspace_root=str(workspace),
         cors_origins=["http://localhost:5173"], hermes_dev_mock=True,
         hermes_executable_path="", log_level="WARNING", outbox_dispatcher_enabled=False,
+        local_actor_subject="user",
     )
     app = create_app(settings_override=settings)
     from app.dependencies import get_db, get_settings
@@ -434,8 +435,17 @@ async def test_p0_restart_recovery_isolated(tmp_path):
             headers={"Idempotency-Key": "uat-restart-package"},
         )
         assert package.status_code == 201, package.text
-        package_id = package.json()["id"]
-        assert (await client.post(f"/api/action-packages/{package_id}/approve")).status_code == 200
+        package_body = package.json()
+        package_id = package_body["id"]
+        approval = await client.post(
+            f"/api/action-packages/{package_id}/approve",
+            headers={"Idempotency-Key": "uat-restart-approve"},
+            json={
+                "expected_revision": package_body["revision"],
+                "expected_payload_hash": package_body["payload_hash"],
+            },
+        )
+        assert approval.status_code == 200, approval.text
         await asyncio.sleep(2.0)
         pre_work = (await client.get(f"/api/works/{work_id}/dashboard")).json()
         pre_packages = (await client.get(f"/api/works/{work_id}/action-packages")).json()

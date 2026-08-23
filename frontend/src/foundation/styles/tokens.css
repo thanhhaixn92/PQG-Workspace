@@ -1,0 +1,47 @@
+:root {
+  /* Foundation semantic aliases. Keep legacy values as the current visual source
+     during Wave 1 so the refactor does not redesign the product. */
+  --pqg-color-canvas: var(--bg-primary);
+  --pqg-color-surface: var(--bg-secondary);
+  --pqg-color-surface-raised: var(--bg-tertiary);
+  --pqg-color-sidebar: var(--sidebar-panel-bg);
+  --pqg-color-text-primary: var(--text-primary);
+  --pqg-color-text-secondary: var(--text-secondary);
+  --pqg-color-text-tertiary: var(--text-tertiary);
+  --pqg-color-accent: var(--accent-primary);
+  --pqg-color-accent-hover: var(--accent-hover);
+  --pqg-color-danger: var(--danger-primary);
+  --pqg-color-success: var(--success-primary);
+  --pqg-color-warning: var(--warning-primary);
+  --pqg-color-border-subtle: var(--border-subtle);
+  --pqg-color-border-strong: var(--border-strong);
+
+  --pqg-space-1: 4px;
+  --pqg-space-2: 8px;
+  --pqg-space-3: 12px;
+  --pqg-space-4: 16px;
+  --pqg-space-6: 24px;
+  --pqg-space-8: 32px;
+  --pqg-space-10: 40px;
+  --pqg-space-12: 48px;
+  --pqg-space-16: 64px;
+
+  --pqg-radius-md: var(--radius-md);
+  --pqg-radius-lg: var(--radius-lg);
+  --pqg-radius-xl: var(--radius-xl);
+  --pqg-shadow-sm: var(--shadow-sm);
+  --pqg-shadow-md: var(--shadow-md);
+  --pqg-shadow-glass: var(--shadow-glass);
+
+  --pqg-motion-micro: 120ms;
+  --pqg-motion-fast: 160ms;
+  --pqg-motion-normal: 180ms;
+  --pqg-motion-panel: 240ms;
+  --pqg-easing-standard: ease;
+
+  --pqg-nav-width: 216px;
+  --pqg-nav-width-compact: 72px;
+  --pqg-agent-dock-width: 380px;
+  --pqg-agent-dock-min-width: 320px;
+  --pqg-agent-dock-max-width: 520px;
+}

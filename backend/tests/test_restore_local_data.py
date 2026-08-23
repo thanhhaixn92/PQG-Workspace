@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import sqlite3
 import subprocess
 from pathlib import Path
+
+import pytest
 
 
 def _create_db(path: Path, marker: str) -> None:
@@ -18,7 +21,15 @@ def _create_db(path: Path, marker: str) -> None:
 
 
 def test_offline_restore_script_validates_manifest_previews_and_swaps_atomically(tmp_path: Path) -> None:
+    powershell = shutil.which("powershell") or shutil.which("pwsh")
+    if powershell is None:
+        pytest.skip("PowerShell is required to validate restore-local-data.ps1")
+
     repo_root = Path(__file__).resolve().parents[2]
+    backend_python = repo_root / "backend" / ".venv" / "Scripts" / "python.exe"
+    if not backend_python.is_file():
+        pytest.skip("restore-local-data.ps1 requires the Windows backend .venv Python environment")
+
     script = repo_root / "restore-local-data.ps1"
     target = tmp_path / "target.db"
     backup = tmp_path / "backup.db"
@@ -38,7 +49,7 @@ def test_offline_restore_script_validates_manifest_previews_and_swaps_atomically
 
     preview = subprocess.run(
         [
-            "powershell", "-NoProfile", "-File", str(script),
+            powershell, "-NoProfile", "-File", str(script),
             "-BackupPath", str(backup), "-TargetPath", str(target), "-WhatIf",
         ],
         check=False, capture_output=True, text=True,
@@ -52,7 +63,7 @@ def test_offline_restore_script_validates_manifest_previews_and_swaps_atomically
 
     restored = subprocess.run(
         [
-            "powershell", "-NoProfile", "-File", str(script),
+            powershell, "-NoProfile", "-File", str(script),
             "-BackupPath", str(backup), "-TargetPath", str(target), "-ConfirmRestore",
         ],
         check=False, capture_output=True, text=True,

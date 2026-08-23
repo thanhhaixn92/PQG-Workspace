@@ -1,0 +1,64 @@
+name: Agent Preflight
+
+on:
+  push:
+    branches:
+      - remediation-r1-ci-module-failclosed-20260824
+    paths:
+      - .github/workflows/agent-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  preflight:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run mandatory agent preflight
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/agent-preflight.ps1
+
+      - name: Publish pqg/preflight status
+        if: always()
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if ($env:JOB_STATUS -eq 'success') {
+            $state = 'success'
+            $description = 'PQG Windows agent preflight passed'
+          }
+          elseif ($env:JOB_STATUS -eq 'failure') {
+            $state = 'failure'
+            $description = 'PQG Windows agent preflight failed'
+          }
+          else {
+            $state = 'error'
+            $description = 'PQG Windows agent preflight did not complete'
+          }
+
+          $body = @{
+            state = $state
+            target_url = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            description = $description
+            context = 'pqg/preflight'
+          } | ConvertTo-Json -Compress
+
+          Invoke-RestMethod `
+            -Method Post `
+            -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/statuses/$env:GITHUB_SHA" `
+            -Headers @{
+              Accept = 'application/vnd.github+json'
+              Authorization = "Bearer $env:GH_TOKEN"
+              'X-GitHub-Api-Version' = '2022-11-28'
+            } `
+            -ContentType 'application/json' `
+            -Body $body

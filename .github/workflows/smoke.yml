@@ -2,14 +2,22 @@ name: Smoke Test
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches:
+      - pqg-workspace
   push:
-    branches: [main, develop]
+    branches:
+      - pqg-workspace
+      - foundation-v2-r1-durable-agent-run-20260823
+      - remediation-r1-ci-module-failclosed-20260824
   workflow_dispatch:
 
 env:
   HERMES_DEV_MOCK: "1"
   HERMES_AUTH_READY: "1"
+
+permissions:
+  contents: read
+  statuses: write
 
 jobs:
   smoke:
@@ -20,6 +28,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Publish pqg/smoke pending status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body -sS \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"PQG smoke validation is running\",\"context\":\"pqg/smoke\"}"
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -35,6 +56,17 @@ jobs:
         run: |
           pytest -v --tb=short
 
+      - name: Validate R1 frontend
+        working-directory: frontend
+        run: |
+          node --version
+          npm --version
+          npm ci
+          npm run test -- src/foundation/shell/ModuleCanvas.test.tsx src/foundation/shell/LeftNavigation.test.tsx src/components/assistant/AssistantTurn.test.tsx src/components/HermesAssistantPanel.test.tsx
+          npm run lint
+          npm run type-check
+          npm run build
+
       - name: Start backend server
         run: |
           uvicorn app.main:app --host 127.0.0.1 --port 8000 &
@@ -48,48 +80,86 @@ jobs:
         run: |
           curl -sf http://127.0.0.1:8000/api/runtime/status | python -c "import sys,json; d=json.load(sys.stdin); assert d['backend']=='ok'; assert d['hermes']['status']=='mock'"
 
-      - name: Smoke test — create session + submit prompt
+      - name: Smoke test — create session + runtime readiness
         run: |
-          python -c "
-import httpx, json, time
+          python - <<'PY'
+          import httpx
 
-base = 'http://127.0.0.1:8000'
+          base = "http://127.0.0.1:8000"
 
-# Create session
-r = httpx.post(f'{base}/api/sessions', json={'title': 'Smoke Test CI'})
-assert r.status_code == 201, r.text
-sid = r.json()['id']
+          # Create a managed local session so workspace readiness is exercised.
+          response = httpx.post(f"{base}/api/sessions", json={"title": "Smoke Test CI"})
+          assert response.status_code == 201, response.text
+          session_id = response.json()["id"]
 
-# Submit prompt
-r = httpx.post(f'{base}/api/sessions/{sid}/prompt', json={'prompt': 'Xin chào'})
-assert r.status_code == 202, r.text
-task_id = r.json()['id']
+          # Use the current provider-independent runtime smoke contract. This
+          # validates local readiness without pretending a model is configured.
+          response = httpx.post(
+              f"{base}/api/runtime/smoke",
+              json={"session_id": session_id},
+          )
+          assert response.status_code == 200, response.text
+          checks = {item["key"]: item for item in response.json()["checks"]}
 
-# Read SSE stream until done
-with httpx.stream('GET', f'{base}/api/sessions/{sid}/events', timeout=15) as sse:
-    for line in sse.iter_lines():
-        if line.startswith('event: done') or line.startswith('event: error'):
-            break
+          required_ready = {"backend", "db", "hermes", "sse", "workspace", "memory_approval"}
+          missing = required_ready - checks.keys()
+          assert not missing, f"Missing smoke checks: {sorted(missing)}"
+          failures = {
+              key: checks[key]
+              for key in required_ready
+              if checks[key]["status"] != "ready"
+          }
+          assert not failures, f"Runtime smoke not ready: {failures}"
+          assert checks["n8n"]["status"] in {"ready", "skipped"}, checks["n8n"]
 
-# Verify task completed
-time.sleep(0.5)
-r = httpx.get(f'{base}/api/sessions/{sid}/task-runs/latest')
-assert r.status_code == 200
-task = r.json()
-assert task['status'] == 'completed', f'Expected completed, got {task}'
+          # The readiness smoke must not synthesize model/chat output.
+          response = httpx.get(f"{base}/api/sessions/{session_id}/messages")
+          assert response.status_code == 200, response.text
+          assert response.json() == []
 
-# Verify messages
-r = httpx.get(f'{base}/api/sessions/{sid}/messages')
-msgs = r.json()
-assert len(msgs) == 2
-assert msgs[0]['role'] == 'user'
-assert msgs[1]['role'] == 'assistant'
-print(f'SMOKE OK — {len(msgs)} messages, task {task[\"status\"]}')
-"
+          print(f"SMOKE OK — {len(checks)} readiness checks, workspace ready")
+          PY
 
       - name: Cleanup smoke test sessions
         run: |
-          curl -s -X POST http://127.0.0.1:8000/api/sessions/cleanup-smoke-tests
+          python - <<'PY'
+          import httpx
+
+          base = "http://127.0.0.1:8000"
+          preview = httpx.get(f"{base}/api/sessions/cleanup-smoke-tests/preview")
+          assert preview.status_code == 200, preview.text
+          payload = preview.json()
+          token = payload.get("confirmation_token")
+          assert isinstance(token, str) and token, payload
+
+          response = httpx.post(
+              f"{base}/api/sessions/cleanup-smoke-tests",
+              json={"confirmation_token": token},
+          )
+          assert response.status_code == 200, response.text
+          archived_count = response.json().get("archived_count")
+          assert isinstance(archived_count, int) and archived_count >= 1, response.text
+          print(f"CLEANUP OK — archived {archived_count} smoke session(s)")
+          PY
+
+      - name: Publish pqg/smoke final status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          case "${JOB_STATUS}" in
+            success) state="success"; description="PQG smoke validation passed" ;;
+            failure) state="failure"; description="PQG smoke validation failed" ;;
+            *) state="error"; description="PQG smoke validation did not complete" ;;
+          esac
+          curl --fail-with-body -sS \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"${state}\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"${description}\",\"context\":\"pqg/smoke\"}"
 
   smoke-real:
     if: github.event_name == 'workflow_dispatch' && vars.HERMES_REAL_CI == '1'
@@ -124,44 +194,57 @@ print(f'SMOKE OK — {len(msgs)} messages, task {task[\"status\"]}')
 
       - name: Smoke test with real Hermes
         run: |
-          python -c "
-import httpx, json, time
+          python - <<'PY'
+          import httpx
+          import time
 
-base = 'http://127.0.0.1:8001'
+          base = "http://127.0.0.1:8001"
 
-# Check preflight
-r = httpx.get(f'{base}/api/runtime/status')
-hermes = r.json()['hermes']
-assert hermes['status'] == 'ready' or hermes['status'] == 'auth_expired', f'Expected ready/auth_expired, got {hermes[\"status\"]}'
-print(f'Hermes status: {hermes[\"status\"]}, auth: {hermes[\"auth_status\"]}')
+          # Check preflight
+          response = httpx.get(f"{base}/api/runtime/status")
+          hermes = response.json()["hermes"]
+          assert hermes["status"] in {"ready", "auth_expired"}, (
+              f"Expected ready/auth_expired, got {hermes['status']}"
+          )
+          print(f"Hermes status: {hermes['status']}, auth: {hermes['auth_status']}")
 
-if hermes['status'] != 'ready':
-    print('SKIP: Hermes not ready — auth may need manual setup')
-    exit(0)
+          if hermes["status"] != "ready":
+              print("SKIP: Hermes not ready — auth may need manual setup")
+              raise SystemExit(0)
 
-# Create session
-r = httpx.post(f'{base}/api/sessions', json={'title': 'CI Real Hermes Smoke'})
-sid = r.json()['id']
+          # Create session
+          response = httpx.post(
+              f"{base}/api/sessions",
+              json={"title": "CI Real Hermes Smoke"},
+          )
+          assert response.status_code == 201, response.text
+          session_id = response.json()["id"]
 
-# Submit prompt
-r = httpx.post(f'{base}/api/sessions/{sid}/prompt', json={'prompt': 'Trả lời ngắn gọn: 2+2 bằng mấy?'})
-assert r.status_code == 202
-task_id = r.json()['id']
+          # Submit prompt
+          response = httpx.post(
+              f"{base}/api/sessions/{session_id}/prompt",
+              json={"prompt": "Trả lời ngắn gọn: 2+2 bằng mấy?"},
+          )
+          assert response.status_code == 202, response.text
 
-# Read SSE
-with httpx.stream('GET', f'{base}/api/sessions/{sid}/events', timeout=60) as sse:
-    for line in sse.iter_lines():
-        if 'done' in line or 'error' in line:
-            break
+          # Read SSE
+          with httpx.stream(
+              "GET",
+              f"{base}/api/sessions/{session_id}/events",
+              timeout=60,
+          ) as stream:
+              for line in stream.iter_lines():
+                  if "done" in line or "error" in line:
+                      break
 
-time.sleep(1)
-r = httpx.get(f'{base}/api/sessions/{sid}/task-runs/latest')
-task = r.json()
-assert task['status'] == 'completed', f'Expected completed, got {task}'
+          time.sleep(1)
+          response = httpx.get(f"{base}/api/sessions/{session_id}/task-runs/latest")
+          task = response.json()
+          assert task["status"] == "completed", f"Expected completed, got {task}"
 
-r = httpx.get(f'{base}/api/sessions/{sid}/messages')
-msgs = r.json()
-print(f'REAL SMOKE OK — {len(msgs)} messages')
-for m in msgs:
-    print(f'  [{m[\"role\"]}] {m[\"content\"][:100]}')
-"
+          response = httpx.get(f"{base}/api/sessions/{session_id}/messages")
+          messages = response.json()
+          print(f"REAL SMOKE OK — {len(messages)} messages")
+          for message in messages:
+              print(f"  [{message['role']}] {message['content'][:100]}")
+          PY

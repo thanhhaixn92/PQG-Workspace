@@ -1,36 +1,7 @@
 import type { SidebarTab } from './store/store';
+import { PATH_BY_SIDEBAR_TAB, SIDEBAR_TAB_BY_PATH } from './foundation/modules/registry';
 
 export type WorkspaceRouteTab = 'today' | 'upcoming' | 'ai' | 'history';
-
-const sidebarTabByPath: Record<string, SidebarTab> = {
-  '/': 'overview',
-  '/assistant': 'hermes',
-  '/work': 'sessions',
-  '/work/files': 'files',
-  '/knowledge': 'skills',
-  '/review': 'review',
-  '/settings': 'settings',
-  '/memory': 'memory',
-  '/memory-hub': 'memory-hub',
-  '/reports': 'reports',
-  '/data': 'data',
-  '/knowledge/search': 'dirap',
-};
-
-const pathBySidebarTab: Record<SidebarTab, string> = {
-  hermes: '/assistant',
-  overview: '/',
-  sessions: '/work',
-  files: '/work/files',
-  skills: '/knowledge',
-  memory: '/memory',
-  'memory-hub': '/memory-hub',
-  reports: '/reports',
-  data: '/data',
-  dirap: '/knowledge/search',
-  review: '/review',
-  settings: '/settings',
-};
 
 const workspaceTabs: WorkspaceRouteTab[] = ['today', 'upcoming', 'ai', 'history'];
 
@@ -46,7 +17,7 @@ const normalisePath = (pathname: string) => {
 };
 
 export const getSidebarTabFromLocation = (location: Pick<Location, 'pathname'> = window.location): SidebarTab =>
-  isGyoAssistantRoute(location.pathname) ? 'sessions' : sidebarTabByPath[normalisePath(location.pathname)] ?? 'overview';
+  isGyoAssistantRoute(location.pathname) ? 'sessions' : SIDEBAR_TAB_BY_PATH[normalisePath(location.pathname)] ?? 'overview';
 
 export const getWorkspaceTabFromLocation = (location: Pick<Location, 'search'> = window.location): WorkspaceRouteTab => {
   const tab = new URLSearchParams(location.search).get('tab');
@@ -54,7 +25,7 @@ export const getWorkspaceTabFromLocation = (location: Pick<Location, 'search'> =
 };
 
 export const navigateToSidebarTab = (tab: SidebarTab) => {
-  const target = pathBySidebarTab[tab];
+  const target = PATH_BY_SIDEBAR_TAB[tab];
   if (typeof window === 'undefined' || `${window.location.pathname}${window.location.search}` === target) return;
   window.history.pushState(null, '', target);
   publishLocationChange();

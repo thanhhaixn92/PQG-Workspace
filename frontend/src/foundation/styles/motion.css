@@ -1,0 +1,30 @@
+/* Foundation motion contract. This file is loaded after legacy index.css so it
+   can narrow broad transitions without changing the current visual language. */
+
+button {
+  transition-property: background-color, border-color, color, opacity, box-shadow, transform;
+  transition-duration: var(--pqg-motion-fast);
+  transition-timing-function: var(--pqg-easing-standard);
+}
+
+input:not([type]),
+input[type="text"],
+input[type="password"],
+input[type="search"],
+select,
+textarea {
+  transition-property: border-color, background-color, color, box-shadow;
+  transition-duration: var(--pqg-motion-fast);
+  transition-timing-function: var(--pqg-easing-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
