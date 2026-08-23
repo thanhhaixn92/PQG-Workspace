@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as marketplaceApi from '../api/marketplace';
+import { useHermesStore } from '../store/store';
 import { SettingsPanel } from './SettingsPanel';
 
 vi.mock('../api/marketplace', () => ({
@@ -10,8 +11,15 @@ vi.mock('../api/marketplace', () => ({
   importZenFreeModels: vi.fn(), installZenFreePreset: vi.fn(), updateGyoRoutingPolicy: vi.fn(),
 }));
 
+vi.mock('./MarketplacePanel', () => ({ MarketplacePanel: () => <div>Marketplace content</div> }));
+vi.mock('./MemoryHubPanel', () => ({ MemoryHubPanel: () => <div>Memory Hub content</div> }));
+vi.mock('./LocalDataPanel', () => ({ LocalDataPanel: () => <div>Local data content</div> }));
+vi.mock('./RuntimeStatusPanel', () => ({ RuntimeStatusPanel: () => <div>Runtime diagnostics</div> }));
+
 describe('SettingsPanel GYO provider controls', () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    useHermesStore.setState({ theme: 'dark' });
     vi.mocked(marketplaceApi.getModelConfig).mockResolvedValue({
       provider: null, model: null, auth_ready: false, mutable_from_browser: true,
       guidance: 'Chưa có model GYO mặc định.', providers: [], models: [], default_model_profile_id: null,
@@ -41,5 +49,44 @@ describe('SettingsPanel GYO provider controls', () => {
     await screen.findByRole('button', { name: 'Thêm lựa chọn miễn phí' });
     expect(screen.getByText('DeepSeek V4 Flash Free')).toBeDefined();
     expect((screen.getByRole('button', { name: 'Thêm lựa chọn miễn phí' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('exposes the seven Foundation settings sections', () => {
+    render(<SettingsPanel />);
+    expect(screen.getByRole('button', { name: 'Giao diện & bố cục' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Modules' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'GYO & Models' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Quyền Agent & Riêng tư' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Memory & Dữ liệu' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Backup & Lưu trữ' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Nâng cao' })).toBeDefined();
+  });
+
+  it('shows Modules as a static projection without fake attach or detach controls', () => {
+    render(<SettingsPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Modules' }));
+    expect(screen.getByRole('heading', { name: 'Modules' })).toBeDefined();
+    expect(screen.getByText('Công việc')).toBeDefined();
+    expect(screen.getByText('Thư viện')).toBeDefined();
+    expect(screen.getByText('Hộp duyệt')).toBeDefined();
+    expect(screen.getByText('Báo cáo')).toBeDefined();
+    expect(screen.getByText(/Attach\/detach\/rename\/reorder/)).toBeDefined();
+    expect(screen.getByText('Marketplace content')).toBeDefined();
+    expect(screen.queryByRole('button', { name: /attach|detach|gắn|tháo/i })).toBeNull();
+  });
+
+  it('keeps privacy read-only until the Data Egress gate is implemented', () => {
+    render(<SettingsPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Quyền Agent & Riêng tư' }));
+    expect(screen.getByText(/không tạo toggle giả/i)).toBeDefined();
+    expect(screen.getByText(/GYO không có quyền quản trị Foundation\/Module/)).toBeDefined();
+  });
+
+  it('reuses the existing theme preference instead of creating a second settings store', () => {
+    render(<SettingsPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Giao diện & bố cục' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Chuyển sang giao diện sáng' }));
+    expect(useHermesStore.getState().theme).toBe('light');
+    expect(window.localStorage.getItem('hermes.theme')).toBe('light');
   });
 });
