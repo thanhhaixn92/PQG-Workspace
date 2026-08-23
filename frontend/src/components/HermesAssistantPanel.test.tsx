@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as assistantApi from '../api/assistant';
 import * as overviewApi from '../api/overview';
@@ -264,7 +264,9 @@ describe('HermesAssistantPanel', () => {
     render(<HermesAssistantPanel />);
     fireEvent.change(await screen.findByRole('combobox', { name: 'Phiên trao đổi trợ lý' }), { target: { value: 'thread-1' } });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    FakeEventSource.instances[0].emit('token', { text: 'Đang tổng hợp tiến độ.', assistant_turn_id: 'turn-running' });
+    await act(async () => {
+      FakeEventSource.instances[0].emit('token', { text: 'Đang tổng hợp tiến độ.', assistant_turn_id: 'turn-running' });
+    });
     expect(await screen.findByText('Đang tổng hợp tiến độ.')).toBeDefined();
     vi.unstubAllGlobals();
   });
@@ -287,7 +289,9 @@ describe('HermesAssistantPanel', () => {
     render(<HermesAssistantPanel />);
     fireEvent.change(await screen.findByRole('combobox', { name: 'Phiên trao đổi trợ lý' }), { target: { value: 'thread-1' } });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    FakeEventSource.instances[0].emit('token', { text: 'Sai turn', assistant_turn_id: 'turn-other' });
+    await act(async () => {
+      FakeEventSource.instances[0].emit('token', { text: 'Sai turn', assistant_turn_id: 'turn-other' });
+    });
     expect(screen.queryByText('Sai turn')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Hủy phản hồi' }));
     await waitFor(() => expect(assistantApi.cancelAssistantTurn).toHaveBeenCalledWith('turn-running'));
@@ -312,7 +316,9 @@ describe('HermesAssistantPanel', () => {
     render(<HermesAssistantPanel />);
     fireEvent.change(await screen.findByRole('combobox', { name: 'Phiên trao đổi trợ lý' }), { target: { value: 'thread-1' } });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    FakeEventSource.instances[0].emit('done', { assistant_turn_id: 'turn-1' });
+    await act(async () => {
+      FakeEventSource.instances[0].emit('done', { assistant_turn_id: 'turn-1' });
+    });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(2));
     vi.unstubAllGlobals();
   });
