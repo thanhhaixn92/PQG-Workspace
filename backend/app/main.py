@@ -38,6 +38,7 @@ from app.api.overview import router as overview_router
 from app.api.context_preview import router as context_preview_router
 from app.api.works import router as works_router
 from app.api.assistant import router as assistant_router
+from app.api.assistant_runs import execute_assistant_run_claim, router as assistant_runs_router
 from app.api.action_packages import router as action_packages_router
 from app.api.marketplace import router as marketplace_router
 from app.api.model_config import router as model_config_router
@@ -52,6 +53,7 @@ from app.services.gyo_orchestrator import GyoOrchestrator
 from app.services.outbox_dispatcher import run_outbox_dispatcher_loop
 from app.services.task_recovery import recover_stale_task_runs
 from app.services.action_packages import run_action_package_executor_loop
+from app.services.assistant_runs import AssistantRunClaim, run_assistant_run_worker_loop
 from app.services.gyo_learning_worker import run_gyo_learning_worker_loop
 from app.settings import Settings, get_settings as _get_settings
 from app.mcp.server import setup_mcp, mcp_server, mcp_session_id_var
@@ -59,6 +61,21 @@ from app.mcp.server import setup_mcp, mcp_server, mcp_session_id_var
 logger = logging.getLogger(__name__)
 
 APP_VERSION = "2.2.0"
+
+
+_DURABLE_ASSISTANT_ROUTE_PATHS = {
+    "/api/assistant/threads/{thread_id}/runs",
+    "/api/assistant/turns/{turn_id}/retry",
+    "/api/assistant/turns/{turn_id}/cancel",
+}
+
+
+def _remove_legacy_assistant_run_routes() -> None:
+    """Keep one authoritative implementation for R1 lifecycle routes."""
+    assistant_router.routes[:] = [
+        route for route in assistant_router.routes
+        if getattr(route, "path", None) not in _DURABLE_ASSISTANT_ROUTE_PATHS
+    ]
 
 
 def create_app(settings_override: Settings | None = None) -> FastAPI:
@@ -97,6 +114,25 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
             run_action_package_executor_loop(settings, action_executor_stop)
         )
         logger.info("Durable action package executor started.")
+
+        async def assistant_run_executor(claim: AssistantRunClaim) -> None:
+            await execute_assistant_run_claim(
+                claim,
+                gyo_orchestrator=gyo_orchestrator,
+                settings=settings,
+            )
+
+        assistant_run_worker_stop = asyncio.Event()
+        assistant_run_worker_task = asyncio.create_task(
+            run_assistant_run_worker_loop(
+                settings,
+                assistant_run_worker_stop,
+                assistant_run_executor,
+            )
+        )
+        app.state.assistant_run_worker_active = True
+        logger.info("Durable Assistant run worker started.")
+
         learning_worker_stop = asyncio.Event()
         learning_worker_task = asyncio.create_task(run_gyo_learning_worker_loop(settings, learning_worker_stop))
         logger.info("GYO governed learning worker started.")
@@ -115,6 +151,10 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         action_executor_stop.set()
         await action_executor_task
         logger.info("Durable action package executor stopped.")
+        app.state.assistant_run_worker_active = False
+        assistant_run_worker_stop.set()
+        await assistant_run_worker_task
+        logger.info("Durable Assistant run worker stopped.")
         learning_worker_stop.set()
         await learning_worker_task
         logger.info("GYO governed learning worker stopped.")
@@ -130,6 +170,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     # Initialise eagerly so isolated route tests can override/use the same
     # native runner without triggering lifespan or spawning a legacy process.
     app.state.gyo_orchestrator = GyoOrchestrator(settings)
+    app.state.assistant_run_worker_active = False
 
     if settings_override:
         app.dependency_overrides[get_settings] = lambda: settings_override
@@ -178,6 +219,8 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     app.include_router(works_router)
     app.include_router(workspace_router)
     app.include_router(modules_router)
+    _remove_legacy_assistant_run_routes()
+    app.include_router(assistant_runs_router)
     app.include_router(assistant_router)
     app.include_router(action_packages_router)
     app.include_router(marketplace_router)
@@ -187,12 +230,12 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
 
     # MCP Integration
     setup_mcp(app)
-    
+
     @app.middleware("http")
     async def extract_mcp_session_id(request: Request, call_next):
         """Extract session_id from header (or query) for MCP context, validate it, and enforce localhost."""
         is_mcp_route = request.url.path.startswith("/mcp") or request.url.path.startswith("/sse")
-        
+
         if is_mcp_route:
             # 1. Localhost enforcement
             client_host = request.client.host if request.client else ""
@@ -200,16 +243,16 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
             if client_host not in allowed_hosts:
                 from fastapi.responses import JSONResponse
                 return JSONResponse(status_code=403, content={"detail": "MCP access restricted to localhost"})
-                
+
             # 2. Extract session_id
             session_id = request.headers.get("x-session-id")
             if not session_id and request.url.path.startswith("/mcp"):
                 session_id = request.query_params.get("session_id")
-                
+
             if not session_id:
                 from fastapi.responses import JSONResponse
                 return JSONResponse(status_code=401, content={"detail": "Missing session_id"})
-                
+
             # 3. Validate session_id has an active task
             settings = request.app.dependency_overrides.get(get_settings, _get_settings)()
             from app.db.connection import get_db_connection
@@ -233,7 +276,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
             finally:
                 mcp_session_id_var.reset(token)
             return response
-            
+
         else:
             return await call_next(request)
 
