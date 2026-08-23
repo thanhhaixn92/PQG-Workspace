@@ -26,11 +26,11 @@ export const FOUNDATION_ROUTES: readonly FoundationRouteDefinition[] = [
 ] as const;
 
 /**
- * First-party Module definitions for Wave 1.
+ * First-party Module definitions.
  *
- * This registry is static and presentation-oriented. It does not represent
- * package installation, attachment persistence or permissions; those remain a
- * later protected gate.
+ * Static definitions own immutable identity/surface/route metadata. Persistent
+ * attachment/display/order state comes from the server Module projection and
+ * never changes these IDs or routes.
  */
 export const MODULE_DEFINITIONS: readonly ModuleDefinition[] = [
   { id: 'work', tab: 'sessions', defaultLabel: 'Công việc', path: '/work', showInPrimaryNavigation: true, requiresWork: false },
@@ -59,6 +59,10 @@ export const PATH_BY_SIDEBAR_TAB = Object.fromEntries(
 
 export function getModuleDefinitionByTab(tab: SidebarTab): ModuleDefinition | null {
   return MODULE_DEFINITIONS.find(definition => definition.tab === tab) ?? null;
+}
+
+export function getModuleDefinitionById(moduleId: string): ModuleDefinition | null {
+  return MODULE_DEFINITIONS.find(definition => definition.id === moduleId) ?? null;
 }
 
 export function getPrimaryModuleDefinitions(): readonly ModuleDefinition[] {
