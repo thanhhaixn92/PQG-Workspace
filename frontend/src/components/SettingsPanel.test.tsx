@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as marketplaceApi from '../api/marketplace';
+import type { ModuleInstance } from '../api/modules';
+import { useModuleProjectionStore } from '../foundation/modules/store';
 import { useHermesStore } from '../store/store';
 import { SettingsPanel } from './SettingsPanel';
 
@@ -16,10 +18,37 @@ vi.mock('./MemoryHubPanel', () => ({ MemoryHubPanel: () => <div>Memory Hub conte
 vi.mock('./LocalDataPanel', () => ({ LocalDataPanel: () => <div>Local data content</div> }));
 vi.mock('./RuntimeStatusPanel', () => ({ RuntimeStatusPanel: () => <div>Runtime diagnostics</div> }));
 
+const moduleInstance = (moduleId: string, displayName: string, attached: boolean, sortOrder: number): ModuleInstance => ({
+  id: `builtin:${moduleId}`,
+  module_id: moduleId,
+  source_kind: 'builtin',
+  package_id: null,
+  display_name: displayName,
+  attached,
+  sort_order: sortOrder,
+  config: {},
+  config_version: 1,
+  health_state: 'ready',
+  revision: 1,
+  created_at: 1,
+  updated_at: 1,
+});
+
 describe('SettingsPanel GYO provider controls', () => {
   beforeEach(() => {
     window.localStorage.clear();
     useHermesStore.setState({ theme: 'dark' });
+    useModuleProjectionStore.setState({
+      status: 'ready',
+      error: null,
+      instances: [
+        moduleInstance('work', 'Công việc', true, 10),
+        moduleInstance('documents', 'Tài liệu', false, 20),
+        moduleInstance('knowledge', 'Thư viện', true, 30),
+        moduleInstance('review', 'Hộp duyệt', true, 40),
+        moduleInstance('reports', 'Báo cáo', true, 50),
+      ],
+    });
     vi.mocked(marketplaceApi.getModelConfig).mockResolvedValue({
       provider: null, model: null, auth_ready: false, mutable_from_browser: true,
       guidance: 'Chưa có model GYO mặc định.', providers: [], models: [], default_model_profile_id: null,
@@ -62,17 +91,16 @@ describe('SettingsPanel GYO provider controls', () => {
     expect(screen.getByRole('button', { name: 'Nâng cao' })).toBeDefined();
   });
 
-  it('shows Modules as a static projection without fake attach or detach controls', () => {
+  it('exposes persistent Module controls only inside the user Settings control plane', () => {
     render(<SettingsPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Modules' }));
     expect(screen.getByRole('heading', { name: 'Modules' })).toBeDefined();
     expect(screen.getByText('Công việc')).toBeDefined();
-    expect(screen.getByText('Thư viện')).toBeDefined();
-    expect(screen.getByText('Hộp duyệt')).toBeDefined();
-    expect(screen.getByText('Báo cáo')).toBeDefined();
-    expect(screen.getByText(/Attach\/detach\/rename\/reorder/)).toBeDefined();
+    expect(screen.getByText('Tài liệu')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Gắn vào điều hướng' })).toBeDefined();
+    expect(screen.getAllByRole('button', { name: 'Tháo khỏi điều hướng' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /xóa|delete|uninstall/i })).toBeNull();
     expect(screen.getByText('Marketplace content')).toBeDefined();
-    expect(screen.queryByRole('button', { name: /attach|detach|gắn|tháo/i })).toBeNull();
   });
 
   it('keeps privacy read-only until the Data Egress gate is implemented', () => {
