@@ -21,13 +21,26 @@ class ModuleAdminError(Exception):
         return self.message
 
 
-def _module(row: aiosqlite.Row) -> dict[str, Any]:
+def _parse_module_config(row: aiosqlite.Row) -> dict[str, Any]:
     try:
-        config = json.loads(row["config_json"] or "{}")
-        if not isinstance(config, dict):
-            config = {}
-    except (TypeError, json.JSONDecodeError):
-        config = {}
+        config = json.loads(row["config_json"])
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ModuleAdminError(
+            500,
+            "MODULE_CONFIG_INVALID",
+            "Stored Module config is invalid; repair local Module state before continuing",
+        ) from exc
+    if not isinstance(config, dict):
+        raise ModuleAdminError(
+            500,
+            "MODULE_CONFIG_INVALID",
+            "Stored Module config is invalid; repair local Module state before continuing",
+        )
+    return config
+
+
+def _module(row: aiosqlite.Row) -> dict[str, Any]:
+    config = _parse_module_config(row)
     return {
         "id": row["id"],
         "module_id": row["module_id"],
@@ -91,9 +104,10 @@ async def set_module_attached(
     try:
         row = await _module_row(conn, module_id)
         _require_revision(row, expected_revision)
+        current = _module(row)
         if bool(row["attached"]) == attached:
             await conn.commit()
-            return _module(row)
+            return current
 
         next_order = int(row["sort_order"])
         if attached:
@@ -141,9 +155,10 @@ async def rename_module(
     try:
         row = await _module_row(conn, module_id)
         _require_revision(row, expected_revision)
+        current = _module(row)
         if row["display_name"] == normalized:
             await conn.commit()
-            return _module(row)
+            return current
         now = int(time.time())
         cursor = await conn.execute(
             """UPDATE module_instances
@@ -180,6 +195,9 @@ async def reorder_attached_modules(
 
     await conn.execute("BEGIN IMMEDIATE")
     try:
+        # Reorder returns the full projection. Validate every persisted config
+        # before any write so corrupt state cannot cause a post-commit 500.
+        await list_module_instances(conn)
         async with conn.execute(
             "SELECT * FROM module_instances WHERE attached = 1 ORDER BY sort_order, module_id"
         ) as cur:
