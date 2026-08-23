@@ -2,5 +2,5 @@ PQG Workspace GitHub Agent Preflight trigger.
 
 This file is intentionally updated by ChatGPT Project / GitHub-connected agents when a fresh Agent Preflight receipt is required and workflow_dispatch is not exposed by the connector.
 
-Last trigger: 2026-08-24 06:25:55 UTC+07:00
-Reason: fresh exact-ref Agent Preflight bootstrap for authorized remediation package A0 (CI/preflight topology only); no application/runtime, dependency/action-major, branch-protection, F9, state/checkpoint, schema/migration, credential/provider, or deployment scope is opened by this trigger.
+Last trigger: 2026-08-24 06:31:05 UTC+07:00
+Reason: final A0 representative task-ref proof on work/a0-final-topology-proof-20260824 after branch-creation committed-diff fix; validates path-scoped Agent Preflight and active-task Smoke topology only. No application/runtime, dependency/action-major, branch-protection, F9, state/checkpoint, schema/migration, credential/provider, or deployment scope is opened by this proof trigger.
