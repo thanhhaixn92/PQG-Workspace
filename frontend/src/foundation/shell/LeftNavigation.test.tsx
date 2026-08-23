@@ -31,13 +31,21 @@ const projected = (
   };
 };
 
+const unavailableProjectionStatuses = ['idle', 'loading', 'error'] as const;
+
 describe('LeftNavigation', () => {
   beforeEach(() => {
     useModuleProjectionStore.setState({ instances: [], status: 'error', error: 'test fallback' });
   });
 
-  it('keeps Home fixed, falls back to static primary Modules, and pins Settings outside the Module list', () => {
+  it.each(unavailableProjectionStatuses)('keeps Foundation navigation available but hides Modules while projection is %s', (status) => {
     const onSelectTab = vi.fn();
+    useModuleProjectionStore.setState({
+      instances: [projected({ module_id: 'documents', display_name: 'Tài liệu' })],
+      status,
+      error: status === 'error' ? 'projection unavailable' : null,
+    });
+
     render(
       <LeftNavigation
         activeTab="overview"
@@ -52,10 +60,8 @@ describe('LeftNavigation', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Tổng quan' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Công việc' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Thư viện' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Hộp duyệt' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Báo cáo' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Tài liệu' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Công việc' })).toBeNull();
 
     const settings = screen.getByRole('button', { name: 'Cài đặt' });
     expect(settings.closest('.foundation-sidebar-footer')).not.toBeNull();
