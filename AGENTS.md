@@ -28,10 +28,17 @@ is `success`; when the workflow publishes `pqg/preflight`, verify that status is
 `success` as well. A run from another branch/ref or an older unrelated HEAD is
 not a substitute. `pqg/smoke` is not a substitute for `pqg/preflight`.
 
-If the connected GitHub tooling cannot dispatch `workflow_dispatch`, request
-that the user run **Actions → Agent Preflight → Run workflow** for the target
-branch/ref, then verify the resulting GitHub evidence before implementation
-writes. Do not fall back to pretending the local command ran.
+When connected GitHub tooling can write repository files but cannot dispatch
+`workflow_dispatch`, the agent must self-trigger the workflow by updating
+`.github/agent-preflight-trigger.txt` on the exact target branch/ref. Do not ask
+the user to click GitHub Actions when the agent has enough GitHub write access
+to perform this trigger itself. The trigger-only commit is a bootstrap/process
+commit, not application/runtime implementation.
+
+Only if connected tooling cannot dispatch the workflow **and** cannot write the
+trigger file may the agent ask the user to run **Actions → Agent Preflight → Run
+workflow** for the target branch/ref. Do not fall back to pretending the local
+command ran.
 
 A user may explicitly approve a narrow bootstrap exception whose sole purpose
 is to establish or repair this preflight execution path or its governance docs.
