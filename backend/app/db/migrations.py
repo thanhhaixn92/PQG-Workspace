@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from app.db import migrations_0001_0036 as _legacy
+from app.db.assistant_run_migrations import apply_0038_durable_assistant_runs
 from app.db.module_migrations import apply_0037_foundation_module_instances
 
 # Explicit bindings keep static analysis honest while the compatibility export
@@ -50,8 +51,11 @@ MIGRATIONS: list[tuple[str, MigrationStep]] = [
     )
     for version, step in _legacy.MIGRATIONS
 ]
-MIGRATIONS.append(
-    ("0037_foundation_module_instances", apply_0037_foundation_module_instances)
+MIGRATIONS.extend(
+    [
+        ("0037_foundation_module_instances", apply_0037_foundation_module_instances),
+        ("0038_durable_assistant_runs", apply_0038_durable_assistant_runs),
+    ]
 )
 
 
