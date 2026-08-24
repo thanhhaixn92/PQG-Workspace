@@ -18,6 +18,7 @@
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 source-validation HEAD: `2c1b8238921bd0e99367802cfb29c5218ef87e6f`.
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 master-plan tracking commit: `6354ae1efc7d6761238edae961333c9e92a39138`; it is docs-only tracking evidence and does not replace the A1 source-validation HEAD.
 - [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 source-validation HEAD: `5fce3270f26f1cac1ffb9d228c63576a47870bc0`; later documentation/memory tracking commits must remain separate from this exact source-validation receipt.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Package B source-validation HEAD: `140df75e907444437844a1328455e6d1c23c7e51`; later documentation/memory tracking commits must remain separate from this exact source-validation receipt.
 
 ## Current state / gates
 
@@ -26,7 +27,7 @@
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] F7 Resource Catalog + Context Broker remains scoped implementation/validation PASS from earlier evidence; A0 did not modify F7 behavior.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] F9 Data Egress remains **CLOSED / NOT APPROVED**.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Migration-maintainability package F remains DEFERRED unless separately justified.
-- [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 is **COMPLETE** at source-validation HEAD `5fce3270f26f1cac1ffb9d228c63576a47870bc0`; the next implementation package is B only after A2 tracker/memory persistence is verified and B receives its own fresh exact-ref Agent Preflight.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Package B is **COMPLETE** at source-validation HEAD `140df75e907444437844a1328455e6d1c23c7e51`; Package C and every other protected scope remain closed until separately authorized.
 
 ## Locked remediation decisions
 
@@ -83,11 +84,24 @@
 - [2026-08-24 08:39:57 UTC+07:00][recorded_at] Final A2 runtime evidence: migrations through 0038, backend startup, health, runtime status, seven readiness checks and cleanup PASS on exact source HEAD.
 - [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 did **not** raise Vite `chunkSizeWarningLimit`; the remaining >500 kB Vite warning is attributable to a non-startup lazy chunk and is recorded rather than hidden. A2 made no dependency/tool-version, schema/migration, security/provider, F9, deployment or state/checkpoint change.
 
+## Package B — completed evidence
+
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Package B status: **COMPLETE** — handle/descriptor-bound sandbox hardening is retained and its route/public-contract integration is validated on source HEAD `140df75e907444437844a1328455e6d1c23c7e51`.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Fresh isolated checkout `C:\Users\dtron\Documents\PQG-Workspace-Package-B` began clean at live `pqg-workspace` HEAD `22fb38a72dff4d62b30cf6f13311752486625430`; the old F5 checkout and dirty registered worktree were not modified.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact 422 root cause: FastAPI 0.141 lazy router inclusion rebuilt `Dependant` from the replaced secure endpoint's internal signature, exposing `request`, `response`, `conn`, `settings` and idempotency arguments as public query parameters. The fix retains the secure callable identity and binds its inspection metadata to the original public endpoint via `__wrapped__`.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Windows nested-write root cause: directory traversal handles unnecessarily requested `DELETE`, causing `NtSetInformationFile` rename of a child to fail with `NTSTATUS 0xC0000043`; removing only that unnecessary parent-handle access preserved HANDLE-relative/reparse protection and restored nested atomic writes.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Source changes are limited to six Package B files: `sandbox_io_posix.py`, `sandbox_io_windows.py`, `security_artifact_create.py`, `security_dirap.py`, `security_overrides.py`, and `test_sandbox_io_b.py`; exact source diff is 78 insertions / 16 deletions and `git diff --check` PASS.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Local validation: representative direct regression 7 PASS; all eight historically failing suites 112 PASS / 1 platform SKIP / 2 warnings; Package B sandbox 12 PASS / 2 warnings; full backend 609 collected, 527 PASS / 82 SKIP / 2 warnings.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact-source Agent Preflight Run ID `32699303000`, job `97347423658` completed SUCCESS and published `pqg/preflight=success`; no separate receipt commit was required because workflow dispatch validated the SOURCE SHA directly.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact-source Sandbox Windows Run ID `32699302690`, job `97347419706` completed SUCCESS with 12 PASS / 2 warnings and published `pqg/sandbox-windows=success`.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact-source Smoke Run ID `32699302749`, job `97347420230` completed SUCCESS and published `pqg/smoke=success`: backend Linux 528 PASS / 81 SKIP / 2 warnings; frontend 50 files / 321 tests PASS; lint 0 warnings / 0 errors; type-check, build, startup, health/runtime, seven readiness checks and cleanup PASS; `smoke-real=SKIPPED`.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Package B did not widen roots or change dependencies/tools, schema/migrations, auth/approval semantics, providers/credentials, Action Package semantics, F9, deployment, state or checkpoint.
+
 ## Current residuals relevant to next packages
 
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1's former limited-frontend/hidden-skip finding is closed; `pqg/smoke` now executes the full frontend suite and backend pytest with visible skip reasons.
 - [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 initial/eager >500 kB finding is closed: final largest eager is 486,620 bytes. A 662,650-byte lazy chunk remains intentionally non-startup and continues to trigger Vite's generic >500 kB warning; this is accepted A2 residual, not an eager/startup regression.
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] Sandbox pathname TOCTOU against hostile local process remains package B scope.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Sandbox pathname TOCTOU finding is closed by Package B at source HEAD `140df75e907444437844a1328455e6d1c23c7e51`; the two backend dependency/version warnings remain assigned to later dependency work rather than hidden.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Admin boundary wording/characterization remains package C; capability executable binding remains package D.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Dependency/supply-chain residuals remain for E1–E3: npm baseline 6 vulnerabilities (3 moderate, 3 high), backend reproducibility/warnings, GitHub Actions Node-version warnings and mutable action tags.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Legacy `smoke-real` remains Hermes/ACP and can false-green on skip; E4 must replace it with bounded native current-GYO evidence.
@@ -95,6 +109,5 @@
 
 ## Next exact action
 
-- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Next package is **B — Sandbox hostile-local-process TOCTOU hardening**, but implementation must not begin until this A2 tracking/memory persistence is verified on live `pqg-workspace` and B has its own fresh exact-ref Agent Preflight.
-- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Before B implementation edits: re-fetch the live tracking HEAD; self-trigger Agent Preflight on that exact ref via `.github/agent-preflight-trigger.txt`; require workflow SUCCESS + `pqg/preflight=success`; inspect current state/canon/security/source/tests and audit `backend/app/api/files.py`, `backend/app/mcp/tools.py`, artifact import/publishing, DIRAP extraction/read paths, workspace/local search and F7 artifact hydration.
-- [2026-08-24 08:39:57 UTC+07:00][recorded_at] B acceptance remains handle/descriptor-bound I/O with Windows-equivalent hostile-swap defenses and focused traversal/symlink/junction/hard-link/swap/race coverage plus full backend, F7 leakage regression and exact-head Smoke; no root widening, F9, schema/migration, provider or checkpoint/state change is authorized.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] No further implementation package is authorized in this execution. Preserve the Package B source and docs/memory lineage, verify the docs-only child independently, and stop before Package C or any protected scope.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] If the user later opens Package C, begin from a fresh live fetch and exact-ref Agent Preflight, then follow the master plan without carrying Package B test claims onto a different SHA.

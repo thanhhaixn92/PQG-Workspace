@@ -99,7 +99,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | A0 | CI/preflight topology repair | P0 | **COMPLETE** | CI/process | source `c6b7d1af…`; Preflight #11/#15; Smoke #115/#116/#117 |
 | A1 | Full frontend regression in `pqg/smoke` + backend skip visibility | P0 | **COMPLETE** | CI/process | source `2c1b823…`; Preflight bootstrap `50e3bdb…`; Smoke #119 / `pqg/smoke=success`; frontend 50 files / 317 tests |
 | A2 | Module/heavy-feature code splitting | P0 | **COMPLETE** | No new security/schema/dependency | source `5fce3270…`; Preflight #17; Smoke #126; eager 486,620 bytes; Monaco/Mermaid outside initial graph |
-| B | Sandbox hostile-local-process TOCTOU hardening | P1 | **NOT STARTED** | **Security boundary** | Linux/POSIX + Windows hostile-swap suites + full backend + Smoke |
+| B | Sandbox hostile-local-process TOCTOU hardening | P1 | **COMPLETE** | **Security boundary** | source `140df75…`; preflight/sandbox-windows/Smoke success; backend + F7 + route-contract regression |
 | C | Admin boundary contract reconciliation | P1 | **NOT STARTED** | Auth/security contract | current controls characterized; docs avoid proof-of-human claim |
 | D | Capability executable-binding validator | P1 | **NOT STARTED** | **Capability/security boundary** | negative drift tests + full backend/startup/Smoke |
 | E1 | npm vulnerability exact inventory | P2 | **NOT STARTED** | Dependency analysis | advisory/path/reachability matrix |
@@ -247,6 +247,16 @@ At minimum inspect/migrate:
 Cover traversal, absolute/drive/UNC escape, symlink leaf/parent, Windows junction/reparse parent, hard-link leaf, parent/leaf swap after validation, approval-wait replacement, creation under swapped parent, atomic-write target swap, read/hash race, iteration/search swap, and post-authorization artifact swap.
 
 Require relevant POSIX tests, Windows hostile-swap suite, existing sandbox/link/hard-link tests, full backend, F7 leakage regression, exact-head Smoke; no root widening/F9/schema/provider changes.
+
+### Acceptance — COMPLETE
+
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Source-validation HEAD is `140df75e907444437844a1328455e6d1c23c7e51`; it is distinct from the later docs/memory-only tracking child.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact-source Agent Preflight Run `32699303000` / job `97347423658`, Sandbox Windows Run `32699302690` / job `97347419706`, and Smoke Run `32699302749` / job `97347420230` all completed SUCCESS and published their matching exact-SHA status contexts.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] The FastAPI 0.141 lazy included-router regression was fixed without changing secure endpoint identity: inspection follows the original public contract while execution remains bound to the secure callable.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Windows nested atomic writes were restored by removing unnecessary `DELETE` access from traversed parent-directory handles; HANDLE-relative rename, reparse rejection, hard-link rejection, hostile-swap checks and object-identity assertions remain enforced.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Local direct regression 7 PASS; eight historical suites 112 PASS / 1 environment SKIP / 2 warnings; local Package B sandbox 12 PASS / 2 warnings; local full backend 527 PASS / 82 SKIP / 2 warnings.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Canonical Windows sandbox is 12 PASS / 2 warnings. Canonical Smoke is backend 528 PASS / 81 SKIP / 2 warnings, frontend 50 files / 321 tests PASS, lint 0/0, type-check/build/startup/health/runtime/seven readiness checks/cleanup PASS; `smoke-real=SKIPPED`.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] No root widening, dependency/tool, schema/migration, auth/approval, provider/credential, Action Package, F9, deployment, checkpoint or state change occurred.
 
 ---
 
@@ -454,3 +464,15 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 09:19:24 UTC+07:00][recorded_at] NOT RUN/SKIPPED: `smoke-real=SKIPPED`; no real-provider acceptance is claimed.
 - [2026-08-24 09:19:24 UTC+07:00][recorded_at] Scope not changed: no dependency/tool-version, schema/migration, sandbox/security/provider, F9, deployment, branch-protection or checkpoint/state change occurred in A2.
 - [2026-08-24 09:19:24 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED. Next package is **B — Sandbox hostile-local-process TOCTOU hardening** after this tracking/memory persistence is verified and B receives a fresh exact-ref Agent Preflight.
+
+### [2026-08-24 13:59:57 UTC+07:00] Package B — Sandbox hostile-local-process TOCTOU hardening
+
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Status: **COMPLETE** at source-validation HEAD `140df75e907444437844a1328455e6d1c23c7e51`; subsequent docs/memory tracking is a distinct child and does not replace the source receipt.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Fresh isolated execution began clean at live HEAD `22fb38a72dff4d62b30cf6f13311752486625430`; the old F5 checkout and abnormal dirty worktree registration were not modified.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact 422 cause was FastAPI lazy route inclusion rebuilding dependency metadata from internal secure signatures after endpoint replacement; binding `__wrapped__` to the original public endpoint fixed request/body/header/dependency classification while keeping the secure endpoint executable identity.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] A second Windows-only defect was closed: nested-directory HANDLEs requested unnecessary `DELETE` access and caused child rename sharing violations. The access was removed without weakening HANDLE-relative/reparse/hostile-swap protections.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Changed source/test files: `backend/app/services/sandbox_io_posix.py`, `sandbox_io_windows.py`, `security_artifact_create.py`, `security_dirap.py`, `security_overrides.py`, and `backend/tests/test_sandbox_io_b.py`; source diff 78 insertions / 16 deletions; `git diff --check` PASS.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Local evidence: representative 7 PASS; eight historical suites 112 PASS / 1 SKIP / 2 warnings; Package B sandbox 12 PASS / 2 warnings; full backend 527 PASS / 82 SKIP / 2 warnings.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact-source CI: Agent Preflight `32699303000` / `97347423658` SUCCESS; Sandbox Windows `32699302690` / `97347419706` SUCCESS with 12 PASS; Smoke `32699302749` / `97347420230` SUCCESS with backend 528 PASS / 81 SKIP, frontend 50 files / 321 tests, lint/type/build/runtime/readiness/cleanup PASS. `smoke-real=SKIPPED`.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Scope remained Package B only. State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; C/D/E/G/H/F9, migrations/schema, dependencies/tools, providers/credentials, Action Package expansion and deployment remain CLOSED.
+- [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact next action: commit and independently verify this docs/memory-only tracking child, then stop; no Package C implementation is authorized in this execution.
