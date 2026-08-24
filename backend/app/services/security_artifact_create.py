@@ -11,7 +11,6 @@ from fastapi import HTTPException, status
 from app.api import artifacts as artifacts_api
 from app.api.schemas import DocumentImportResponse, ManagedFolderResponse, ReportCreateResponse
 from app.repositories.idempotency_repository import IdempotencyConflict, IdempotencyRepository
-from app.services.audit import log_audit_event
 from app.services.sandbox import get_workspace_path
 from app.services.sandbox_io import (
     create_directory,
@@ -86,7 +85,7 @@ async def secure_create_managed_text_file(
                 media_type=media_type,
                 detail={"source": "managed_text", "bytes": len(content)},
             )
-        await log_audit_event(
+        await artifacts_api.log_audit_event(
             conn,
             session_id,
             "user",
@@ -147,7 +146,7 @@ async def secure_create_managed_folder(
         create_directory(workspace, "inputs", parents=True, exist_ok=True)
         create_directory(workspace, relative_target, parents=False, exist_ok=False)
         payload = {"relative_path": relative_target}
-        await log_audit_event(
+        await artifacts_api.log_audit_event(
             conn,
             session_id,
             "user",
@@ -226,7 +225,7 @@ async def secure_create_report(
                VALUES (:id, :session_id, :relative_path, :kind, :sha256, :size_bytes, :created_at)""",
             artifact,
         )
-        await log_audit_event(
+        await artifacts_api.log_audit_event(
             conn,
             session_id,
             "user",

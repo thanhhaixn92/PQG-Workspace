@@ -10,7 +10,7 @@ from fastapi import HTTPException, status
 from app.api import dirap as dirap_api
 from app.repositories.idempotency_repository import IdempotencyConflict, IdempotencyRepository
 from app.services.audit import log_audit_event
-from app.services.extraction import EXTRACTOR_VERSION, extract_bytes, file_type_for
+from app.services.extraction import EXTRACTOR_VERSION
 from app.services.sandbox import get_workspace_path
 from app.services.sandbox_io import MAX_FILE_SIZE, inspect_path, normalized_relative_string, read_snapshot
 
@@ -106,7 +106,7 @@ async def secure_attach_source_file(
 
 async def secure_refresh_source_freshness(conn, session_id: str, task_id: str, source: dict):
     workspace = await get_workspace_path(session_id, conn)
-    file_type = file_type_for(source["file_name"])
+    file_type = dirap_api.file_type_for(source["file_name"])
     if file_type is None:
         raise HTTPException(
             status_code=415,
@@ -130,7 +130,7 @@ async def secure_extract_source_file(task_id: str, source_file_id: str, response
         raise HTTPException(status_code=400, detail="Task has no session")
     source = await dirap_api._get_source_file_or_404(conn, task_id, source_file_id)
     workspace = await get_workspace_path(session_id, conn)
-    file_type = file_type_for(source["file_name"])
+    file_type = dirap_api.file_type_for(source["file_name"])
     if file_type is None:
         raise HTTPException(
             status_code=415,
@@ -177,7 +177,7 @@ async def secure_extract_source_file(task_id: str, source_file_id: str, response
         )
 
     try:
-        records = extract_bytes(snapshot.data, file_type)
+        records = dirap_api.extract_bytes(snapshot.data, file_type)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

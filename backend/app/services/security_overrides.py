@@ -43,6 +43,14 @@ def _replace_router_route(router, original, method: str, call) -> None:
     route = matches[0]
     if not hasattr(route, "dependant"):
         raise RuntimeError(f"Package B route has no FastAPI dependant: {method} {route.path}")
+
+    # FastAPI may rebuild the dependency graph when an APIRouter is included.
+    # Keep the secure callable as the endpoint while exposing the original
+    # endpoint's public parameter contract to FastAPI's signature inspection.
+    wrapped = getattr(call, "__wrapped__", None)
+    if wrapped not in {None, original}:
+        raise RuntimeError(f"Package B secure endpoint already wraps a different callable: {method} {route.path}")
+    call.__wrapped__ = original
     route.endpoint = call
     route.dependant.call = call
 

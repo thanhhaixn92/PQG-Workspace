@@ -271,7 +271,7 @@ class WindowsSandbox:
         if code == STATUS_OBJECT_NAME_COLLISION:
             raise HTTPException(status_code=409, detail="Target already exists")
         if code in {STATUS_REPARSE_POINT_ENCOUNTERED, STATUS_IO_REPARSE_TAG_NOT_HANDLED}:
-            raise _sandbox_error("Reparse/junction paths are not allowed in workspace sandbox")
+            raise _sandbox_error("Workspace path escape through a reparse/junction is not allowed")
         if code in {STATUS_NOT_A_DIRECTORY, STATUS_FILE_IS_A_DIRECTORY}:
             raise HTTPException(status_code=400, detail="Workspace path type mismatch")
         if code == STATUS_ACCESS_DENIED:
@@ -286,14 +286,14 @@ class WindowsSandbox:
                 handle = self._nt_create(
                     current,
                     part,
-                    access=FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY | FILE_READ_ATTRIBUTES | DELETE | SYNCHRONIZE,
+                    access=FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
                     disposition=FILE_OPEN_IF if create else FILE_OPEN,
                     options=FILE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_OPEN_REPARSE_POINT,
                 )
                 info = self._info(handle)
                 if info.dwFileAttributes & _FILE_ATTRIBUTE_REPARSE_POINT:
                     _close(handle)
-                    raise _sandbox_error("Reparse/junction parent is not allowed in workspace sandbox")
+                    raise _sandbox_error("Workspace path escape through a reparse/junction parent is not allowed")
                 owned.append(handle)
                 current = handle
                 _run_test_hook("opened_parent", "/".join(parts[: index + 1]))
@@ -318,7 +318,7 @@ class WindowsSandbox:
         info = self._info(handle)
         if info.dwFileAttributes & _FILE_ATTRIBUTE_REPARSE_POINT:
             _close(handle)
-            raise _sandbox_error("Reparse/symlink files are not allowed in workspace sandbox")
+            raise _sandbox_error("Workspace path escape through a reparse/symlink file is not allowed")
         if info.nNumberOfLinks > 1:
             _close(handle)
             raise _sandbox_error("Hard-linked files are not allowed in the workspace sandbox")

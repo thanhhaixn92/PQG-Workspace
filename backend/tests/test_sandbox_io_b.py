@@ -5,9 +5,11 @@ import os
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Annotated
 
 import pytest
-from fastapi import HTTPException
+from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException
+from fastapi.testclient import TestClient
 
 from app.services import sandbox_io
 from app.services.context_broker import BrokerScope, CatalogResource
@@ -18,6 +20,23 @@ from app.services.sandbox_io import (
     write_bytes,
 )
 from app.services.security_context_mcp import SecureContextBroker
+from app.services.security_overrides import _replace_router_route
+
+
+async def _route_contract_dependency() -> str:
+    return "dependency-value"
+
+
+async def _original_route_contract(
+    payload: Annotated[dict[str, str], Body()],
+    token: Annotated[str, Header(alias="X-Package-B-Contract")],
+    marker: Annotated[str, Depends(_route_contract_dependency)],
+) -> dict[str, str]:
+    raise AssertionError("The original endpoint must not execute after Package B binding")
+
+
+async def _secure_route_contract(payload, token, marker):
+    return {"value": payload["value"], "token": token, "marker": marker}
 
 
 def _status(exc: pytest.ExceptionInfo[HTTPException]) -> int:
@@ -36,6 +55,32 @@ def _make_dir_link(link: Path, target: Path) -> None:
             pytest.skip(f"Windows junction creation unavailable: {result.stderr or result.stdout}")
     else:
         link.symlink_to(target, target_is_directory=True)
+
+
+def test_b_route_override_preserves_fastapi_public_contract() -> None:
+    router = APIRouter()
+    router.add_api_route("/contract", _original_route_contract, methods=["POST"])
+
+    _replace_router_route(router, _original_route_contract, "POST", _secure_route_contract)
+
+    route = router.routes[0]
+    assert route.endpoint is _secure_route_contract
+    assert route.dependant.call is _secure_route_contract
+
+    application = FastAPI()
+    application.include_router(router)
+    response = TestClient(application).post(
+        "/contract",
+        json={"value": "accepted"},
+        headers={"X-Package-B-Contract": "header-value"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "value": "accepted",
+        "token": "header-value",
+        "marker": "dependency-value",
+    }
 
 
 def _attempt_hostile_parent_swap(parent: Path, held: Path, outside: Path) -> bool:
@@ -104,6 +149,16 @@ def test_b_rejects_symlink_or_junction_parent(tmp_path: Path) -> None:
     with pytest.raises(HTTPException) as exc:
         read_snapshot(workspace, "linked/secret.txt")
     assert _status(exc) == 403
+
+
+def test_b_writes_through_nested_bound_parent(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    write_bytes(workspace, "nested/result.txt", b"created", create_only=True)
+    write_bytes(workspace, "nested/result.txt", b"updated")
+
+    assert (workspace / "nested" / "result.txt").read_bytes() == b"updated"
 
 
 def test_b_parent_swap_after_open_never_redirects_write(tmp_path: Path) -> None:

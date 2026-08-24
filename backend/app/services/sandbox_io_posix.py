@@ -79,7 +79,7 @@ class PosixSandbox:
                     raise _not_found() from exc
                 except OSError as exc:
                     if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
-                        raise _sandbox_error("Reparse/symlink parent is not allowed in workspace sandbox") from exc
+                        raise _sandbox_error("Workspace path escape through a reparse/symlink parent is not allowed") from exc
                     raise
                 os.close(fd)
                 fd = next_fd
@@ -97,7 +97,7 @@ class PosixSandbox:
             raise _not_found() from exc
         except OSError as exc:
             if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
-                raise _sandbox_error("Symlink/reparse file is not allowed in workspace sandbox") from exc
+                raise _sandbox_error("Workspace path escape through a symlink/reparse file is not allowed") from exc
             raise
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode):
@@ -195,7 +195,7 @@ class PosixSandbox:
         except FileNotFoundError:
             return None
         if stat.S_ISLNK(st.st_mode):
-            raise _sandbox_error("Symlink/reparse file is not allowed in workspace sandbox")
+            raise _sandbox_error("Workspace path escape through a symlink/reparse file is not allowed")
         if stat.S_ISDIR(st.st_mode):
             raise HTTPException(status_code=400, detail="Target is a directory")
         if not stat.S_ISREG(st.st_mode):
