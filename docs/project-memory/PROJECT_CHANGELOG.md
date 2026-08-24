@@ -315,3 +315,8 @@
 
 - [2026-08-24 19:09:01 UTC+07:00][recorded_at] T2 `603fdd19139e5cd3c76797e6576c25a746f79e40` ran Smoke `32725233242` and failed closed: `classify=success`, `tracking-integrity=failure`, `smoke-full=skipped`, `smoke-result=failure`; exact statuses are `pqg/tracking-integrity=failure` and canonical `pqg/smoke=failure`. State/checkpoint and all protected boundaries remain unchanged.
 - [2026-08-24 19:09:01 UTC+07:00][recorded_at] Evidence identifies shallow-fetch poisoning, not missing S/T1 receipts: source `2ac0e831…` has `pqg/smoke-full=success`, T1 `42b16fcb…` has `pqg/tracking-integrity=success`, but `--depth=1` on T1 removed its first parent before classification. The corrective workflow/script/test commit is outside the tracking allowlist and therefore takes the required full Smoke path; no T2.5 tracking commit is created.
+
+### [2026-08-24 19:14:52 UTC+07:00] P-MEM full recovery accepted
+
+- [2026-08-24 19:14:52 UTC+07:00][recorded_at] Corrective SOURCE `0994a6b7077964bd57e2043657ea4f5cec52d320` completed exact full Smoke `32725628340`: `classify=success`, `smoke-full=success`, `tracking-integrity=skipped`, `smoke-result=success`, `pqg/smoke-full=success` and canonical `pqg/smoke=success`. The normal payload validates backend/frontend/runtime readiness; `smoke-real` remained SKIPPED.
+- [2026-08-24 19:14:52 UTC+07:00][recorded_at] P-MEM is **COMPLETE** by this full recovery. The current docs-only direct child records the acceptance in current continuity and must obtain its own bounded tracking receipt; it is a fresh tracking window after full source validation, not a prohibited T2.5 correction. E2-B remains unopened.
