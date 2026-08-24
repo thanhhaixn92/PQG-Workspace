@@ -3,6 +3,7 @@ import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 const distDir = path.resolve(process.cwd(), 'dist');
+const srcDir = path.resolve(process.cwd(), 'src');
 const manifestPath = path.join(distDir, '.vite', 'manifest.json');
 const MAX_EAGER_CHUNK_BYTES = 500 * 1024;
 
@@ -58,9 +59,9 @@ function normalizeManifestPath(value) {
   return typeof value === 'string' ? value.replaceAll('\\', '/') : '';
 }
 
-function findDynamicEntry(sourcePath, outputStem) {
+function findSourceEntry(sourcePath) {
   const normalizedSourcePath = normalizeManifestPath(sourcePath);
-  const sourceMatches = records.filter(([key, record]) => {
+  const matches = records.filter(([key, record]) => {
     const normalizedKey = normalizeManifestPath(key);
     const normalizedRecordSource = normalizeManifestPath(record?.src);
     return normalizedKey === normalizedSourcePath
@@ -68,34 +69,51 @@ function findDynamicEntry(sourcePath, outputStem) {
       || normalizedRecordSource === normalizedSourcePath
       || normalizedRecordSource.endsWith(normalizedSourcePath);
   });
-
-  if (sourceMatches.length > 1) {
+  if (matches.length > 1) {
     throw new Error(`A2 bundle gate found ambiguous manifest source entries for ${sourcePath}`);
   }
-  if (sourceMatches.length === 1) {
-    const [key, record] = sourceMatches[0];
-    return { key, record, lookup: 'manifest-source' };
-  }
+  return matches.length === 1 ? { key: matches[0][0], record: matches[0][1] } : null;
+}
 
-  const dynamicChunkMatches = records.filter(([, record]) => {
-    if (!record?.isDynamicEntry || !record?.file?.endsWith('.js')) return false;
+function findOutputChunk(outputStem) {
+  const matches = records.filter(([, record]) => {
+    if (!record?.file?.endsWith('.js')) return false;
     const basename = path.posix.basename(normalizeManifestPath(record.file));
     return basename.startsWith(`${outputStem}-`);
   });
-
-  if (dynamicChunkMatches.length > 1) {
-    throw new Error(`A2 bundle gate found ambiguous dynamic output entries for ${outputStem}`);
+  if (matches.length > 1) {
+    throw new Error(`A2 bundle gate found ambiguous output chunks for ${outputStem}`);
   }
-  if (dynamicChunkMatches.length === 1) {
-    const [key, record] = dynamicChunkMatches[0];
-    return { key, record, lookup: 'dynamic-chunk-stem' };
-  }
-
-  return null;
+  return matches.length === 1 ? { key: matches[0][0], record: matches[0][1] } : null;
 }
 
-const monacoEntry = findDynamicEntry('src/components/EditorPanel.tsx', 'EditorPanel');
-const mermaidEntry = findDynamicEntry('src/components/MermaidDiagram.tsx', 'MermaidDiagram');
+function runtimeSourceFiles(directory) {
+  const files = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...runtimeSourceFiles(absolute));
+      continue;
+    }
+    if (!/\.(?:[cm]?[jt]sx?)$/.test(entry.name)) continue;
+    if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(entry.name)) continue;
+    files.push(absolute);
+  }
+  return files;
+}
+
+function findRuntimeImportSources(needle) {
+  return runtimeSourceFiles(srcDir)
+    .filter(file => fs.readFileSync(file, 'utf8').includes(needle))
+    .map(file => normalizeManifestPath(path.relative(process.cwd(), file)))
+    .sort();
+}
+
+const editorBoundary = findSourceEntry('src/foundation/shell/EditorSurface.tsx');
+const editorPanelChunk = findOutputChunk('EditorPanel');
+const mermaidEntry = findSourceEntry('src/components/MermaidDiagram.tsx');
+const monacoImportSources = findRuntimeImportSources('@monaco-editor/react');
+const editorBoundaryGraph = editorBoundary ? collectStaticGraph([editorBoundary.key]) : new Set();
 const entryAssets = entryKeys.map(jsAssetFor).filter(Boolean);
 const largestEager = largest(eagerAssets);
 const largestLazy = largest(lazyAssets);
@@ -107,29 +125,44 @@ const receipt = {
   initialJsGzipBytes: total(eagerAssets, 'gzipBytes'),
   largestEager,
   largestLazy,
-  monacoEditorEntry: monacoEntry?.key ?? null,
-  monacoEditorSource: monacoEntry?.record?.src ?? null,
-  monacoEditorFile: monacoEntry?.record?.file ?? null,
-  monacoEditorLookup: monacoEntry?.lookup ?? null,
-  monacoEditorIsDynamicEntry: monacoEntry?.record?.isDynamicEntry ?? false,
-  monacoInInitialGraph: monacoEntry ? eagerKeys.has(monacoEntry.key) : null,
+  monacoImportSources,
+  monacoEditorEntry: editorBoundary?.key ?? null,
+  monacoEditorSource: editorBoundary?.record?.src ?? null,
+  monacoEditorFile: editorBoundary?.record?.file ?? null,
+  monacoEditorIsDynamicEntry: editorBoundary?.record?.isDynamicEntry ?? false,
+  monacoInInitialGraph: editorBoundary ? eagerKeys.has(editorBoundary.key) : null,
+  editorPanelChunk: editorPanelChunk?.key ?? null,
+  editorPanelFile: editorPanelChunk?.record?.file ?? null,
+  editorPanelInEditorBoundaryGraph: editorPanelChunk ? editorBoundaryGraph.has(editorPanelChunk.key) : null,
+  editorPanelInInitialGraph: editorPanelChunk ? eagerKeys.has(editorPanelChunk.key) : null,
   mermaidEntry: mermaidEntry?.key ?? null,
   mermaidSource: mermaidEntry?.record?.src ?? null,
   mermaidFile: mermaidEntry?.record?.file ?? null,
-  mermaidLookup: mermaidEntry?.lookup ?? null,
   mermaidIsDynamicEntry: mermaidEntry?.record?.isDynamicEntry ?? false,
   mermaidInInitialGraph: mermaidEntry ? eagerKeys.has(mermaidEntry.key) : null,
 };
 
 console.log(`PQG_BUNDLE_RECEIPT_JSON=${JSON.stringify(receipt)}`);
 
-if (!monacoEntry) {
-  throw new Error('A2 bundle gate could not find EditorPanel dynamic entry in manifest');
+if (monacoImportSources.length !== 1 || monacoImportSources[0] !== 'src/components/EditorPanel.tsx') {
+  throw new Error(`A2 bundle gate failed: Monaco runtime imports are not isolated to EditorPanel (${monacoImportSources.join(', ') || 'none'})`);
 }
-if (!monacoEntry.record?.isDynamicEntry) {
-  throw new Error('A2 bundle gate failed: EditorPanel is not a dynamic manifest entry');
+if (!editorBoundary) {
+  throw new Error('A2 bundle gate could not find EditorSurface dynamic entry in manifest');
 }
-if (eagerKeys.has(monacoEntry.key)) {
+if (!editorBoundary.record?.isDynamicEntry) {
+  throw new Error('A2 bundle gate failed: EditorSurface is not a dynamic manifest entry');
+}
+if (eagerKeys.has(editorBoundary.key)) {
+  throw new Error('A2 bundle gate failed: EditorSurface remains in the initial static graph');
+}
+if (!editorPanelChunk) {
+  throw new Error('A2 bundle gate could not find EditorPanel output chunk');
+}
+if (!editorBoundaryGraph.has(editorPanelChunk.key)) {
+  throw new Error('A2 bundle gate failed: EditorPanel is not downstream of the dynamic EditorSurface boundary');
+}
+if (eagerKeys.has(editorPanelChunk.key)) {
   throw new Error('A2 bundle gate failed: EditorPanel/Monaco remains in the initial static graph');
 }
 if (!mermaidEntry) {

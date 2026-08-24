@@ -18,7 +18,7 @@ export interface ModuleCanvasLoaders {
 export const DEFAULT_MODULE_CANVAS_LOADERS: ModuleCanvasLoaders = {
   work: () => import('../../components/WorkWorkspace').then(module => ({ default: module.WorkWorkspace })),
   fileExplorer: () => import('../../components/FileExplorer').then(module => ({ default: module.FileExplorer })),
-  editor: () => import('../../components/EditorPanel').then(module => ({ default: module.EditorPanel })),
+  editor: () => import('./EditorSurface'),
   knowledge: () => import('../../components/KnowledgePanel').then(module => ({ default: module.KnowledgePanel })),
   reports: () => import('../../components/ReportsPanel').then(module => ({ default: module.ReportsPanel })),
   review: () => import('../../components/ReviewInboxPanel').then(module => ({ default: module.ReviewInboxPanel })),
