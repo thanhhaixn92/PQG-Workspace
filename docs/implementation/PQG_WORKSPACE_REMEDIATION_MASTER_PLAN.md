@@ -106,15 +106,15 @@ Do not advance to the next package until the current package meets its acceptanc
 | C | Admin boundary contract reconciliation | P1 | **COMPLETE** | Auth/security contract | source `fe2ad41…`; Preflight/Smoke success; focused admin/capability/UI proof |
 | D | Capability executable-binding validator | P1 | **COMPLETE** | **Capability/security boundary** | source `36b2fef…`; negative drift + backend/startup/Preflight/Smoke success |
 | E1 | npm vulnerability exact inventory | P2 | **COMPLETE** | Dependency analysis | exact 6-node / 32-advisory inventory + four proposed E2 batches |
-| E2 | Selective dependency remediation | P2 | **IN PROGRESS — E2-A/C/D COMPLETE; E2-B BLOCKED-UPSTREAM; E2-E tracking closeout pending** | **Dependencies/tool versions** | E2-E source `479c339…`; exact Linux Smoke `32738509343` and Windows Sandbox `32738509351` PASS |
+| E2 | Selective dependency remediation | P2 | **IN PROGRESS — E2-A/C/D/E COMPLETE; E2-B BLOCKED-UPSTREAM** | **Dependencies/tool versions** | E2-E source `479c339…`; Linux Smoke `32738509343`; Windows `32738509351`; tracking child `5fff315…` / `32739156748` PASS |
 | P-TRACK | Bounded tracking-equivalence CI | P1 process | **COMPLETE** | CI/process | source `2ac0e831…` full receipt; T1 `42b16fcb…` tracking receipt |
-| P-MEM | Project Memory/Context normalization | P2 docs | **COMPLETE** | Docs/evidence | T2 fail-closed; full recovery `0994a6b…` plus tracking closeout pending this exact SHA |
+| P-MEM | Project Memory/Context normalization | P2 docs | **COMPLETE** | Docs/evidence | T2 fail-closed; full recovery `0994a6b…`; bounded continuity receipts retained in history |
 | E2-B | Monaco bundled DOMPurify | P1 security | **BLOCKED-UPSTREAM** | Dependency/security evidence | latest 0.56.0 bundles vulnerable DOMPurify 3.4.8; recheck upstream release/artifact |
-| E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **COMPLETE** | Dependencies/tool versions | source `03d2869…`; exact full Smoke `32729794074` PASS |
-| E2-D | jsdom/Undici test chain | P2 | **COMPLETE** | Dependencies/tool versions | source `8e3f2fd…`; exact full Smoke `32733404512` PASS |
-| E2-E | Backend deterministic constraints + warning closure | P2 | **SOURCE VALIDATED — tracking closeout pending** | Dependency/test environment | source `479c339…`; exact Linux Smoke `32738509343` + Windows Sandbox `32738509351` PASS |
-| E3 | GitHub Actions major upgrade + immutable SHA pins | P2 | **NOT STARTED** | **Tool/supply-chain** | pinned action SHAs + fresh Preflight/Smoke |
-| E4 | Bounded native current-GYO acceptance | P1 evidence | **NOT STARTED** | **Provider/network/credential use** | local Windows native GYO receipt; no skip-as-success |
+| E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **COMPLETE** | Dependencies/tool versions | source `03d2869…`; push full `32729774355`; workflow_dispatch `32729794074` corroborating |
+| E2-D | jsdom/Undici test chain | P2 | **COMPLETE** | Dependencies/tool versions | source `8e3f2fd…`; push full `32733392294`; workflow_dispatch `32733404512` corroborating |
+| E2-E | Backend deterministic constraints + warning closure | P2 | **COMPLETE** | Dependency/test environment | source `479c339…`; Linux `32738509343`; Windows `32738509351`; tracking `5fff315…` / `32739156748` |
+| E3 | GitHub Actions major upgrade + immutable SHA pins | P2 | **COMPLETE — docs tracking closeout pending** | **Tool/supply-chain** | source `b111207…`; Preflight `32749299759`; Windows `32749299689`; full Smoke `32749299548` |
+| E4 | Bounded native current-GYO acceptance | P1 evidence | **NOT STARTED / CLOSED — FRESH APPROVAL REQUIRED** | **Provider/network/credential use** | local Windows native GYO receipt; no skip-as-success |
 | F | Migration registry maintainability | P3 | **DEFERRED** | **Migration** | reopen only if separately justified |
 | G | Branch protection / PR-first governance | P1 governance | **NOT STARTED** | **Repository governance** | live protection verification + required `pqg/smoke` behavior |
 | H1 | Authoritative evidence normalization | P1 acceptance | **NOT STARTED** | Docs/evidence | source-SHA/evidence matrix |
@@ -459,7 +459,7 @@ Smoke.
 
 ## E2-E — Backend deterministic constraints and warning closure
 
-**Status: SOURCE VALIDATED — tracking closeout pending.**
+**Status: COMPLETE.**
 
 First select and validate one canonical CI resolution authority: the committed
 `uv.lock` with its matching installer, or generated `backend/constraints-ci.txt`
@@ -484,25 +484,28 @@ forcing one wheel graph across Linux and Windows.
   regular and PEP 517 isolated-build resolution, and run `python -m pip check`.
   Sandbox triggers include the manifest, constraints authority and validator;
   no Actions version/tooling upgrade occurred.
-- [2026-08-24 21:28:55 UTC+07:00][recorded_at] Source `479c3399fd0867421fb7aa1245e74246f4ac9878`
-  passed clean Windows bootstrap/install/`pip check`, focused dependency and
-  warning regression, Python compile, and full backend `549 passed, 83 skipped,
-  2 warnings`. Exact Linux push Smoke
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Source `479c3399fd0867421fb7aa1245e74246f4ac9878`
+  passed exact Linux push Smoke
   [32738509343](https://github.com/thanhhaixn92/PQG-Workspace/actions/runs/32738509343)
-  passed constrained/build-constrained install, `pip check`, backend, frontend
-  and runtime payload with `pqg/smoke-full=success` and `pqg/smoke=success`.
-  Exact Windows Sandbox
+  with canonical backend **551 passed / 81 skipped / 2 warnings**, constrained/
+  build-constrained install, `pip check`, frontend and runtime payload green,
+  `pqg/smoke-full=success` and `pqg/smoke=success`. Exact Windows Sandbox
   [32738509351](https://github.com/thanhhaixn92/PQG-Workspace/actions/runs/32738509351)
-  passed with `pqg/sandbox-windows=success`. `smoke-real` was guarded SKIPPED,
-  not PASS.
+  passed with `pqg/sandbox-windows=success`. Local Windows full backend
+  `549 passed / 83 skipped / 2 warnings` remains local-only evidence.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Docs child
+  `5fff3153493dfb5fde1410edcd28a9b54a9cc45f` subsequently passed tracking run
+  `32739156748` with exact `pqg/tracking-integrity=success` and canonical
+  `pqg/smoke=success`; `smoke-full` was correctly SKIPPED in tracking mode.
+  E2-E is therefore **COMPLETE** and that tracking receipt does not relabel
+  runtime validation as executing on the docs child.
 - [2026-08-24 21:28:55 UTC+07:00][recorded_at] The two fresh warning regressions
   retain their discovery provenance: MCP v1 FastMCP `Settings.lifespan` emits
   `IncompleteFieldDefinitionWarning` through pydantic-settings, and FastAPI's
   TestClient bridge emits `StarletteDeprecationWarning` for `httpx`. They remain
   documented UPSTREAM RESIDUALS; no PQG Settings patch/suppression, MCP v2,
   `httpx2`, provider/network, schema/auth, state/checkpoint or F9 change was
-  made. E2-E becomes COMPLETE only when this direct docs child receives exact
-  `pqg/tracking-integrity=success` and `pqg/smoke=success`; stop before E3.
+  made.
 
 Investigate warnings with a minimal version/reproduction matrix before changing
 app code: retain the PQG Settings model unchanged for the MCP FastMCP
@@ -516,9 +519,17 @@ either closed or explicitly recorded as upstream residual.
 
 ## E3 — GitHub Actions upgrade and immutable pinning
 
+**Status: COMPLETE — source accepted; this docs child is tracking closeout only.**
+
 For each active official action: resolve appropriate current major at implementation time, verify runner compatibility and known regressions, validate upgrade, pin immutable commit SHA, and retain a human-readable release/major comment. Resolve SHAs fresh; do not copy stale pins from this plan. Add an explicit project-compatible Node environment and npm download cache while retaining `npm ci`; do not cache `node_modules`, parallelize Smoke, or add cancellation concurrency without later measured bottleneck evidence.
 
-Acceptance: fresh Agent Preflight + Smoke on pinned actions and no avoidable Node20-target deprecation warning.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Stable `setup-python@v7.0.0` and `setup-node@v7.0.0` were rejected during discovery because their distributed dependency graphs still contained known High-severity `brace-expansion` exposure. The user explicitly approved a bounded exception to use audited official post-release security-fixed commits by immutable SHA only when actual distributed artifacts are patched and upstream validation is suitable; mutable `main`/`@vN` remained forbidden.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Fresh preimplementation bootstrap trigger `35367ac4c46d866cb0793d4621617b67261cb2f5` passed Agent Preflight `32748436134`. E3 source `b11120749a13334456ce409cd5ecab6a2b731bdc` changes only `.github/workflows/agent-preflight.yml`, `.github/workflows/smoke.yml`, and `.github/workflows/sandbox-windows.yml`.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Immutable action pins are checkout `3d3c42e5aac5ba805825da76410c181273ba90b1` (`v7.0.1`), setup-python `9191ea1a55b1e7028943ee5647bf579e1182b42d` (merged official security-fix commit with rebuilt `dist` and upstream audit/build/test evidence), and setup-node `1acbd4c02f0ca4d959e23850ad70c50828476634` (merged official descendant whose lock and rebuilt distributed artifact carry patched `brace-expansion 5.0.9`).
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Full Smoke explicitly selects Node `24.16.0`; setup-node npm caching is keyed by `frontend/package-lock.json` and caches global npm package data only, not `node_modules`; `npm ci` remains authoritative. P-TRACK classification, backend pip constraints, product/runtime behavior, provider/network/credential semantics, schema/migration, branch protection, F9 and state/checkpoint were unchanged.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Exact-source acceptance PASS: Agent Preflight `32749299759` → `pqg/preflight=success`; Windows Sandbox `32749299689` → `pqg/sandbox-windows=success`; full Smoke `32749299548` → `pqg/smoke-full=success` and canonical `pqg/smoke=success`. Runner `2.336.0` executed Node24 actions successfully and the prior avoidable Node20-target action warning was not observed in the E3 source Preflight/Smoke/Sandbox execution logs reviewed.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] E3 Smoke payload is backend **551 passed / 81 skipped / 2 warnings**, frontend **54 files / 334 tests PASS**, lint/type-check/build, startup, health/runtime, seven readiness checks and cleanup PASS; Node `24.16.0`, npm `11.13.0`. Existing React `act(...)` stderr warnings remain H2 fix/classification residuals, not E3 regressions. `smoke-real` remains **SKIPPED**, not PASS, and its legacy Hermes/ACP acceptance semantic remains E4 scope.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Acceptance criteria are satisfied on exact source `b111207…`. This material docs child must only prove tracking equivalence; it does not need nor inherit runtime execution on its own SHA. Stop before E4.
 
 ## E4 — Retire legacy real-smoke; bounded native current-GYO acceptance
 
@@ -762,3 +773,15 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 19:25:16 UTC+07:00][recorded_at] PQG remains locked at `@monaco-editor/react 4.7.0 -> @monaco-editor/loader 1.7.0 -> monaco-editor 0.55.1 -> dompurify 3.2.7`. The wrapper peer range permits 0.56.0 but cannot replace a bundled sanitizer. Fresh `npm audit --json` is 2 moderate / 3 high; `--omit=dev` is 2 moderate / 0 high. `npm` fixAvailable, override, dedupe or a clean tree would not close this artifact finding.
 - [2026-08-24 19:25:16 UTC+07:00][recorded_at] User-controlled UTF-8 managed file content reaches the lazy Monaco editor surface, but PQG source alone does not prove a specific internal Monaco markdown/hover sanitizer trigger. Existing size, UTF-8, sandbox and lazy-loading controls reduce scope only; they do not fix bundled code. No dependency, lockfile, override, artifact, runtime, Actions, F9, state or checkpoint change occurred.
 - [2026-08-24 19:25:16 UTC+07:00][recorded_at] Recheck only when a new stable Monaco release has an actual shipped ESM and min artifact embedding DOMPurify at the then-current audit-safe floor (currently at least `3.4.13`), then repeat exact metadata/artifact/audit/reachability discovery before requesting human approval for any mutation. Continue to separately gated E2-C; do not call E2-B complete.
+
+### [2026-08-24 23:16:11 UTC+07:00] Package E3 — GitHub Actions immutable supply-chain pinning
+
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Status: **COMPLETE at source; tracking closeout pending this direct docs child**.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Continuity correction accepted E2-E as COMPLETE after docs child `5fff3153493dfb5fde1410edcd28a9b54a9cc45f` passed tracking run `32739156748`; canonical Linux E2-E source payload is 551 PASS / 81 SKIP / 2 warnings.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] E3 stable-release discovery rejected vulnerable current setup-python/setup-node v7 stable artifacts and used the user's explicit bounded exception for official post-release security-fixed immutable SHAs only.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Fresh preimplementation bootstrap `35367ac4c46d866cb0793d4621617b67261cb2f5` → Agent Preflight `32748436134` SUCCESS. Source-validation HEAD is `b11120749a13334456ce409cd5ecab6a2b731bdc`; its exact diff changes only the three active workflow files.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Exact immutable pins: checkout `3d3c42e5aac5ba805825da76410c181273ba90b1`; setup-python `9191ea1a55b1e7028943ee5647bf579e1182b42d`; setup-node `1acbd4c02f0ca4d959e23850ad70c50828476634`. Full Smoke selects Node `24.16.0`, retains `npm ci`, and caches only global npm download data keyed by `frontend/package-lock.json`, not `node_modules`.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Exact-source Agent Preflight `32749299759`, Windows Sandbox `32749299689`, and full Smoke `32749299548` all SUCCESS with `pqg/preflight=success`, `pqg/sandbox-windows=success`, `pqg/smoke-full=success` and canonical `pqg/smoke=success`.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Source Smoke: backend 551 PASS / 81 SKIP / 2 warnings; frontend 54 files / 334 tests PASS; lint/type/build/runtime/readiness/cleanup PASS; Node 24.16.0 / npm 11.13.0. No avoidable Node20-target action warning was observed in the reviewed E3 source Preflight/Smoke/Sandbox logs.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] `smoke-real=SKIPPED`; legacy Hermes/ACP real-smoke replacement remains E4. Existing frontend React `act(...)` stderr warnings remain H2 fix/classification residuals. No E4 provider/network/credential, G branch protection, H acceptance, F/F9, schema/migration, deployment or state/checkpoint promotion scope was opened.
+- [2026-08-24 23:16:11 UTC+07:00][recorded_at] Next package is E4 but remains **NOT STARTED / CLOSED** pending fresh explicit provider/network/credential authorization. This docs child may only close E3 continuity through bounded tracking-equivalence; it does not inherit the source runtime execution claim.
