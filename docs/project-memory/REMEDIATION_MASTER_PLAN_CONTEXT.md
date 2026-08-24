@@ -56,8 +56,22 @@
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] A0 master-plan tracking commit is `710355d39bbbd64127e70cfdbaa6e42173dfc692`; later memory/context commits are docs-only and must not be confused with source-validation HEAD `c6b7d1af…`.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] No application/runtime, dependency/action-major, schema/migration, branch-protection, provider/credential, deployment, F9 or checkpoint/state changes were made by A0.
 
-## [2026-08-24 06:39:02 UTC+07:00] Next-session / next-package protocol
+## [2026-08-24 07:20:44 UTC+07:00] A1 completion receipt
 
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] Next package is **A1 — full frontend regression + backend skip visibility**.
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] Before A1 implementation: re-fetch live `pqg-workspace`; self-trigger fresh Agent Preflight on exact current ref; require workflow SUCCESS + `pqg/preflight=success`; inspect frontend/backend test commands and skip sources; state exact scope/files/validation/forbidden boundaries; then edit only authorized A1 CI/process scope.
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] Continue sequentially after each package only after package acceptance and master-plan/memory persistence; source-validation HEAD and docs-only tracking HEAD remain separate claims.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 — full frontend regression + backend skip visibility — is **COMPLETE**.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] This session re-fetched live `pqg-workspace` at `2c1b8238921bd0e99367802cfb29c5218ef87e6f`, 12 commits ahead of handoff `e84cb0a030f6be54ab9f341b6065f562e301f7b0`; inspection showed the drift contains completed A0 tracking plus A1 bootstrap/implementation.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Fresh A1 bootstrap HEAD `50e3bdb83054b3e27d6c20105bfc4e326ce2dd9e` had exact-SHA `pqg/preflight=success` from Agent Preflight Run ID `32674453029` before A1 implementation.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 source-validation HEAD is `2c1b8238921bd0e99367802cfb29c5218ef87e6f`; exact compare from bootstrap is ahead 1 / behind 0 and changes only `.github/workflows/smoke.yml` (4 additions / 4 deletions).
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Smoke Test Run #119 / ID `32674524485` on the exact A1 source completed SUCCESS and published `pqg/smoke=success`; `smoke-real=SKIPPED` and is not PASS evidence.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Backend: 597 collected, 516 passed / 81 skipped / 2 warnings under `pytest -v -ra --tb=short`; visible skip reasons account for 80 superseded Hermes/ACP cases and one Windows restore-local-data environment case, with no unexplained backend skip observed.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Frontend: full `npm run test` ran 50 files / 317 tests PASS; lint 0 warnings / 0 errors over 144 files / 103 rules; type-check PASS; production build PASS.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Runtime: migrations through 0038, startup, health/runtime, seven readiness checks and cleanup PASS.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Residuals remain explicit: backend dependency/version warnings; React `act(...)` stderr warnings; npm 6 vulnerabilities (3 moderate / 3 high); GitHub Actions Node/action-version warnings; initial/eager bundle chunks >500 kB, now A2 scope.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 source evidence remains attached to `2c1b823…`; docs-only tracking commits beginning with master-plan commit `6354ae1efc7d6761238edae961333c9e92a39138` must not be relabeled as A1 source-validation HEAD.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 made no application/runtime behavior, schema/migration, dependency/tool-version, branch-protection, auth/security semantic, provider/credential, deployment, F9 or checkpoint/state change.
+
+## [2026-08-24 07:20:44 UTC+07:00] Next-session / next-package protocol
+
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Next package is **A2 — Module/heavy-feature code splitting**.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Before A2 implementation: re-fetch live `pqg-workspace` after A1 docs/memory persistence; self-trigger fresh Agent Preflight on the exact current ref via `.github/agent-preflight-trigger.txt`; require workflow SUCCESS + `pqg/preflight=success`; inspect Foundation/module loader, Documents/Monaco, Mermaid import paths, Vite build configuration and focused tests; state exact scope/files/validation/forbidden boundaries before editing implementation.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Continue sequentially only after each package acceptance and tracker/memory persistence; source-validation HEAD and later docs-only tracking HEAD remain separate claims. F9 remains CLOSED / NOT APPROVED; state/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`.
