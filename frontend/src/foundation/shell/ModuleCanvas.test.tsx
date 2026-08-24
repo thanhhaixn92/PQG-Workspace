@@ -4,7 +4,9 @@ import type { ModuleInstance } from '../../api/modules';
 import { useHermesStore } from '../../store/store';
 import { useModuleProjectionStore } from '../modules/store';
 import { ModuleCanvas } from './ModuleCanvas';
-import type { ModuleCanvasLoaders, SurfaceLoader } from './ModuleCanvas';
+import type { ModuleCanvasLoaders, SurfaceLoader } from './moduleCanvasLoaders';
+
+type LoadedSurface = Awaited<ReturnType<SurfaceLoader>>;
 
 vi.mock('../../components/AssistantChatSidebar', () => ({ AssistantChatSidebar: ({ surfaceMode }: { surfaceMode?: string }) => <div>GYO {surfaceMode ?? 'drawer'}</div> }));
 vi.mock('../../components/OverviewPanel', () => ({ OverviewPanel: () => <div>Overview content</div> }));
@@ -31,6 +33,14 @@ const unavailableProjectionStatuses = ['idle', 'loading', 'error'] as const;
 const resolvedLoader = (label: string): ReturnType<typeof vi.fn<SurfaceLoader>> => vi.fn(async () => ({
   default: () => <div>{label}</div>,
 }));
+
+function deferredLoader() {
+  let resolve!: (value: LoadedSurface) => void;
+  const loader: SurfaceLoader = () => new Promise<LoadedSurface>(resolver => {
+    resolve = resolver;
+  });
+  return { loader: vi.fn(loader), resolve: (value: LoadedSurface) => resolve(value) };
+}
 
 function makeLoaders(): ModuleCanvasLoaders {
   return {
@@ -98,11 +108,9 @@ describe('ModuleCanvas', () => {
     expect(useHermesStore.getState().sidebarTab).toBe('settings');
   });
 
-  it('starts an attached Module import only after projection eligibility and shows pending state', () => {
-    let resolveWork!: (value: { default: () => JSX.Element }) => void;
-    loaders.work = vi.fn(() => new Promise(resolve => {
-      resolveWork = resolve;
-    }));
+  it('starts an attached Module import only after projection eligibility and shows pending state', async () => {
+    const deferred = deferredLoader();
+    loaders.work = deferred.loader;
     useModuleProjectionStore.setState({ instances: [instanceFor('work')], status: 'ready', error: null });
 
     render(<ModuleCanvas activeTab="sessions" activeWorkId="work-1" assistantFocusRoute={false} loaders={loaders} />);
@@ -110,7 +118,11 @@ describe('ModuleCanvas', () => {
     expect(loaders.work).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Đang tải Công việc...')).toBeDefined();
 
-    act(() => resolveWork({ default: () => <div>Work content</div> }));
+    await act(async () => {
+      deferred.resolve({ default: () => <div>Work content</div> });
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Work content')).toBeDefined();
   });
 
   it('keeps Monaco/editor loading outside the graph until Documents has Work plus an open file', async () => {
@@ -152,10 +164,8 @@ describe('ModuleCanvas', () => {
   });
 
   it('discards a late Module import after switching to another eligible Module', async () => {
-    let resolveWork!: (value: { default: () => JSX.Element }) => void;
-    loaders.work = vi.fn(() => new Promise(resolve => {
-      resolveWork = resolve;
-    }));
+    const deferred = deferredLoader();
+    loaders.work = deferred.loader;
     useModuleProjectionStore.setState({
       instances: [instanceFor('work'), instanceFor('knowledge')],
       status: 'ready',
@@ -170,7 +180,10 @@ describe('ModuleCanvas', () => {
     rerender(<ModuleCanvas activeTab="skills" activeWorkId="work-1" assistantFocusRoute={false} loaders={loaders} />);
     expect(await screen.findByText('Knowledge content')).toBeDefined();
 
-    act(() => resolveWork({ default: () => <div>Late Work</div> }));
+    await act(async () => {
+      deferred.resolve({ default: () => <div>Late Work</div> });
+      await Promise.resolve();
+    });
     await waitFor(() => expect(screen.queryByText('Late Work')).toBeNull());
     expect(screen.getByText('Knowledge content')).toBeDefined();
   });
