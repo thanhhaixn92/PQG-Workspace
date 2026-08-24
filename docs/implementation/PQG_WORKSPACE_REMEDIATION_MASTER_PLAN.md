@@ -103,7 +103,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | C | Admin boundary contract reconciliation | P1 | **COMPLETE** | Auth/security contract | source `fe2ad41…`; Preflight/Smoke success; focused admin/capability/UI proof |
 | D | Capability executable-binding validator | P1 | **COMPLETE** | **Capability/security boundary** | source `36b2fef…`; negative drift + backend/startup/Preflight/Smoke success |
 | E1 | npm vulnerability exact inventory | P2 | **COMPLETE** | Dependency analysis | exact 6-node / 32-advisory inventory + four proposed E2 batches |
-| E2 | Selective dependency remediation + backend reproducibility/warnings | P2 | **NOT STARTED** | **Dependencies/tool versions** | selective updates + deterministic constraints + full validation |
+| E2 | Selective dependency remediation + backend reproducibility/warnings | P2 | **IN PROGRESS — E2-A COMPLETE** | **Dependencies/tool versions** | E2-A source `dc1a462…`; Mermaid/DOMPurify fixed; E2-B/C/D and backend warning work unopened |
 | E3 | GitHub Actions major upgrade + immutable SHA pins | P2 | **NOT STARTED** | **Tool/supply-chain** | pinned action SHAs + fresh Preflight/Smoke |
 | E4 | Bounded native current-GYO acceptance | P1 evidence | **NOT STARTED** | **Provider/network/credential use** | local Windows native GYO receipt; no skip-as-success |
 | F | Migration registry maintainability | P3 | **DEFERRED** | **Migration** | reopen only if separately justified |
@@ -333,6 +333,15 @@ Completed inventory: `docs/implementation/PACKAGE_E1_NPM_VULNERABILITY_INVENTORY
 
 Acceptance: advisory-targeted updates only; deterministic clean install; full backend/frontend; lint/type/build; runtime/migrations; exact-head Smoke; document accepted residual advisories/warnings.
 
+### E2-A — Mermaid/runtime DOMPurify remediation
+
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] **COMPLETE** at source-validation HEAD `dc1a46280a006c2214a301557284fbbbd476ed27`. Mermaid is pinned from `^11.16.0` to exact `11.16.1`; only its nested DOMPurify resolution changed, from `3.4.11` to `3.4.14`.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Deterministic dependency and runtime regressions lock the approved floors, preserve Monaco's separately gated `dompurify@3.2.7` branch, parse bounded flowchart/XY/radar/architecture inputs under `securityLevel: strict`, and reject malformed input.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Live audit moved from six to five vulnerable nodes: full `2 moderate / 3 high`; production `2 moderate / 0 high`. Mermaid and Mermaid-owned DOMPurify are absent from the remaining findings. Remaining nodes are exactly Monaco/DOMPurify (E2-B), PostCSS/Nanoid (E2-C), and Undici (E2-D).
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Focused 19 PASS; full frontend 52 files / 330 tests, lint, type-check and build PASS. A2 bundle receipt remains fail-closed and confirms `mermaidIsDynamicEntry=true`, `mermaidInInitialGraph=false`.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Exact-source Agent Preflight `32710121468` / `97379518811` and Smoke `32710112957` / `97379488765` SUCCESS. Smoke backend 548 PASS / 81 SKIP / 2 existing warnings; frontend 52 files / 330 tests; runtime/readiness/cleanup PASS; `smoke-real` `97379490095` SKIPPED.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] E2 overall remains **IN PROGRESS**. E2-B/C/D and backend reproducibility/warning remediation were neither authorized nor executed; no `npm audit fix`, schema/migration, provider/credential, E3/E4/G/H/F/F9, deployment or state/checkpoint change occurred.
+
 ## E3 — GitHub Actions upgrade and immutable pinning
 
 For each active official action: resolve appropriate current major at implementation time, verify runner compatibility, validate upgrade, pin immutable commit SHA, and retain human-readable release/major comment. Resolve SHAs fresh; do not copy stale pins from this plan.
@@ -527,3 +536,11 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 15:21:55 UTC+07:00][recorded_at] Live npm audit with Node `24.16.0` / npm `11.13.0`: repository root 0 findings; frontend full tree 6 vulnerable nodes (`3 moderate / 3 high`) and 32 advisory records; frontend production view 3 moderate nodes and no high nodes.
 - [2026-08-24 15:21:55 UTC+07:00][recorded_at] The exact advisory/path/fixed-range/reachability/owner/risk matrix and four proposed E2 batches are recorded in `PACKAGE_E1_NPM_VULNERABILITY_INVENTORY.md`. No remediation command or dependency mutation was performed.
 - [2026-08-24 15:21:55 UTC+07:00][recorded_at] Result: Package E1 inventory is **COMPLETE**. E2/E3/E4/G/H/F/F9 remain unopened; state/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`. Stop and request separate E2 approval.
+
+### [2026-08-24 16:15:15 UTC+07:00] Package E2-A — Mermaid/runtime DOMPurify remediation
+
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Explicit approval opened E2-A only. Clean/current baseline was E1 tracking HEAD `6fe0db6cd85cea81f11b358d0402e5eef9baaba9`; local preflight PASS and preimplementation exact-ref Agent Preflight `32709269035` / `97376992586` SUCCESS.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Source commit `dc1a46280a006c2214a301557284fbbbd476ed27` changes only `frontend/package.json`, `frontend/package-lock.json`, and two focused dependency/runtime regression tests. Mermaid is exact `11.16.1`; Mermaid-owned DOMPurify is `3.4.14`; Monaco's `3.2.7` branch and all E2-C/D nodes remain unchanged.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Audit after remediation: full frontend five vulnerable nodes (`2 moderate / 3 high`), production two moderate nodes and no high nodes. Neither Mermaid nor its nested DOMPurify remains in the findings; no blanket audit remediation was used.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Local focused 19 PASS; full frontend 52 files / 330 tests, lint, type-check, build and A2 lazy-boundary gate PASS. Exact-source Preflight `32710121468` / `97379518811` and Smoke `32710112957` / `97379488765` SUCCESS; Smoke backend 548 PASS / 81 SKIP / 2 warnings; `smoke-real` `97379490095` SKIPPED.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Result: E2-A **COMPLETE**, E2 overall **IN PROGRESS**. Stop before separately gated E2-B/C/D, backend reproducibility/warnings, E3/E4/G/H/F/F9, schema/migration, provider/credential, deployment or state/checkpoint promotion.

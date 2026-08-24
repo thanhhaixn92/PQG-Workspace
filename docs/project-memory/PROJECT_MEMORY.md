@@ -19,6 +19,7 @@
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 master-plan tracking commit: `6354ae1efc7d6761238edae961333c9e92a39138`; it is docs-only tracking evidence and does not replace the A1 source-validation HEAD.
 - [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 source-validation HEAD: `5fce3270f26f1cac1ffb9d228c63576a47870bc0`; later documentation/memory tracking commits must remain separate from this exact source-validation receipt.
 - [2026-08-24 13:59:57 UTC+07:00][recorded_at] Package B source-validation HEAD: `140df75e907444437844a1328455e6d1c23c7e51`; later documentation/memory tracking commits must remain separate from this exact source-validation receipt.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Package E2-A source-validation HEAD: `dc1a46280a006c2214a301557284fbbbd476ed27`; later documentation/memory tracking remains a distinct child.
 
 ## Current state / gates
 
@@ -105,6 +106,7 @@
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Admin boundary wording/characterization remains package C; capability executable binding remains package D.
 - [2026-08-24 14:37:06 UTC+07:00][recorded_at] The Package C admin wording/characterization residual is closed at source-validation HEAD `fe2ad41052fc4cde3ae49543fd9978d12a692d4c`; capability executable binding remains unopened Package D.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Dependency/supply-chain residuals remain for E1–E3: npm baseline 6 vulnerabilities (3 moderate, 3 high), backend reproducibility/warnings, GitHub Actions Node-version warnings and mutable action tags.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] E2-A supersedes the npm baseline for the reachable Mermaid chain: current frontend audit is five nodes (`2 moderate / 3 high`), with two production moderate nodes confined to Monaco/DOMPurify. E2-B/C/D, backend reproducibility/warnings and E3 action warnings/pins remain residuals.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Legacy `smoke-real` remains Hermes/ACP and can false-green on skip; E4 must replace it with bounded native current-GYO evidence.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Branch protection remains deferred until G after A0, A1 and E3 are truthful/stable prerequisites.
 
@@ -118,6 +120,17 @@
 - [2026-08-24 15:07:32 UTC+07:00][recorded_at] Stop after Package D. E1/E2/E3/E4/G/H/F/F9 require separate authorization and a fresh exact-ref preflight; state/checkpoint remain unchanged.
 - [2026-08-24 15:21:55 UTC+07:00][recorded_at] Package E1 npm vulnerability exact inventory is **COMPLETE** at the following inventory/tracking commit; E1 changed docs only and did not change either lockfile or any dependency/tool version.
 - [2026-08-24 15:21:55 UTC+07:00][recorded_at] Stop after E1. E2 selective remediation requires separate approval and fresh exact-ref preflight; E3/E4/G/H/F/F9 remain unopened and state/checkpoint remain unchanged.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Package E2-A is **COMPLETE** at source-validation HEAD `dc1a46280a006c2214a301557284fbbbd476ed27`; E2 overall remains **IN PROGRESS** because E2-B/C/D and backend reproducibility/warning work are unopened.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Stop after E2-A. Do not carry its PASS evidence into E2-B/C/D or any later package; each requires separate approval and fresh exact-ref preflight.
+
+## Package E2-A — completed evidence
+
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Mermaid changed from `^11.16.0` / locked `11.16.0` to exact `11.16.1`; Mermaid-owned DOMPurify changed only from `3.4.11` to `3.4.14`. Monaco/DOMPurify `3.2.7`, Vite/PostCSS/Nanoid and jsdom/Undici were not modified.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Dependency contract tests enforce the approved floors and preserve the E2-B boundary. Real Mermaid parsing under strict security covers bounded flowchart, XY, radar and architecture inputs plus malformed rejection.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Post-change audit: full five nodes (`2 moderate / 3 high`), production two moderate nodes and zero high nodes; remaining findings map exactly to E2-B/C/D. `npm audit fix` was not run.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Local focused 19 PASS; full frontend 52 files / 330 tests, lint, type-check, production build and A2 Mermaid lazy-boundary receipt PASS.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] Exact-source Agent Preflight `32710121468` / `97379518811` and Smoke `32710112957` / `97379488765` SUCCESS. Smoke backend 548 PASS / 81 SKIP / 2 existing warnings; runtime/readiness/cleanup PASS; `smoke-real` `97379490095` SKIPPED.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; E3/E4/G/H/F/F9 remain closed and no schema/migration, provider/credential or deployment work occurred.
 
 ## Package E1 — completed inventory
 
