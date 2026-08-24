@@ -2,5 +2,5 @@ PQG Workspace GitHub Agent Preflight trigger.
 
 This file is intentionally updated by ChatGPT Project / GitHub-connected agents when a fresh Agent Preflight receipt is required and workflow_dispatch is not exposed by the connector.
 
-Last trigger: 2026-08-24 11:57:57 UTC+07:00
-Reason: fresh exact-ref Agent Preflight before continuing the already-authorized remediation package B (Sandbox hostile-local-process TOCTOU hardening) from live source baseline 6e51932c82a717b096d081d7ec8df132754b90f9. This trigger opens no new protected scope; it does not open F9, schema/migration, dependency/tool-version, provider/credential, deployment, checkpoint/state promotion, branch protection, or unrelated security/application scope.
+Last trigger: 2026-08-24 12:58:21 UTC+07:00
+Reason: fresh exact-ref Agent Preflight before continuing the already-authorized remediation package B (Sandbox hostile-local-process TOCTOU hardening) from source candidate a9f3b5798fd19511c02c13c8efa1f7bd7d699126. This trigger opens no new protected scope; it does not open F9, schema/migration, dependency/tool-version, provider/credential, deployment, checkpoint/state promotion, branch protection, or unrelated security/application scope.
