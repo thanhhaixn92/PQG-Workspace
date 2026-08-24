@@ -107,8 +107,8 @@ Do not advance to the next package until the current package meets its acceptanc
 | D | Capability executable-binding validator | P1 | **COMPLETE** | **Capability/security boundary** | source `36b2fef…`; negative drift + backend/startup/Preflight/Smoke success |
 | E1 | npm vulnerability exact inventory | P2 | **COMPLETE** | Dependency analysis | exact 6-node / 32-advisory inventory + four proposed E2 batches |
 | E2 | Selective dependency remediation | P2 | **IN PROGRESS — E2-A COMPLETE** | **Dependencies/tool versions** | E2-A source `dc1a462…`; remaining fault domains are separately gated below |
-| P-TRACK | Bounded tracking-equivalence CI | P1 process | **PARTIAL — local candidate** | CI/process | exact SOURCE full receipt, then exact T1 tracking receipt |
-| P-MEM | Project Memory/Context normalization | P2 docs | **NOT STARTED** | Docs/evidence | T2 only after P-TRACK COMPLETE |
+| P-TRACK | Bounded tracking-equivalence CI | P1 process | **COMPLETE** | CI/process | source `2ac0e831…` full receipt; T1 `42b16fcb…` tracking receipt |
+| P-MEM | Project Memory/Context normalization | P2 docs | **IN PROGRESS — T2 candidate** | Docs/evidence | final bounded tracking child; complete only on its exact CI receipt |
 | E2-B | Monaco bundled DOMPurify | P1 security | **NOT STARTED — upstream-aware** | Dependency/security evidence | fresh artifact discovery; fixed upstream release or explicit BLOCKED-UPSTREAM |
 | E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted same-major resolution + frontend/full Smoke |
 | E2-D | jsdom/Undici test chain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted Undici resolution without default jsdom-major upgrade |
@@ -353,7 +353,7 @@ Acceptance: advisory-targeted updates only; deterministic clean install; full ba
 
 ## P-TRACK — Fail-closed tracking equivalence gate
 
-**Status: APPROVED INSERTION BEFORE E2-B / IN PROGRESS.**
+**Status: COMPLETE.**
 
 P-TRACK may optimize only the normal Smoke decision path. It keeps every
 existing trigger active and defaults to full validation. Pull requests remain
@@ -403,7 +403,7 @@ integration topology; that residual is recorded, not solved here.
 
 ## P-MEM — Project Memory normalization
 
-**Status: APPROVED AS A SEPARATE DOCS PACKAGE AFTER P-TRACK / NOT STARTED.**
+**Status: IN PROGRESS — T2 COMPLETION CANDIDATE.**
 
 P-MEM must not be folded into P-TRACK. It will define one canonical home per
 fact while preserving historical receipts in the changelog and Git history.
@@ -698,3 +698,9 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 18:58:09 UTC+07:00][recorded_at] SOURCE `2ac0e83184e891bd61f5543084b5d26868e10636` is full-validated by Smoke run `32724184829`: `classify=success`, `smoke-full=success`, `tracking-integrity=skipped`, `smoke-result=success`, exact `pqg/smoke-full=success` and canonical `pqg/smoke=success`.
 - [2026-08-24 18:58:09 UTC+07:00][recorded_at] Full-source run evidence is backend 548 PASS / 81 SKIP / 2 warnings; frontend 52 files / 330 tests, lint/type-check/build, startup, health/runtime, seven readiness checks and cleanup PASS; `smoke-real` SKIPPED. Existing Node 20 action annotation remains E3 scope.
 - [2026-08-24 18:58:09 UTC+07:00][recorded_at] T1 is this one direct child and is restricted to allowlisted docs plus the `PROJECT_CONTEXT` conditional aggregate/full/tracking invariant. P-TRACK remains **PARTIAL** until exact T1 returns `tracking-integrity=success`, `smoke-full=skipped`, `smoke-result=success`, `pqg/tracking-integrity=success` and canonical `pqg/smoke=success`.
+
+### [2026-08-24 19:03:27 UTC+07:00] P-TRACK accepted; P-MEM T2 completion candidate
+
+- [2026-08-24 19:03:27 UTC+07:00][recorded_at] P-TRACK is **COMPLETE**: SOURCE `2ac0e83184e891bd61f5543084b5d26868e10636` has the canonical full receipt, and direct child T1 `42b16fcb2394528f0b73ebb2812a4c8ff5274953` has exact `pqg/tracking-integrity=success` and canonical `pqg/smoke=success`. The tracking receipt proves bounded equivalence only; it does not relabel runtime validation as executed on T1.
+- [2026-08-24 19:03:27 UTC+07:00][recorded_at] P-MEM is this one remaining bounded tracking child T2. Its scope is the existing five-file tracking allowlist only: Master Plan, Project Context, Project Memory, Project Changelog and `REMEDIATION_MASTER_PLAN_CONTEXT.md`; no add/delete/rename, state/checkpoint or runtime change is permitted.
+- [2026-08-24 19:03:27 UTC+07:00][recorded_at] T2 becomes **COMPLETE** only if its exact SHA publishes `pqg/tracking-integrity=success` and canonical `pqg/smoke=success`, with `smoke-full=skipped`; there is no T2.5 receipt commit. A correction after T2 must fall back to full Smoke. E2-B remains unopened until that receipt exists.
