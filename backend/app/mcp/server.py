@@ -3,7 +3,12 @@ import contextvars
 from mcp.server.fastmcp import FastMCP
 
 from app.services.capabilities import MCP_COMPAT_TOOL_NAMES
+from app.services.security_overrides import install_security_api_overrides, install_security_mcp_overrides
 from app.settings import get_settings
+
+# Patch the source APIRouters before any create_app() call clones them into a
+# FastAPI instance. This is idempotent because tests create multiple app instances.
+install_security_api_overrides()
 
 # Context var for storing session ID from request
 mcp_session_id_var = contextvars.ContextVar("mcp_session_id", default=None)
@@ -36,11 +41,10 @@ def get_mcp_session_id() -> str:
 def setup_mcp(fast_api_app):
     """Mount FastMCP server on the FastAPI app."""
     import app.mcp.tools  # This registers the tools
-    from app.services.security_overrides import install_security_overrides
 
-    # Package B swaps only filesystem-sensitive route/tool implementations. The
-    # public paths, MCP names and capability allowlist remain unchanged.
-    install_security_overrides(fast_api_app, mcp_server)
+    # Package B keeps the model-visible tool names/allowlist stable while
+    # replacing only the three filesystem-sensitive implementations.
+    install_security_mcp_overrides(mcp_server)
 
     registered = {tool.name for tool in mcp_server._tool_manager.list_tools()}
     if registered != MCP_COMPAT_TOOL_NAMES:
