@@ -1,7 +1,7 @@
 # V2.2 Final Evidence Matrix
 
-**Normalized at:** 2026-08-25 02:12:00 UTC+07:00  
-**Matrix source baseline:** `3bb732eed171458ffb19274a3d3d5dc73910e3e3` (governance merge)  
+**Normalized at:** 2026-08-25 02:12:00 UTC+07:00<br>
+**Matrix source baseline:** `3bb732eed171458ffb19274a3d3d5dc73910e3e3` (governance merge)<br>
 **State:** `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL` — this document is evidence normalization only. It does not promote the checkpoint.
 
 ## Reading rules
