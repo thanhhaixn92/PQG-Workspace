@@ -1,13 +1,13 @@
 # PQG Workspace — Remaining Execution Plan after E3
 
-**Audit date:** 2026-08-25 (UTC+07:00)  
-**Repository:** `thanhhaixn92/PQG-Workspace`  
-**Default branch:** `pqg-workspace`  
-**Live tracking HEAD at audit:** `e5885bed15c5636254b468f11341d0c7b72df805` — `docs: close E3 tracking receipt`  
-**Full-validated E3 source anchor:** `b11120749a13334456ce409cd5ecab6a2b731bdc` — `ci: pin GitHub Actions toolchain`  
-**State/checkpoint:** `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`  
-**F9 Data Egress:** `CLOSED / NOT APPROVED`  
-**Branch protection:** OFF / unprotected at audit  
+**Audit date:** 2026-08-25 (UTC+07:00)<br>
+**Repository:** `thanhhaixn92/PQG-Workspace`<br>
+**Default branch:** `pqg-workspace`<br>
+**Live tracking HEAD at audit:** `e5885bed15c5636254b468f11341d0c7b72df805` — `docs: close E3 tracking receipt`<br>
+**Full-validated E3 source anchor:** `b11120749a13334456ce409cd5ecab6a2b731bdc` — `ci: pin GitHub Actions toolchain`<br>
+**State/checkpoint:** `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`<br>
+**F9 Data Egress:** `CLOSED / NOT APPROVED`<br>
+**Branch protection:** OFF / unprotected at audit<br>
 **Purpose:** define the smallest, fail-closed execution path from the post-E3 baseline through E4, G and H1–H6 without widening scope.
 
 ---
@@ -30,7 +30,7 @@ Before every package, follow the live repository authority order rather than thi
 
 This file is a planning artifact. It does **not** authorize protected operations and does not override live authority.
 
-Evidence labels are exact: `PASS`, `FAIL`, `SKIPPED`, `NOT RUN`, `BLOCKED-UPSTREAM`, `PARTIAL`.  
+Evidence labels are exact: `PASS`, `FAIL`, `SKIPPED`, `NOT RUN`, `BLOCKED-UPSTREAM`, `PARTIAL`.
 Never convert:
 
 - tracking equivalence into runtime execution on a tracking SHA;
@@ -180,7 +180,7 @@ Do not create receipt-only recursion. Fold these into the next material package 
 E4 → G → PRE-H1 E2-B RECHECK → H1 → H2 → H3 → H4 → H5 → H6
 ```
 
-`F` remains **DEFERRED**.  
+`F` remains **DEFERRED**.
 `F9` remains **CLOSED / NOT APPROVED**.
 
 If an H3 or H4 finding requires a source correction, the final candidate SHA is invalidated:
