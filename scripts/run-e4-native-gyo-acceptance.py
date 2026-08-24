@@ -19,6 +19,7 @@ import shutil
 import sys
 import tempfile
 import time
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = REPO_ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
+warnings.filterwarnings("ignore", category=UserWarning, module=r"pydantic_settings\.sources\.utils")
 
 from app.api.assistant_runs import execute_assistant_run_claim
 from app.db.connection import get_db_connection
