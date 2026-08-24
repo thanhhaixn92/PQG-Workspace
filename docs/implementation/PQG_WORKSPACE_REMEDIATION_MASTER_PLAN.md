@@ -111,7 +111,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | P-MEM | Project Memory/Context normalization | P2 docs | **COMPLETE** | Docs/evidence | T2 fail-closed; full recovery `0994a6b…` plus tracking closeout pending this exact SHA |
 | E2-B | Monaco bundled DOMPurify | P1 security | **BLOCKED-UPSTREAM** | Dependency/security evidence | latest 0.56.0 bundles vulnerable DOMPurify 3.4.8; recheck upstream release/artifact |
 | E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **COMPLETE** | Dependencies/tool versions | source `03d2869…`; exact full Smoke `32729794074` PASS |
-| E2-D | jsdom/Undici test chain | P2 | **IN PROGRESS — source validation PASS; exact-source Smoke pending** | Dependencies/tool versions | targeted Undici resolution without default jsdom-major upgrade |
+| E2-D | jsdom/Undici test chain | P2 | **COMPLETE** | Dependencies/tool versions | source `8e3f2fd…`; exact full Smoke `32733404512` PASS |
 | E2-E | Backend deterministic constraints + warning closure | P2 | **NOT STARTED** | Dependency/test environment | clean Linux/Windows install, `pip check`, warning disposition |
 | E3 | GitHub Actions major upgrade + immutable SHA pins | P2 | **NOT STARTED** | **Tool/supply-chain** | pinned action SHAs + fresh Preflight/Smoke |
 | E4 | Bounded native current-GYO acceptance | P1 evidence | **NOT STARTED** | **Provider/network/credential use** | local Windows native GYO receipt; no skip-as-success |
@@ -445,7 +445,7 @@ fix`, raise `chunkSizeWarningLimit`, or broaden the dependency update.
 
 ## E2-D — jsdom/Undici test chain
 
-**Status: IN PROGRESS — source validation PASS; exact-source Smoke pending.**
+**Status: COMPLETE.**
 
 Prefer the smallest compatible Undici `>=7.29.0` resolution within the existing
 jsdom 29 line; do not default to a jsdom major upgrade merely to clear the
@@ -455,6 +455,7 @@ Smoke.
 
 - [2026-08-24 20:32:51 UTC+07:00][recorded_at] Approved source candidate changes only the resolved test-environment node `undici 7.28.0 -> 7.29.0`; root `jsdom` remains manifest/resolved `^29.1.1` / `29.1.1`, whose declared range is `undici ^7.25.0`. No direct Undici dependency, override, jsdom-major change, Monaco/E2-B or Vite/PostCSS/Nanoid E2-C mutation.
 - [2026-08-24 20:32:51 UTC+07:00][recorded_at] Local validation PASS: clean `npm ci --ignore-scripts`; installed `jsdom@29.1.1 -> undici@7.29.0`; focused 6 files / 31 tests; full frontend 54 files / 334 tests; lint; type-check; build and A2 receipt (`monacoInInitialGraph=false`). Fresh full and production audits are each `2 moderate / 0 high`; remaining moderate findings are Monaco/DOMPurify (E2-B). Exact pushed-source canonical Smoke is required before completion; no state/checkpoint or F9 promotion.
+- [2026-08-24 20:38:18 UTC+07:00][recorded_at] **COMPLETE.** Source `8e3f2fdbc94eeb1a00ae6e1531863f2d8b87b11e` was pushed to `pqg-workspace`. Exact-source manual canonical Smoke [32733404512](https://github.com/thanhhaixn92/PQG-Workspace/actions/runs/32733404512) is SUCCESS: `classify=success`, `smoke-full=success`, `smoke-result=success`, exact `pqg/smoke-full=success` and final `pqg/smoke=success`. `tracking-integrity` and `smoke-real` are SKIPPED by defined source/guard conditions, not inferred acceptance. E2 overall remains in progress; F9/state/checkpoint remain unchanged.
 
 ## E2-E — Backend deterministic constraints and warning closure
 
