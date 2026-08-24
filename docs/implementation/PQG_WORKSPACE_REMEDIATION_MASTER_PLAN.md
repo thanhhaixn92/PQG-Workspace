@@ -109,7 +109,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | E2 | Selective dependency remediation | P2 | **IN PROGRESS — E2-A COMPLETE** | **Dependencies/tool versions** | E2-A source `dc1a462…`; remaining fault domains are separately gated below |
 | P-TRACK | Bounded tracking-equivalence CI | P1 process | **COMPLETE** | CI/process | source `2ac0e831…` full receipt; T1 `42b16fcb…` tracking receipt |
 | P-MEM | Project Memory/Context normalization | P2 docs | **COMPLETE** | Docs/evidence | T2 fail-closed; full recovery `0994a6b…` plus tracking closeout pending this exact SHA |
-| E2-B | Monaco bundled DOMPurify | P1 security | **NOT STARTED — upstream-aware** | Dependency/security evidence | fresh artifact discovery; fixed upstream release or explicit BLOCKED-UPSTREAM |
+| E2-B | Monaco bundled DOMPurify | P1 security | **BLOCKED-UPSTREAM** | Dependency/security evidence | latest 0.56.0 bundles vulnerable DOMPurify 3.4.8; recheck upstream release/artifact |
 | E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted same-major resolution + frontend/full Smoke |
 | E2-D | jsdom/Undici test chain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted Undici resolution without default jsdom-major upgrade |
 | E2-E | Backend deterministic constraints + warning closure | P2 | **NOT STARTED** | Dependency/test environment | clean Linux/Windows install, `pip check`, warning disposition |
@@ -417,7 +417,7 @@ mark it superseded for current continuity and point to these three live files.
 
 ## E2-B — Monaco bundled DOMPurify
 
-**Status: NOT STARTED — DISCOVERY-FIRST / UPSTREAM-AWARE.**
+**Status: BLOCKED-UPSTREAM — B1 DISCOVERY COMPLETE.**
 
 At execution, re-resolve the Monaco release and inspect the installed shipped
 artifact, not only the consumer lock graph. The current upstream issue reports
@@ -714,3 +714,10 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 
 - [2026-08-24 19:14:52 UTC+07:00][recorded_at] Full recovery SOURCE `0994a6b7077964bd57e2043657ea4f5cec52d320` completed Smoke `32725628340` with `classify=success`, `smoke-full=success`, `tracking-integrity=skipped` and `smoke-result=success`; exact `pqg/smoke-full=success` and canonical `pqg/smoke=success` validate the corrected gate and the normalized documentation tree.
 - [2026-08-24 19:14:52 UTC+07:00][recorded_at] P-MEM is **COMPLETE** by full recovery. This one docs-only child is a continuity closeout and should receive a bounded depth-one tracking receipt from SOURCE `0994a6b…`; it is not a T2.5 correction and does not reopen E2-B.
+
+### [2026-08-24 19:25:16 UTC+07:00] E2-B B1 Monaco bundled DOMPurify discovery
+
+- [2026-08-24 19:25:16 UTC+07:00][recorded_at] **BLOCKED-UPSTREAM.** Fresh exact-ref discovery at `82b3263a184829b66320b84ed86e01ed64780faa` finds latest stable `monaco-editor` `0.56.0` (published 2026-07-20) still declares DOMPurify `3.4.8`; issue [microsoft/monaco-editor#5454](https://github.com/microsoft/monaco-editor/issues/5454) remains open and documents that this copy is bundled into shipped Monaco artifacts, not consumer-resolved.
+- [2026-08-24 19:25:16 UTC+07:00][recorded_at] PQG remains locked at `@monaco-editor/react 4.7.0 -> @monaco-editor/loader 1.7.0 -> monaco-editor 0.55.1 -> dompurify 3.2.7`. The wrapper peer range permits 0.56.0 but cannot replace a bundled sanitizer. Fresh `npm audit --json` is 2 moderate / 3 high; `--omit=dev` is 2 moderate / 0 high. `npm` fixAvailable, override, dedupe or a clean tree would not close this artifact finding.
+- [2026-08-24 19:25:16 UTC+07:00][recorded_at] User-controlled UTF-8 managed file content reaches the lazy Monaco editor surface, but PQG source alone does not prove a specific internal Monaco markdown/hover sanitizer trigger. Existing size, UTF-8, sandbox and lazy-loading controls reduce scope only; they do not fix bundled code. No dependency, lockfile, override, artifact, runtime, Actions, F9, state or checkpoint change occurred.
+- [2026-08-24 19:25:16 UTC+07:00][recorded_at] Recheck only when a new stable Monaco release has an actual shipped ESM and min artifact embedding DOMPurify at the then-current audit-safe floor (currently at least `3.4.13`), then repeat exact metadata/artifact/audit/reachability discovery before requesting human approval for any mutation. Continue to separately gated E2-C; do not call E2-B complete.
