@@ -110,7 +110,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | P-TRACK | Bounded tracking-equivalence CI | P1 process | **COMPLETE** | CI/process | source `2ac0e831…` full receipt; T1 `42b16fcb…` tracking receipt |
 | P-MEM | Project Memory/Context normalization | P2 docs | **COMPLETE** | Docs/evidence | T2 fail-closed; full recovery `0994a6b…` plus tracking closeout pending this exact SHA |
 | E2-B | Monaco bundled DOMPurify | P1 security | **BLOCKED-UPSTREAM** | Dependency/security evidence | latest 0.56.0 bundles vulnerable DOMPurify 3.4.8; recheck upstream release/artifact |
-| E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted same-major resolution + frontend/full Smoke |
+| E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **IN PROGRESS — source validation PASS; exact-source Smoke pending** | Dependencies/tool versions | targeted same-major resolution + frontend/full Smoke |
 | E2-D | jsdom/Undici test chain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted Undici resolution without default jsdom-major upgrade |
 | E2-E | Backend deterministic constraints + warning closure | P2 | **NOT STARTED** | Dependency/test environment | clean Linux/Windows install, `pip check`, warning disposition |
 | E3 | GitHub Actions major upgrade + immutable SHA pins | P2 | **NOT STARTED** | **Tool/supply-chain** | pinned action SHAs + fresh Preflight/Smoke |
@@ -431,13 +431,16 @@ internal-sanitizer boundary; vendor patching requires separate user approval.
 
 ## E2-C — Vite/PostCSS/Nanoid dev toolchain
 
-**Status: NOT STARTED.**
+**Status: IN PROGRESS — source validation PASS; exact-source Smoke pending.**
 
 Resolve the current compatible Vite 8.x patch only at execution, with
 PostCSS `>=8.5.23` and Nanoid `>=3.3.18`. Require a clean install, `npm ls vite
 postcss nanoid`, audit, full frontend test/lint/type-check/build, unchanged
 Mermaid/Monaco lazy boundaries and A2 bundle receipt. Do not use `npm audit
 fix`, raise `chunkSizeWarningLimit`, or broaden the dependency update.
+
+- [2026-08-24 19:54:54 UTC+07:00][recorded_at] Approved source candidate changes only frontend Vite tooling resolution and its regression test: `vite ^8.1.0 -> ^8.2.2`, resolved `postcss 8.5.26` and `nanoid 3.3.18`. Fresh installed-tree proof is `vite@8.2.2 -> postcss@8.5.26 -> nanoid@3.3.18`; no direct PostCSS/Nanoid addition, override, vendor patch, Monaco/E2-B or jsdom/Undici/E2-D mutation.
+- [2026-08-24 19:54:54 UTC+07:00][recorded_at] Local validation PASS: clean `npm ci --ignore-scripts`; focused 5 files / 29 tests; full frontend 53 files / 332 tests; lint; type-check; build and A2 receipt (`monacoInInitialGraph=false`). Fresh audit is full `2 moderate / 1 high` and production `2 moderate / 0 high`; residuals are Monaco/DOMPurify (E2-B) and Undici (E2-D). Exact pushed-source canonical Smoke is required before completion; no state/checkpoint or F9 promotion.
 
 ## E2-D — jsdom/Undici test chain
 
