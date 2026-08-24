@@ -2,5 +2,5 @@ PQG Workspace GitHub Agent Preflight trigger.
 
 This file is intentionally updated by ChatGPT Project / GitHub-connected agents when a fresh Agent Preflight receipt is required and workflow_dispatch is not exposed by the connector.
 
-Last trigger: 2026-08-24 12:58:21 UTC+07:00
-Reason: fresh exact-ref Agent Preflight before continuing the already-authorized remediation package B (Sandbox hostile-local-process TOCTOU hardening) from source candidate a9f3b5798fd19511c02c13c8efa1f7bd7d699126. This trigger opens no new protected scope; it does not open F9, schema/migration, dependency/tool-version, provider/credential, deployment, checkpoint/state promotion, branch protection, or unrelated security/application scope.
+Last trigger: 2026-08-24 23:01:33 UTC+07:00
+Reason: fresh exact-ref Agent Preflight before Package E3 bounded-exception implementation. User explicitly approved immutable-SHA pins for official GitHub Actions post-release security-fixed commits when current stable releases retain a known High advisory, conditional on patched actual distributed artifacts, suitable upstream validation, and PQG Preflight/Smoke/Windows PASS. This bootstrap write opens only the preflight path and no E4 provider/credential/network, G branch protection, H acceptance, F/F9, schema/migration, deployment, or checkpoint/state promotion scope.
