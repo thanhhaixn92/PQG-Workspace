@@ -38,6 +38,23 @@ def _make_dir_link(link: Path, target: Path) -> None:
         link.symlink_to(target, target_is_directory=True)
 
 
+def _attempt_hostile_parent_swap(parent: Path, held: Path, outside: Path) -> bool:
+    """Return True only when the hostile pathname swap actually completed.
+
+    Windows may deny the rename while the sandbox holds a directory HANDLE. That is
+    itself a valid fail-closed security outcome, so the race tests must distinguish
+    a blocked attacker mutation from a successful mutation that could redirect I/O.
+    """
+    try:
+        parent.rename(held)
+    except OSError as exc:
+        if os.name == "nt" and getattr(exc, "winerror", None) in {5, 32}:
+            return False
+        raise
+    _make_dir_link(parent, outside)
+    return True
+
+
 def test_b_rejects_cross_platform_escape_aliases() -> None:
     rejected = [
         "../secret.txt",
@@ -89,7 +106,7 @@ def test_b_rejects_symlink_or_junction_parent(tmp_path: Path) -> None:
     assert _status(exc) == 403
 
 
-def test_b_parent_swap_after_open_fails_closed(tmp_path: Path) -> None:
+def test_b_parent_swap_after_open_never_redirects_write(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     parent = workspace / "parent"
     held = workspace / "held-parent"
@@ -100,28 +117,45 @@ def test_b_parent_swap_after_open_fails_closed(tmp_path: Path) -> None:
     (parent / "value.txt").write_text("old", encoding="utf-8")
     outside_target = outside / "value.txt"
     outside_target.write_text("outside", encoding="utf-8")
-    swapped = False
+    hook_ran = False
+    swap_succeeded = False
 
     def hook(stage: str, relative: str) -> None:
-        nonlocal swapped
-        if stage != "before_replace" or swapped:
+        nonlocal hook_ran, swap_succeeded
+        if stage != "before_replace" or hook_ran:
             return
-        swapped = True
-        parent.rename(held)
-        _make_dir_link(parent, outside)
+        hook_ran = True
+        swap_succeeded = _attempt_hostile_parent_swap(parent, held, outside)
 
     sandbox_io._TEST_HOOK = hook
+    error: HTTPException | None = None
     try:
-        with pytest.raises(HTTPException) as exc:
+        try:
             write_bytes(workspace, "parent/value.txt", b"new")
-        assert _status(exc) == 403
+        except HTTPException as exc:
+            error = exc
+            assert exc.status_code == 403
     finally:
         sandbox_io._TEST_HOOK = None
+
+    assert hook_ran
     assert outside_target.read_text(encoding="utf-8") == "outside"
-    assert (held / "value.txt").read_text(encoding="utf-8") == "old"
+    if swap_succeeded:
+        # A successful hostile pathname swap may either be rejected after the
+        # race or continue only through the already-bound trusted parent.
+        if error is None:
+            assert (held / "value.txt").read_text(encoding="utf-8") == "new"
+        else:
+            assert (held / "value.txt").read_text(encoding="utf-8") == "old"
+    else:
+        # Windows commonly prevents the attacker rename while the trusted
+        # directory HANDLE is open. The write may then safely finish in place.
+        assert error is None
+        assert not held.exists()
+        assert (parent / "value.txt").read_text(encoding="utf-8") == "new"
 
 
-def test_b_creation_under_swapped_parent_fails_closed(tmp_path: Path) -> None:
+def test_b_creation_under_swapped_parent_never_redirects_write(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     parent = workspace / "parent"
     held = workspace / "held-parent"
@@ -129,25 +163,38 @@ def test_b_creation_under_swapped_parent_fails_closed(tmp_path: Path) -> None:
     workspace.mkdir()
     parent.mkdir()
     outside.mkdir()
-    swapped = False
+    hook_ran = False
+    swap_succeeded = False
 
     def hook(stage: str, relative: str) -> None:
-        nonlocal swapped
-        if stage != "before_replace" or swapped:
+        nonlocal hook_ran, swap_succeeded
+        if stage != "before_replace" or hook_ran:
             return
-        swapped = True
-        parent.rename(held)
-        _make_dir_link(parent, outside)
+        hook_ran = True
+        swap_succeeded = _attempt_hostile_parent_swap(parent, held, outside)
 
     sandbox_io._TEST_HOOK = hook
+    error: HTTPException | None = None
     try:
-        with pytest.raises(HTTPException) as exc:
+        try:
             write_bytes(workspace, "parent/new.txt", b"new", create_only=True)
-        assert _status(exc) == 403
+        except HTTPException as exc:
+            error = exc
+            assert exc.status_code == 403
     finally:
         sandbox_io._TEST_HOOK = None
+
+    assert hook_ran
     assert not (outside / "new.txt").exists()
-    assert not (held / "new.txt").exists()
+    if swap_succeeded:
+        if error is None:
+            assert (held / "new.txt").read_bytes() == b"new"
+        else:
+            assert not (held / "new.txt").exists()
+    else:
+        assert error is None
+        assert not held.exists()
+        assert (parent / "new.txt").read_bytes() == b"new"
 
 
 def test_b_atomic_target_hardlink_swap_fails_closed(tmp_path: Path) -> None:
