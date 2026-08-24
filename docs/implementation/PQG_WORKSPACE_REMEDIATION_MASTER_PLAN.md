@@ -98,7 +98,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | --- | --- | --- | --- | --- | --- |
 | A0 | CI/preflight topology repair | P0 | **COMPLETE** | CI/process | source `c6b7d1af…`; Preflight #11/#15; Smoke #115/#116/#117 |
 | A1 | Full frontend regression in `pqg/smoke` + backend skip visibility | P0 | **COMPLETE** | CI/process | source `2c1b823…`; Preflight bootstrap `50e3bdb…`; Smoke #119 / `pqg/smoke=success`; frontend 50 files / 317 tests |
-| A2 | Module/heavy-feature code splitting | P0 | **NOT STARTED** | No new security/schema/dependency | focused lazy/fail-closed tests + full frontend + bundle receipt + Smoke |
+| A2 | Module/heavy-feature code splitting | P0 | **COMPLETE** | No new security/schema/dependency | source `5fce3270…`; Preflight #17; Smoke #126; eager 486,620 bytes; Monaco/Mermaid outside initial graph |
 | B | Sandbox hostile-local-process TOCTOU hardening | P1 | **NOT STARTED** | **Security boundary** | Linux/POSIX + Windows hostile-swap suites + full backend + Smoke |
 | C | Admin boundary contract reconciliation | P1 | **NOT STARTED** | Auth/security contract | current controls characterized; docs avoid proof-of-human claim |
 | D | Capability executable-binding validator | P1 | **NOT STARTED** | **Capability/security boundary** | negative drift tests + full backend/startup/Smoke |
@@ -204,9 +204,20 @@ Preserve eager Foundation/core surfaces where startup UX requires them. Lazy-loa
 
 Focused tests must cover idle/loading/error, detached, attached load start, pending state, recoverable import failure, stale late import after module switch, Monaco non-load without scope, and existing fail-closed Foundation behavior.
 
-### Bundle receipt / acceptance
+### Acceptance — COMPLETE
 
-Record before/after initial entry JS+gzip, largest eager chunk, largest lazy chunk, initial JS request count, proof Monaco is not startup content, and proof Mermaid remains on-demand. Require focused tests + full frontend + lint + type-check + build + bundle comparison + exact-head Smoke.
+- Fresh exact-ref A2 preflight: trigger commit `f7750190c3c1744f259fb9ef0b25d9c34ab07eda`; Agent Preflight Run #17 / ID `32676695105` completed SUCCESS and published `pqg/preflight=success`.
+- Final source-validation HEAD: `5fce3270f26f1cac1ffb9d228c63576a47870bc0`.
+- Failed intermediate validation remained fail-closed and is preserved: `3a035ee7…` / Smoke #123 failed reporter source binding and eager threshold; `ea874f56…` / Smoke #124 reduced eager size below threshold but reporter binding failed; `388cd713…` / Smoke #125 failed because the EditorPanel record was not a verified dynamic manifest entry.
+- Final Smoke Run #126 / ID `32680074013` on exact source HEAD completed SUCCESS and published `pqg/smoke=success`; `smoke-real=SKIPPED` and is not A2 PASS evidence.
+- Backend final regression: 597 collected; **516 passed / 81 skipped / 2 warnings**.
+- Frontend final regression: **50 files / 321 tests PASS**; ModuleCanvas focused 11 PASS; SettingsPanel 7 PASS; EditorPanel 8 PASS; lint **0 warnings / 0 errors** over 147 files / 103 rules; type-check PASS; production build PASS.
+- Runtime/migrations/startup/health/runtime status/seven readiness checks/cleanup PASS.
+- Final bundle receipt: entry `assets/index-DQn4IEj6.js` = **486,620 bytes / 144,605 gzip bytes**; initial static graph = **5 JS requests / 497,075 bytes / 149,128 gzip bytes**; largest eager = **486,620 bytes**; largest lazy `assets/chunk-KEIR6QF5-DNzq6p3w.js` = **662,650 bytes / 142,278 gzip bytes**.
+- Monaco proof: runtime source import isolated to `src/components/EditorPanel.tsx`; dynamic facade `src/foundation/shell/EditorSurface.tsx`; `monacoInInitialGraph=false`; EditorPanel chunk is downstream of EditorSurface and outside the initial graph.
+- Mermaid proof: `src/components/MermaidDiagram.tsx` is a dynamic manifest entry with `mermaidInInitialGraph=false`.
+- `chunkSizeWarningLimit` remained unchanged at `500 * 1024 = 512,000`; the remaining generic Vite >500 kB warning belongs to a non-startup lazy chunk and is an explicit residual rather than hidden.
+- A2 changed no dependency/tool version, schema/migration, auth/security/provider/F9/deployment/state/checkpoint scope.
 
 ---
 
@@ -426,3 +437,20 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] Residuals were preserved, not hidden: two backend dependency/version warnings; React `act(...)` test stderr warnings; npm reports 6 vulnerabilities (3 moderate / 3 high); GitHub Actions Node/action-version warnings; Vite build still reports eager/initial chunks `chunk-KEIR6QF5…` 662.65 kB and `index-BcNgI1tV.js` 667.45 kB. Bundle remediation remains A2.
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 made no application/runtime behavior, schema/migration, dependency/tool-version, branch-protection, auth/security semantic, provider/credential, F9, deployment or checkpoint/state change.
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED. Next package is **A2 — Module/heavy-feature code splitting** after A1 tracking/memory persistence and a fresh exact-ref A2 Agent Preflight.
+
+### [2026-08-24 09:19:24 UTC+07:00] Package A2 — Module/heavy-feature code splitting
+
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Status: **COMPLETE**.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Fresh A2 exact-ref preflight trigger HEAD `f7750190c3c1744f259fb9ef0b25d9c34ab07eda`; Agent Preflight Run #17 / ID `32676695105` completed SUCCESS and published `pqg/preflight=success` before implementation writes.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Source-validation HEAD: `5fce3270f26f1cac1ffb9d228c63576a47870bc0`; later docs/memory tracking commits must not inherit this source-validation claim.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Failed validation evidence is preserved: `3a035ee7…` / Smoke #123 failed reporter identification and eager threshold; `ea874f56…` / Smoke #124 reached eager <500 KiB but reporter binding still failed; `388cd713…` / Smoke #125 failed closed because the inferred EditorPanel record was not a verified dynamic entry.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Final implementation introduces deterministic lazy module boundaries, dynamic `EditorSurface` isolation for Monaco/EditorPanel, on-demand Mermaid, optional Settings-section lazy loading and a bundle reporter that verifies startup graph rather than hiding warnings.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Exact Smoke Run #126 / ID `32680074013` on source HEAD completed SUCCESS and published `pqg/smoke=success`; normal smoke PASS and `smoke-real=SKIPPED`.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Backend: 597 collected, **516 passed / 81 skipped / 2 warnings**. Frontend: **50 files / 321 tests PASS**; ModuleCanvas 11 PASS; SettingsPanel 7 PASS; EditorPanel 8 PASS; lint **0 warnings / 0 errors** over 147 files / 103 rules; type-check PASS; production build PASS.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Runtime: migrations through 0038, startup, health/runtime, seven readiness checks and cleanup PASS.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Bundle receipt: initial entry `assets/index-DQn4IEj6.js` **486,620 bytes / 144,605 gzip**; initial JS **5 requests / 497,075 bytes / 149,128 gzip**; largest eager **486,620 bytes**; largest lazy `assets/chunk-KEIR6QF5-DNzq6p3w.js` **662,650 bytes / 142,278 gzip**.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Startup proof: `monacoInInitialGraph=false`, EditorPanel is downstream of the dynamic EditorSurface boundary and outside the initial graph; Mermaid is a dynamic entry with `mermaidInInitialGraph=false`.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Known residuals: generic Vite >500 kB warning remains for the 662,650-byte lazy chunk; backend Pydantic Settings and Starlette/httpx warnings, React `act(...)` stderr warnings elsewhere, npm 6 vulnerabilities and GitHub Actions Node/action-version warnings remain for later packages. `chunkSizeWarningLimit` was not raised.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] NOT RUN/SKIPPED: `smoke-real=SKIPPED`; no real-provider acceptance is claimed.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] Scope not changed: no dependency/tool-version, schema/migration, sandbox/security/provider, F9, deployment, branch-protection or checkpoint/state change occurred in A2.
+- [2026-08-24 09:19:24 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED. Next package is **B — Sandbox hostile-local-process TOCTOU hardening** after this tracking/memory persistence is verified and B receives a fresh exact-ref Agent Preflight.

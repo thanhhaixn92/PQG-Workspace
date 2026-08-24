@@ -17,6 +17,7 @@
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Master-plan A0 tracking commit after source validation: `710355d39bbbd64127e70cfdbaa6e42173dfc692`; this is docs-only tracking evidence and must not be represented as the A0 source-validation HEAD.
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 source-validation HEAD: `2c1b8238921bd0e99367802cfb29c5218ef87e6f`.
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 master-plan tracking commit: `6354ae1efc7d6761238edae961333c9e92a39138`; it is docs-only tracking evidence and does not replace the A1 source-validation HEAD.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 source-validation HEAD: `5fce3270f26f1cac1ffb9d228c63576a47870bc0`; later documentation/memory tracking commits must remain separate from this exact source-validation receipt.
 
 ## Current state / gates
 
@@ -25,7 +26,7 @@
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] F7 Resource Catalog + Context Broker remains scoped implementation/validation PASS from earlier evidence; A0 did not modify F7 behavior.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] F9 Data Egress remains **CLOSED / NOT APPROVED**.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Migration-maintainability package F remains DEFERRED unless separately justified.
-- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 is **COMPLETE**; the next active remediation package is A2 after a fresh exact-ref Agent Preflight.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 is **COMPLETE** at source-validation HEAD `5fce3270f26f1cac1ffb9d228c63576a47870bc0`; the next implementation package is B only after A2 tracker/memory persistence is verified and B receives its own fresh exact-ref Agent Preflight.
 
 ## Locked remediation decisions
 
@@ -68,10 +69,24 @@
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 residuals: two backend dependency/version warnings, React `act(...)` test stderr warnings, npm 6 vulnerabilities (3 moderate / 3 high), GitHub Actions Node/action-version warnings, and eager/initial frontend chunks above 500 kB. These remain scoped to later packages rather than silently accepted as fixed.
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 changed CI test semantics only; no application/runtime behavior, schema/migration, dependency/tool-version, branch protection, auth/security semantic, provider/credential, F9, deployment or state/checkpoint change occurred.
 
+## A2 — completed evidence
+
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 status: **COMPLETE** — module/heavy-feature code splitting with deterministic startup-graph receipt.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Fresh A2 exact-ref Agent Preflight was established by trigger commit `f7750190c3c1744f259fb9ef0b25d9c34ab07eda`; Agent Preflight Run #17 / ID `32676695105` completed SUCCESS and published `pqg/preflight=success`.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 source evolution preserved failed validation evidence rather than hiding it: `3a035ee7…` / Smoke #123 failed reporter identification and still exceeded the eager threshold; `ea874f56…` / Smoke #124 fixed startup size but reporter binding failed; `388cd713…` / Smoke #125 remained fail-closed because the inferred EditorPanel manifest record was not a verified dynamic entry; final source-validation HEAD is `5fce3270f26f1cac1ffb9d228c63576a47870bc0`.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 keeps Foundation/core startup surfaces eager where required while lazy-loading optional module surfaces only after projection/attachment eligibility; Settings keeps its Foundation shell and default GYO model settings eager but lazy-loads Marketplace, Memory Hub, Local Data and Runtime Status only when their tabs are selected.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Documents/editor loading is guarded by Work + active/open-file eligibility. A stable dynamic `EditorSurface` facade isolates `EditorPanel`; runtime source scanning verifies `@monaco-editor/react` is imported only by `src/components/EditorPanel.tsx`.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Final exact Smoke Run #126 / ID `32680074013` on source HEAD `5fce3270…` completed SUCCESS and published `pqg/smoke=success`; `smoke-real=SKIPPED` and is not part of A2 PASS evidence.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Backend final A2 regression: 597 collected; **516 passed / 81 skipped / 2 warnings**. Frontend: **50 files / 321 tests PASS**; `ModuleCanvas` focused suite 11 PASS; `SettingsPanel` 7 PASS; lint **0 warnings / 0 errors** over 147 files / 103 rules; type-check PASS; production build PASS.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Final A2 bundle receipt: initial entry `assets/index-DQn4IEj6.js` = **486,620 bytes / 144,605 gzip bytes**; initial static graph = **5 JS requests / 497,075 bytes / 149,128 gzip bytes**; largest eager = **486,620 bytes**, below the unchanged `500 * 1024 = 512,000` gate; largest lazy = **662,650 bytes / 142,278 gzip bytes**.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Deterministic heavy-feature proof: `EditorSurface` is a dynamic manifest entry, `monacoInInitialGraph=false`, `EditorPanel` is downstream of that boundary and `editorPanelInInitialGraph=false`; `MermaidDiagram` is a dynamic manifest entry with `mermaidInInitialGraph=false`.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Final A2 runtime evidence: migrations through 0038, backend startup, health, runtime status, seven readiness checks and cleanup PASS on exact source HEAD.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 did **not** raise Vite `chunkSizeWarningLimit`; the remaining >500 kB Vite warning is attributable to a non-startup lazy chunk and is recorded rather than hidden. A2 made no dependency/tool-version, schema/migration, security/provider, F9, deployment or state/checkpoint change.
+
 ## Current residuals relevant to next packages
 
 - [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1's former limited-frontend/hidden-skip finding is closed; `pqg/smoke` now executes the full frontend suite and backend pytest with visible skip reasons.
-- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Initial/eager frontend chunks above 500 kB remain active **A2** scope; A1 build recorded approximately 662.65 kB and 667.45 kB large eager/entry chunks.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 initial/eager >500 kB finding is closed: final largest eager is 486,620 bytes. A 662,650-byte lazy chunk remains intentionally non-startup and continues to trigger Vite's generic >500 kB warning; this is accepted A2 residual, not an eager/startup regression.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Sandbox pathname TOCTOU against hostile local process remains package B scope.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Admin boundary wording/characterization remains package C; capability executable binding remains package D.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Dependency/supply-chain residuals remain for E1–E3: npm baseline 6 vulnerabilities (3 moderate, 3 high), backend reproducibility/warnings, GitHub Actions Node-version warnings and mutable action tags.
@@ -80,5 +95,6 @@
 
 ## Next exact action
 
-- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Begin **A2 — Module/heavy-feature code splitting** only after A1 tracking/memory persistence is verified on live `pqg-workspace`.
-- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Before A2 implementation edits, re-fetch the live docs-only tracking HEAD, self-trigger a fresh Agent Preflight on that exact ref via `.github/agent-preflight-trigger.txt`, require workflow SUCCESS + `pqg/preflight=success`, then inspect Foundation/module loader, Documents/Monaco, Mermaid import paths, build configuration and focused tests before stating A2 exact scope/validation/forbidden boundaries.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Next package is **B — Sandbox hostile-local-process TOCTOU hardening**, but implementation must not begin until this A2 tracking/memory persistence is verified on live `pqg-workspace` and B has its own fresh exact-ref Agent Preflight.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] Before B implementation edits: re-fetch the live tracking HEAD; self-trigger Agent Preflight on that exact ref via `.github/agent-preflight-trigger.txt`; require workflow SUCCESS + `pqg/preflight=success`; inspect current state/canon/security/source/tests and audit `backend/app/api/files.py`, `backend/app/mcp/tools.py`, artifact import/publishing, DIRAP extraction/read paths, workspace/local search and F7 artifact hydration.
+- [2026-08-24 08:39:57 UTC+07:00][recorded_at] B acceptance remains handle/descriptor-bound I/O with Windows-equivalent hostile-swap defenses and focused traversal/symlink/junction/hard-link/swap/race coverage plus full backend, F7 leakage regression and exact-head Smoke; no root widening, F9, schema/migration, provider or checkpoint/state change is authorized.
