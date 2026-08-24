@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import hashlib
+import io
 import json
+import logging
 import runpy
 import shutil
 import sys
@@ -159,7 +162,10 @@ async def _run(receipt: dict[str, Any], temp_root: Path, model_profile_id: str) 
         "selection": "manual",
     }
     db_path = temp_root / "e4.sqlite"
-    await run_migrations(db_path)
+    # Migration helpers print progress and HTTPX logs request URLs. Neither is
+    # suitable for the redacted receipt/console channel.
+    with contextlib.redirect_stdout(io.StringIO()):
+        await run_migrations(db_path)
     settings = Settings(
         db_path=str(db_path),
         default_workspace_root=str(temp_root / "workspaces"),
@@ -256,6 +262,8 @@ async def main() -> int:
     parser = argparse.ArgumentParser(description="Run bounded E4 native current-GYO acceptance.")
     parser.add_argument("--model-profile-id", required=True, help="Existing enabled free model profile selected manually.")
     args = parser.parse_args()
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     output_dir = REPO_ROOT / "output" / "e4-native-gyo" / f"package-e4-{time.strftime('%Y%m%d-%H%M%S')}"
     output_dir.mkdir(parents=True, exist_ok=False)
     receipt: dict[str, Any] = {"package": "E4 native current-GYO", "started_at": int(time.time()), "provider_request_budget": 3, "fallback_budget": 0, "source_hashes": _source_hashes(), "runner_sha256": _sha256(Path(__file__))}
@@ -271,7 +279,7 @@ async def main() -> int:
         receipt["finished_at"] = int(time.time())
         receipt["exit_code"] = exit_code
         (output_dir / "run-metadata.json").write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"status": receipt["status"], "exit_code": exit_code, "evidence": str(output_dir)}, ensure_ascii=False))
+    print(json.dumps({"status": receipt["status"], "exit_code": exit_code, "evidence_dir": output_dir.name}, ensure_ascii=False))
     return exit_code
 
 
