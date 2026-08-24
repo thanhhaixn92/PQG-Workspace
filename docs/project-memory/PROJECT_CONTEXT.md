@@ -25,6 +25,8 @@
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] A0 established active Smoke push conventions: `pqg-workspace`, `work/**`, `security/**`, `maintenance/**`, `integration/**`; PR validation targets `pqg-workspace`; workflow_dispatch remains available.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] For a new-branch push where GitHub reports `before=0000000000000000000000000000000000000000`, Smoke must deepen the shallow checkout enough to resolve `HEAD^` and run committed-diff validation on `parent→HEAD`, not scan the full historical snapshot.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] `pqg/preflight` is an agent execution prerequisite. Locked Q7 keeps it separate from final merge-required status semantics unless that design is explicitly changed; final governance package G requires `pqg/smoke` after technical gates are truthful/stable.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 established stable Smoke regression semantics: the normal `pqg/smoke` job runs backend `pytest -v -ra --tb=short`, the full frontend `npm run test`, lint, type-check, production build, migrations/startup, health/runtime, readiness and cleanup; real-provider validation remains a separate job/evidence path and a skipped real-provider job is never PASS evidence.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 source-validation HEAD is `2c1b8238921bd0e99367802cfb29c5218ef87e6f`, where Smoke Run #119 / ID `32674524485` proved full frontend 50 files / 317 tests plus backend 516 passed / 81 skipped / 2 warnings and exact-SHA `pqg/smoke=success`; later docs/memory tracking HEADs do not inherit that source-validation claim.
 
 ## Locked Foundation architecture
 
@@ -59,5 +61,6 @@
 
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] User locked all remediation choices `Q1=A` through `Q9=A` and authorized sequential single-agent execution; multi-agent remains paused.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Locked execution order: `A0 → A1 → A2 → B → C → D → E1 → E2 → E3 → E4 → G → H1 → H2 → H3 → H4 → H5 → H6`; migration package F is deferred unless separately justified; F9 stays closed.
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] A0 is COMPLETE at source-validation HEAD `c6b7d1afab3f066a4aa7f99639104441db1d69fa`; next package is A1 after A0 tracking/memory persistence is verified.
+- [2026-08-24 06:39:02 UTC+07:00][recorded_at] A0 is COMPLETE at source-validation HEAD `c6b7d1afab3f066a4aa7f99639104441db1d69fa`.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 is COMPLETE at source-validation HEAD `2c1b8238921bd0e99367802cfb29c5218ef87e6f`; next implementation package is A2 after its own fresh exact-ref preflight.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Source-validation HEADs must always be separated from later documentation/memory-only tracking HEADs; later docs commits do not inherit source/CI validation merely by ancestry.
