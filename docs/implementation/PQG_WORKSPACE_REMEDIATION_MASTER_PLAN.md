@@ -108,7 +108,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | E1 | npm vulnerability exact inventory | P2 | **COMPLETE** | Dependency analysis | exact 6-node / 32-advisory inventory + four proposed E2 batches |
 | E2 | Selective dependency remediation | P2 | **IN PROGRESS — E2-A COMPLETE** | **Dependencies/tool versions** | E2-A source `dc1a462…`; remaining fault domains are separately gated below |
 | P-TRACK | Bounded tracking-equivalence CI | P1 process | **COMPLETE** | CI/process | source `2ac0e831…` full receipt; T1 `42b16fcb…` tracking receipt |
-| P-MEM | Project Memory/Context normalization | P2 docs | **IN PROGRESS — T2 candidate** | Docs/evidence | final bounded tracking child; complete only on its exact CI receipt |
+| P-MEM | Project Memory/Context normalization | P2 docs | **PARTIAL — full-recovery candidate** | Docs/evidence | T2 failed closed on shallow ancestry; recovery requires exact full Smoke |
 | E2-B | Monaco bundled DOMPurify | P1 security | **NOT STARTED — upstream-aware** | Dependency/security evidence | fresh artifact discovery; fixed upstream release or explicit BLOCKED-UPSTREAM |
 | E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted same-major resolution + frontend/full Smoke |
 | E2-D | jsdom/Undici test chain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted Undici resolution without default jsdom-major upgrade |
@@ -403,7 +403,7 @@ integration topology; that residual is recorded, not solved here.
 
 ## P-MEM — Project Memory normalization
 
-**Status: IN PROGRESS — T2 COMPLETION CANDIDATE.**
+**Status: PARTIAL — T2 FAILED CLOSED; FULL-RECOVERY CANDIDATE.**
 
 P-MEM must not be folded into P-TRACK. It will define one canonical home per
 fact while preserving historical receipts in the changelog and Git history.
@@ -704,3 +704,8 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] P-TRACK is **COMPLETE**: SOURCE `2ac0e83184e891bd61f5543084b5d26868e10636` has the canonical full receipt, and direct child T1 `42b16fcb2394528f0b73ebb2812a4c8ff5274953` has exact `pqg/tracking-integrity=success` and canonical `pqg/smoke=success`. The tracking receipt proves bounded equivalence only; it does not relabel runtime validation as executed on T1.
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] P-MEM is this one remaining bounded tracking child T2. Its scope is the existing five-file tracking allowlist only: Master Plan, Project Context, Project Memory, Project Changelog and `REMEDIATION_MASTER_PLAN_CONTEXT.md`; no add/delete/rename, state/checkpoint or runtime change is permitted.
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] T2 becomes **COMPLETE** only if its exact SHA publishes `pqg/tracking-integrity=success` and canonical `pqg/smoke=success`, with `smoke-full=skipped`; there is no T2.5 receipt commit. A correction after T2 must fall back to full Smoke. E2-B remains unopened until that receipt exists.
+
+### [2026-08-24 19:09:01 UTC+07:00] P-MEM T2 fail-closed receipt and full-recovery candidate
+
+- [2026-08-24 19:09:01 UTC+07:00][recorded_at] Exact T2 `603fdd19139e5cd3c76797e6576c25a746f79e40` failed closed in Smoke run `32725233242`: classifier reported T1 `42b16fcb…` as a depth-one anchor and tracking integrity correctly rejected it because it has no `pqg/smoke-full` receipt. No runtime validation was falsely claimed and P-MEM remains PARTIAL.
+- [2026-08-24 19:09:01 UTC+07:00][recorded_at] Root cause is workflow shallow-fetch poisoning: `git fetch --depth=1` on push `before` truncated T1's parent relation to SOURCE `2ac0e831…`. The correction preserves ancestry and makes incomplete ancestry fall back to full validation. This recovery commit is intentionally outside the tracking allowlist and therefore must complete exact full Smoke before P-MEM can be accepted.

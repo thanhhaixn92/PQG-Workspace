@@ -30,6 +30,7 @@ class ClassifierTests(unittest.TestCase):
             "parent_sha": PARENT,
             "head_changes": TRACKING_CHANGE,
             "parent_changes": [gate.Change("M", ".github/workflows/smoke.yml")],
+            "parent_parent_sha": ANCHOR,
         }
         values.update(overrides)
         return gate.classify_candidate(**values)
@@ -86,6 +87,12 @@ class ClassifierTests(unittest.TestCase):
         self.assertEqual(self.classify(before_sha=gate.ZERO_SHA).mode, "full")
         self.assertEqual(self.classify(head_sha="invalid").mode, "full")
 
+    def test_incomplete_parent_ancestry_falls_full(self):
+        self.assertEqual(
+            self.classify(parent_changes=(), parent_parent_sha="").mode,
+            "full",
+        )
+
     def test_head_add_delete_rename_or_outside_path_is_full(self):
         for change in (
             gate.Change("A", TRACKING_FILE),
@@ -102,6 +109,15 @@ class ClassifierTests(unittest.TestCase):
             gate.parse_name_status_z(raw),
             [gate.Change("M", TRACKING_FILE), gate.Change("D", "old.md")],
         )
+
+
+class WorkflowContractTests(unittest.TestCase):
+    def test_push_base_fetch_preserves_tracking_ancestry(self):
+        workflow = (Path(__file__).parents[3] / ".github/workflows/smoke.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('fetch --no-tags --deepen=4 origin "${BEFORE_SHA}"', workflow)
+        self.assertNotIn('fetch --no-tags --depth=1 origin "${BEFORE_SHA}"', workflow)
 
 
 class ReceiptTests(unittest.TestCase):

@@ -16,10 +16,10 @@
 ## Latest completed package and active gate
 
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] Latest completed package: **P-TRACK**. SOURCE has exact `pqg/smoke-full=success` and canonical `pqg/smoke=success`; T1 has exact `pqg/tracking-integrity=success` and canonical `pqg/smoke=success`. Tracking-equivalence is not runtime execution on T1.
-- [2026-08-24 19:03:27 UTC+07:00][recorded_at] Active gate: **P-MEM T2 completion candidate**. It consumes the only remaining bounded tracking slot and may modify only Master Plan, Project Context, this Project Memory, Project Changelog and `REMEDIATION_MASTER_PLAN_CONTEXT.md`, all as modifications. P-MEM becomes COMPLETE only if exact T2 publishes `pqg/tracking-integrity=success` and canonical `pqg/smoke=success`; no T2.5 receipt commit is allowed.
+- [2026-08-24 19:09:01 UTC+07:00][recorded_at] Active gate: **P-MEM full-recovery candidate**. T2 `603fdd19139e5cd3c76797e6576c25a746f79e40` changed only the five permitted documents but failed closed because shallow workflow ancestry misclassified it as depth one; its receipts are `pqg/tracking-integrity=failure` and `pqg/smoke=failure`. No T2.5 is allowed. The corrective source commit must pass exact full Smoke before P-MEM can be accepted.
 
 ## Open residuals and next action
 
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] Open owned work: E2-B is discovery-first and can be BLOCKED-UPSTREAM; E2-C and E2-D are selective dependency packages; E2-E first selects one reproducibility authority; E3 owns action/toolchain remediation; E4 requires fresh provider/credential/network authorization and native-GYO proof; G owns PR-first governance; H1-H6 are later gates. External-fork custom-status compatibility remains NOT RUN.
-- [2026-08-24 19:03:27 UTC+07:00][recorded_at] Next exact action: publish and inspect exact T2 tracking receipts, then stop before E2-B. Any correction after T2 follows the full fail-closed path and begins with a fresh exact-ref preflight.
+- [2026-08-24 19:09:01 UTC+07:00][recorded_at] Next exact action: publish and inspect the full-recovery Smoke receipt, then stop before E2-B. Any later correction also follows the full fail-closed path and begins with a fresh exact-ref preflight.
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] Approval remains required for protected scope, including dependency/tool changes, providers/credentials/network, schema/migration, F9, deployment, branch protection, and state/checkpoint promotion.

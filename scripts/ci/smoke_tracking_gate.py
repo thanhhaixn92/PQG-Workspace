@@ -94,6 +94,8 @@ def classify_candidate(
         return Decision("full", "push is not a single direct child of before SHA")
     if not _changes_are_tracking_only(head_changes):
         return Decision("full", _change_failure(head_changes, "head commit"))
+    if not SHA_PATTERN.fullmatch(parent_parent_sha):
+        return Decision("full", "parent ancestry is incomplete")
     if not _changes_are_tracking_only(parent_changes):
         return Decision(
             "tracking",
@@ -102,8 +104,6 @@ def classify_candidate(
             "",
             1,
         )
-    if not SHA_PATTERN.fullmatch(parent_parent_sha):
-        return Decision("full", "tracking predecessor has no valid first parent")
     if anchor_is_tracking:
         return Decision("full", "tracking chain would exceed two consecutive commits")
     if not _changes_are_tracking_only(cumulative_changes):

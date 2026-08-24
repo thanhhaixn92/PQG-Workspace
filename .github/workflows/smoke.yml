@@ -62,7 +62,9 @@ jobs:
             git -C "${GITHUB_WORKSPACE}" fetch --no-tags --depth=1 origin "${PR_BASE_SHA}"
             git -C "${GITHUB_WORKSPACE}" diff --check "${PR_BASE_SHA}" "${GITHUB_SHA}"
           elif [[ "${EVENT_NAME}" == "push" && -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "${zero_sha}" ]]; then
-            git -C "${GITHUB_WORKSPACE}" fetch --no-tags --depth=1 origin "${BEFORE_SHA}"
+            # Preserve first-parent ancestry for the bounded T1/T2 classifier.
+            # `--depth=1` would make BEFORE_SHA shallow and misclassify T2 as T1.
+            git -C "${GITHUB_WORKSPACE}" fetch --no-tags --deepen=4 origin "${BEFORE_SHA}"
             git -C "${GITHUB_WORKSPACE}" diff --check "${BEFORE_SHA}" "${GITHUB_SHA}"
           elif [[ "${EVENT_NAME}" == "push" && "${BEFORE_SHA}" == "${zero_sha}" ]]; then
             git -C "${GITHUB_WORKSPACE}" fetch --no-tags --deepen=1 origin "${GITHUB_REF_NAME}"
@@ -71,12 +73,6 @@ jobs:
           else
             git -C "${GITHUB_WORKSPACE}" show --check --oneline --no-renames "${GITHUB_SHA}"
           fi
-
-      - name: Fetch push base for tracking classification
-        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
-        run: git fetch --no-tags --depth=1 origin "${BEFORE_SHA}"
 
       - name: Classify full versus tracking validation
         id: gate
