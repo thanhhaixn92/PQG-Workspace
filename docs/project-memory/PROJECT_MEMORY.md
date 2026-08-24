@@ -15,6 +15,8 @@
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Authoritative remediation tracker: `docs/implementation/PQG_WORKSPACE_REMEDIATION_MASTER_PLAN.md`; execution context: `docs/project-memory/REMEDIATION_MASTER_PLAN_CONTEXT.md`.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] A0 source-validation HEAD: `c6b7d1afab3f066a4aa7f99639104441db1d69fa`.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Master-plan A0 tracking commit after source validation: `710355d39bbbd64127e70cfdbaa6e42173dfc692`; this is docs-only tracking evidence and must not be represented as the A0 source-validation HEAD.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 source-validation HEAD: `2c1b8238921bd0e99367802cfb29c5218ef87e6f`.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 master-plan tracking commit: `6354ae1efc7d6761238edae961333c9e92a39138`; it is docs-only tracking evidence and does not replace the A1 source-validation HEAD.
 
 ## Current state / gates
 
@@ -23,6 +25,7 @@
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] F7 Resource Catalog + Context Broker remains scoped implementation/validation PASS from earlier evidence; A0 did not modify F7 behavior.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] F9 Data Egress remains **CLOSED / NOT APPROVED**.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Migration-maintainability package F remains DEFERRED unless separately justified.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 is **COMPLETE**; the next active remediation package is A2 after a fresh exact-ref Agent Preflight.
 
 ## Locked remediation decisions
 
@@ -52,10 +55,23 @@
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] A0 Smoke still used the pre-A1 focused frontend set, so A0 does **not** prove full frontend regression. Full frontend regression and backend skip visibility remain the A1 acceptance target.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] A0 made no application/runtime, dependency/action-major, schema/migration, branch-protection, provider/credential, F9, deployment or checkpoint/state change.
 
+## A1 — completed evidence
+
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 status: **COMPLETE** — full frontend regression in `pqg/smoke` plus backend skip visibility.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Current-session drift reconciliation found `pqg-workspace` at A1 source HEAD `2c1b8238921bd0e99367802cfb29c5218ef87e6f`, 12 commits ahead of the handoff docs HEAD; the drift contained prior A0 completion/tracking and A1 work, not an unrelated competing line.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Fresh A1 bootstrap HEAD `50e3bdb83054b3e27d6c20105bfc4e326ce2dd9e` had exact-SHA `pqg/preflight=success` from Agent Preflight Run ID `32674453029` before A1 implementation.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Exact A1 implementation compare `50e3bdb…→2c1b823…` is ahead 1 / behind 0 and modifies only `.github/workflows/smoke.yml` (4 additions / 4 deletions).
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Smoke Test Run #119 / ID `32674524485` on exact A1 source = SUCCESS with `pqg/smoke=success`; normal smoke passed and `smoke-real=SKIPPED`.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Backend A1 result: 597 collected; **516 passed / 81 skipped / 2 warnings** using `pytest -v -ra --tb=short`; visible reasons account for 80 superseded Hermes/ACP cases plus 1 Windows restore-local-data environment case, with no unexplained backend skip observed.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Frontend A1 result: full suite **50 files / 317 tests PASS**; lint **0 warnings / 0 errors** over 144 files / 103 rules; type-check PASS; build PASS.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Runtime A1 result: migrations through 0038, startup, health/runtime, 7 readiness checks and cleanup PASS.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 residuals: two backend dependency/version warnings, React `act(...)` test stderr warnings, npm 6 vulnerabilities (3 moderate / 3 high), GitHub Actions Node/action-version warnings, and eager/initial frontend chunks above 500 kB. These remain scoped to later packages rather than silently accepted as fixed.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 changed CI test semantics only; no application/runtime behavior, schema/migration, dependency/tool-version, branch protection, auth/security semantic, provider/credential, F9, deployment or state/checkpoint change occurred.
+
 ## Current residuals relevant to next packages
 
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] A1 remains required because current Smoke semantics before A1 cover only four focused frontend test files and do not expose/classify backend skip reasons sufficiently.
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] Initial frontend chunks >500 kB remain A2 scope.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1's former limited-frontend/hidden-skip finding is closed; `pqg/smoke` now executes the full frontend suite and backend pytest with visible skip reasons.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Initial/eager frontend chunks above 500 kB remain active **A2** scope; A1 build recorded approximately 662.65 kB and 667.45 kB large eager/entry chunks.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Sandbox pathname TOCTOU against hostile local process remains package B scope.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Admin boundary wording/characterization remains package C; capability executable binding remains package D.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Dependency/supply-chain residuals remain for E1–E3: npm baseline 6 vulnerabilities (3 moderate, 3 high), backend reproducibility/warnings, GitHub Actions Node-version warnings and mutable action tags.
@@ -64,5 +80,5 @@
 
 ## Next exact action
 
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] After A0 master-plan/context/changelog persistence is verified on live `pqg-workspace`, begin **A1 — full frontend regression + backend skip visibility**.
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] Before A1 implementation edit, re-fetch live default HEAD, self-trigger a fresh Agent Preflight on that exact ref, require workflow SUCCESS + `pqg/preflight=success`, inspect frontend/backend test commands and skip sources, then state A1 exact scope/validation/forbidden boundaries.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Begin **A2 — Module/heavy-feature code splitting** only after A1 tracking/memory persistence is verified on live `pqg-workspace`.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Before A2 implementation edits, re-fetch the live docs-only tracking HEAD, self-trigger a fresh Agent Preflight on that exact ref via `.github/agent-preflight-trigger.txt`, require workflow SUCCESS + `pqg/preflight=success`, then inspect Foundation/module loader, Documents/Monaco, Mermaid import paths, build configuration and focused tests before stating A2 exact scope/validation/forbidden boundaries.
