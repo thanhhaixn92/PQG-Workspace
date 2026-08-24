@@ -58,9 +58,9 @@ function normalizeManifestPath(value) {
   return typeof value === 'string' ? value.replaceAll('\\', '/') : '';
 }
 
-function findSourceEntry(sourcePath) {
+function findDynamicEntry(sourcePath, outputStem) {
   const normalizedSourcePath = normalizeManifestPath(sourcePath);
-  const match = records.find(([key, record]) => {
+  const sourceMatches = records.filter(([key, record]) => {
     const normalizedKey = normalizeManifestPath(key);
     const normalizedRecordSource = normalizeManifestPath(record?.src);
     return normalizedKey === normalizedSourcePath
@@ -68,11 +68,34 @@ function findSourceEntry(sourcePath) {
       || normalizedRecordSource === normalizedSourcePath
       || normalizedRecordSource.endsWith(normalizedSourcePath);
   });
-  return match ? { key: match[0], record: match[1] } : null;
+
+  if (sourceMatches.length > 1) {
+    throw new Error(`A2 bundle gate found ambiguous manifest source entries for ${sourcePath}`);
+  }
+  if (sourceMatches.length === 1) {
+    const [key, record] = sourceMatches[0];
+    return { key, record, lookup: 'manifest-source' };
+  }
+
+  const dynamicChunkMatches = records.filter(([, record]) => {
+    if (!record?.isDynamicEntry || !record?.file?.endsWith('.js')) return false;
+    const basename = path.posix.basename(normalizeManifestPath(record.file));
+    return basename.startsWith(`${outputStem}-`);
+  });
+
+  if (dynamicChunkMatches.length > 1) {
+    throw new Error(`A2 bundle gate found ambiguous dynamic output entries for ${outputStem}`);
+  }
+  if (dynamicChunkMatches.length === 1) {
+    const [key, record] = dynamicChunkMatches[0];
+    return { key, record, lookup: 'dynamic-chunk-stem' };
+  }
+
+  return null;
 }
 
-const monacoEntry = findSourceEntry('src/components/EditorPanel.tsx');
-const mermaidEntry = findSourceEntry('src/components/MermaidDiagram.tsx');
+const monacoEntry = findDynamicEntry('src/components/EditorPanel.tsx', 'EditorPanel');
+const mermaidEntry = findDynamicEntry('src/components/MermaidDiagram.tsx', 'MermaidDiagram');
 const entryAssets = entryKeys.map(jsAssetFor).filter(Boolean);
 const largestEager = largest(eagerAssets);
 const largestLazy = largest(lazyAssets);
@@ -86,10 +109,14 @@ const receipt = {
   largestLazy,
   monacoEditorEntry: monacoEntry?.key ?? null,
   monacoEditorSource: monacoEntry?.record?.src ?? null,
+  monacoEditorFile: monacoEntry?.record?.file ?? null,
+  monacoEditorLookup: monacoEntry?.lookup ?? null,
   monacoEditorIsDynamicEntry: monacoEntry?.record?.isDynamicEntry ?? false,
   monacoInInitialGraph: monacoEntry ? eagerKeys.has(monacoEntry.key) : null,
   mermaidEntry: mermaidEntry?.key ?? null,
   mermaidSource: mermaidEntry?.record?.src ?? null,
+  mermaidFile: mermaidEntry?.record?.file ?? null,
+  mermaidLookup: mermaidEntry?.lookup ?? null,
   mermaidIsDynamicEntry: mermaidEntry?.record?.isDynamicEntry ?? false,
   mermaidInInitialGraph: mermaidEntry ? eagerKeys.has(mermaidEntry.key) : null,
 };
