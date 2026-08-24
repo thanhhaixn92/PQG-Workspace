@@ -91,7 +91,7 @@ describe('SettingsPanel GYO provider controls', () => {
     expect(screen.getByRole('button', { name: 'Nâng cao' })).toBeDefined();
   });
 
-  it('exposes persistent Module controls only inside the user Settings control plane', () => {
+  it('exposes persistent Module controls only inside the user Settings control plane', async () => {
     render(<SettingsPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Modules' }));
     expect(screen.getByRole('heading', { name: 'Modules' })).toBeDefined();
@@ -100,7 +100,19 @@ describe('SettingsPanel GYO provider controls', () => {
     expect(screen.getByRole('button', { name: 'Gắn vào điều hướng' })).toBeDefined();
     expect(screen.getAllByRole('button', { name: 'Tháo khỏi điều hướng' }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /xóa|delete|uninstall/i })).toBeNull();
-    expect(screen.getByText('Marketplace content')).toBeDefined();
+    expect(await screen.findByText('Marketplace content')).toBeDefined();
+  });
+
+  it('loads optional storage panels only after their settings sections are selected', async () => {
+    render(<SettingsPanel />);
+    expect(screen.queryByText('Memory Hub content')).toBeNull();
+    expect(screen.queryByText('Local data content')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Memory & Dữ liệu' }));
+    expect(await screen.findByText('Memory Hub content')).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Backup & Lưu trữ' }));
+    expect(await screen.findByText('Local data content')).toBeDefined();
   });
 
   it('keeps privacy read-only until the Data Egress gate is implemented', () => {

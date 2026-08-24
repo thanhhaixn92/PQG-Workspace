@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { GyoModelSettings } from '../foundation/settings/GyoModelSettings';
 import { ModulesSettings } from '../foundation/settings/ModulesSettings';
 import { useHermesStore } from '../store/store';
-import { LocalDataPanel } from './LocalDataPanel';
-import { MarketplacePanel } from './MarketplacePanel';
-import { MemoryHubPanel } from './MemoryHubPanel';
-import { RuntimeStatusPanel } from './RuntimeStatusPanel';
+
+const LazyLocalDataPanel = lazy(() => import('./LocalDataPanel').then(module => ({ default: module.LocalDataPanel })));
+const LazyMarketplacePanel = lazy(() => import('./MarketplacePanel').then(module => ({ default: module.MarketplacePanel })));
+const LazyMemoryHubPanel = lazy(() => import('./MemoryHubPanel').then(module => ({ default: module.MemoryHubPanel })));
+const LazyRuntimeStatusPanel = lazy(() => import('./RuntimeStatusPanel').then(module => ({ default: module.RuntimeStatusPanel })));
 
 type Section = 'appearance' | 'modules' | 'model' | 'privacy' | 'memory-data' | 'backup' | 'advanced';
 
@@ -18,6 +19,8 @@ const sections: readonly { id: Section; label: string }[] = [
   { id: 'backup', label: 'Backup & Lưu trữ' },
   { id: 'advanced', label: 'Nâng cao' },
 ] as const;
+
+const settingsFallback = <div className="runtime-guidance" role="status">Đang tải khu vực cài đặt...</div>;
 
 /** Foundation Settings control plane. */
 export const SettingsPanel: React.FC = () => {
@@ -60,7 +63,7 @@ export const SettingsPanel: React.FC = () => {
           <>
             <ModulesSettings />
             <div className="runtime-guidance">Marketplace vẫn giữ cơ chế fail-closed hiện hành. Cài package không đồng nghĩa package được phép chạy hoặc Module được gắn vào điều hướng.</div>
-            <MarketplacePanel />
+            <Suspense fallback={settingsFallback}><LazyMarketplacePanel /></Suspense>
           </>
         )}
 
@@ -85,7 +88,7 @@ export const SettingsPanel: React.FC = () => {
               <h2 id="memory-data-settings-title">Memory & Dữ liệu người dùng</h2>
               <p>Memory GYO có lifecycle riêng và không được coi là source-of-truth của dữ liệu người dùng.</p>
             </header>
-            <MemoryHubPanel />
+            <Suspense fallback={settingsFallback}><LazyMemoryHubPanel /></Suspense>
           </section>
         )}
 
@@ -95,14 +98,14 @@ export const SettingsPanel: React.FC = () => {
               <h2 id="backup-settings-title">Backup & Lưu trữ</h2>
               <p>Giữ nguyên capability backup hiện hành. Không mô tả DB-only backup là full workspace backup.</p>
             </header>
-            <LocalDataPanel />
+            <Suspense fallback={settingsFallback}><LazyLocalDataPanel /></Suspense>
           </section>
         )}
 
         {section === 'advanced' && (
           <>
             <div className="runtime-guidance">Khu vực này dành cho chẩn đoán runtime và kiểm tra kỹ thuật. Trạng thái “chưa xác định” không đồng nghĩa với “sẵn sàng”.</div>
-            <RuntimeStatusPanel />
+            <Suspense fallback={settingsFallback}><LazyRuntimeStatusPanel /></Suspense>
           </>
         )}
       </div>

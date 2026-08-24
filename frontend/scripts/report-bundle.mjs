@@ -54,12 +54,25 @@ function total(assets, field) {
   return assets.reduce((sum, asset) => sum + asset[field], 0);
 }
 
-function findSourceKey(fragment) {
-  return records.find(([key]) => key.endsWith(fragment))?.[0] ?? null;
+function normalizeManifestPath(value) {
+  return typeof value === 'string' ? value.replaceAll('\\', '/') : '';
 }
 
-const monacoEntryKey = findSourceKey('src/components/EditorPanel.tsx');
-const mermaidEntryKey = findSourceKey('src/components/MermaidDiagram.tsx');
+function findSourceEntry(sourcePath) {
+  const normalizedSourcePath = normalizeManifestPath(sourcePath);
+  const match = records.find(([key, record]) => {
+    const normalizedKey = normalizeManifestPath(key);
+    const normalizedRecordSource = normalizeManifestPath(record?.src);
+    return normalizedKey === normalizedSourcePath
+      || normalizedKey.endsWith(normalizedSourcePath)
+      || normalizedRecordSource === normalizedSourcePath
+      || normalizedRecordSource.endsWith(normalizedSourcePath);
+  });
+  return match ? { key: match[0], record: match[1] } : null;
+}
+
+const monacoEntry = findSourceEntry('src/components/EditorPanel.tsx');
+const mermaidEntry = findSourceEntry('src/components/MermaidDiagram.tsx');
 const entryAssets = entryKeys.map(jsAssetFor).filter(Boolean);
 const largestEager = largest(eagerAssets);
 const largestLazy = largest(lazyAssets);
@@ -71,24 +84,34 @@ const receipt = {
   initialJsGzipBytes: total(eagerAssets, 'gzipBytes'),
   largestEager,
   largestLazy,
-  monacoEditorEntry: monacoEntryKey,
-  monacoInInitialGraph: monacoEntryKey ? eagerKeys.has(monacoEntryKey) : null,
-  mermaidEntry: mermaidEntryKey,
-  mermaidInInitialGraph: mermaidEntryKey ? eagerKeys.has(mermaidEntryKey) : null,
+  monacoEditorEntry: monacoEntry?.key ?? null,
+  monacoEditorSource: monacoEntry?.record?.src ?? null,
+  monacoEditorIsDynamicEntry: monacoEntry?.record?.isDynamicEntry ?? false,
+  monacoInInitialGraph: monacoEntry ? eagerKeys.has(monacoEntry.key) : null,
+  mermaidEntry: mermaidEntry?.key ?? null,
+  mermaidSource: mermaidEntry?.record?.src ?? null,
+  mermaidIsDynamicEntry: mermaidEntry?.record?.isDynamicEntry ?? false,
+  mermaidInInitialGraph: mermaidEntry ? eagerKeys.has(mermaidEntry.key) : null,
 };
 
 console.log(`PQG_BUNDLE_RECEIPT_JSON=${JSON.stringify(receipt)}`);
 
-if (!monacoEntryKey) {
+if (!monacoEntry) {
   throw new Error('A2 bundle gate could not find EditorPanel dynamic entry in manifest');
 }
-if (eagerKeys.has(monacoEntryKey)) {
+if (!monacoEntry.record?.isDynamicEntry) {
+  throw new Error('A2 bundle gate failed: EditorPanel is not a dynamic manifest entry');
+}
+if (eagerKeys.has(monacoEntry.key)) {
   throw new Error('A2 bundle gate failed: EditorPanel/Monaco remains in the initial static graph');
 }
-if (!mermaidEntryKey) {
+if (!mermaidEntry) {
   throw new Error('A2 bundle gate could not find MermaidDiagram dynamic entry in manifest');
 }
-if (eagerKeys.has(mermaidEntryKey)) {
+if (!mermaidEntry.record?.isDynamicEntry) {
+  throw new Error('A2 bundle gate failed: MermaidDiagram is not a dynamic manifest entry');
+}
+if (eagerKeys.has(mermaidEntry.key)) {
   throw new Error('A2 bundle gate failed: MermaidDiagram remains in the initial static graph');
 }
 if (largestEager && largestEager.bytes >= MAX_EAGER_CHUNK_BYTES) {
