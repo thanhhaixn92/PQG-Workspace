@@ -116,6 +116,17 @@
 - [2026-08-24 14:37:06 UTC+07:00][recorded_at] Stop after Package C. Package D and all E/G/H/F/F9 work require their own authorization and fresh exact-ref preflight; state/checkpoint remain unchanged.
 - [2026-08-24 15:07:32 UTC+07:00][recorded_at] Package D is **COMPLETE** at source-validation HEAD `36b2fef6817dff9b97e15ee58d1004ab9a067ce6`; preserve its exact-source Preflight/Smoke/Sandbox receipts and keep the following tracking-only child distinct.
 - [2026-08-24 15:07:32 UTC+07:00][recorded_at] Stop after Package D. E1/E2/E3/E4/G/H/F/F9 require separate authorization and a fresh exact-ref preflight; state/checkpoint remain unchanged.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Package E1 npm vulnerability exact inventory is **COMPLETE** at the following inventory/tracking commit; E1 changed docs only and did not change either lockfile or any dependency/tool version.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Stop after E1. E2 selective remediation requires separate approval and fresh exact-ref preflight; E3/E4/G/H/F/F9 remain unopened and state/checkpoint remain unchanged.
+
+## Package E1 — completed inventory
+
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Audited clean/current HEAD `322c1009405c5cb09ebe6b04a5e0c66c5e8b253c`; local preflight PASS and Agent Preflight `32705514343` / `97365648952` SUCCESS.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Root npm audit has 0 findings. Frontend full audit has 6 vulnerable package nodes (`3 moderate / 3 high`) aggregating 32 advisory records; production `--omit=dev` has 3 moderate nodes and no high nodes.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Runtime-established chain: Mermaid `11.16.0` → DOMPurify `3.4.11`, reached by untrusted fenced Mermaid content. Runtime-conditional chain: `@monaco-editor/react@4.7.0` → Monaco `0.55.1` → DOMPurify `3.2.7`. Dev-only chains: Vite → PostCSS `8.5.16` → Nanoid `3.3.15`, and jsdom → Undici `7.28.0`.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Overall safe floors from the live affected ranges are Mermaid `>=11.16.1`, DOMPurify `>=3.4.13`, PostCSS `>=8.5.23`, Nanoid `>=3.3.18` and Undici `>=7.29.0`. Latest Monaco `0.56.0` still pins vulnerable DOMPurify `3.4.8`, so Monaco needs a separate compatibility-sensitive E2 decision rather than a false version-only closure.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Proposed E2 batches: A Mermaid/runtime DOMPurify; B Monaco/DOMPurify; C Vite/PostCSS/Nanoid; D jsdom/Undici. No batch was authorized or executed; no `npm audit fix` was run.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Exact inventory: `docs/implementation/PACKAGE_E1_NPM_VULNERABILITY_INVENTORY.md`. Root lock SHA-256 remains `DE077363…433DD84`; frontend lock remains `D1F621A8…1936296`.
 
 ## Package D — completed evidence
 

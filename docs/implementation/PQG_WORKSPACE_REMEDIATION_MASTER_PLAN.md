@@ -102,7 +102,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | B | Sandbox hostile-local-process TOCTOU hardening | P1 | **COMPLETE** | **Security boundary** | source `140df75…`; preflight/sandbox-windows/Smoke success; backend + F7 + route-contract regression |
 | C | Admin boundary contract reconciliation | P1 | **COMPLETE** | Auth/security contract | source `fe2ad41…`; Preflight/Smoke success; focused admin/capability/UI proof |
 | D | Capability executable-binding validator | P1 | **COMPLETE** | **Capability/security boundary** | source `36b2fef…`; negative drift + backend/startup/Preflight/Smoke success |
-| E1 | npm vulnerability exact inventory | P2 | **NOT STARTED** | Dependency analysis | advisory/path/reachability matrix |
+| E1 | npm vulnerability exact inventory | P2 | **COMPLETE** | Dependency analysis | exact 6-node / 32-advisory inventory + four proposed E2 batches |
 | E2 | Selective dependency remediation + backend reproducibility/warnings | P2 | **NOT STARTED** | **Dependencies/tool versions** | selective updates + deterministic constraints + full validation |
 | E3 | GitHub Actions major upgrade + immutable SHA pins | P2 | **NOT STARTED** | **Tool/supply-chain** | pinned action SHAs + fresh Preflight/Smoke |
 | E4 | Bounded native current-GYO acceptance | P1 evidence | **NOT STARTED** | **Provider/network/credential use** | local Windows native GYO receipt; no skip-as-success |
@@ -317,6 +317,13 @@ Require focused negative drift tests + existing registry/MCP/AP tests + full bac
 
 Run/read exact `npm audit --json` findings and record advisory/package, severity, direct/transitive path, runtime/dev-only status, affected/fixed range, established PQG exploitability, owning top-level dependency and remediation semver/behavioral risk. `npm audit fix` blanket remediation is forbidden. Commit an actionable matrix before E2.
 
+Completed inventory: `docs/implementation/PACKAGE_E1_NPM_VULNERABILITY_INVENTORY.md`.
+
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Root npm project is clean. Frontend full audit reports six vulnerable package nodes (`3 moderate / 3 high`) aggregating 32 advisory records; `--omit=dev` leaves three moderate runtime nodes and zero high nodes.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Runtime inventory is Mermaid `11.16.0` + DOMPurify `3.4.11` with established untrusted-diagram reachability, and Monaco `0.55.1` + DOMPurify `3.2.7` with conditional internal-sanitizer reachability. Dev-only inventory is PostCSS `8.5.16`, Nanoid `3.3.15` and Undici `7.28.0` through Vite/jsdom.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Proposed E2 batches are separated into reachable Mermaid runtime, compatibility-sensitive Monaco/DOMPurify, Vite/PostCSS/Nanoid dev toolchain and jsdom/Undici test-chain remediation. None was executed in E1.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Both package-lock SHA-256 values remained unchanged; no package, dependency/tool version, lockfile, schema, provider, credential, F9, deployment, checkpoint or state mutation occurred.
+
 ## E2 — Selective dependency remediation + backend reproducibility/warnings
 
 - patch/minor updates first where sufficient; major only when required;
@@ -513,3 +520,10 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 15:07:32 UTC+07:00][recorded_at] Source commit `36b2fef6817dff9b97e15ee58d1004ab9a067ce6` changes four source/test files, 389 insertions / 64 deletions. Negative drift coverage rejects missing/orphan/duplicate bindings, compatibility aliases, incompatible surfaces, metadata changes, handler replacement and Action Package allowlist drift.
 - [2026-08-24 15:07:32 UTC+07:00][recorded_at] Exact-source Preflight `32704348381` / `97362194625`, Sandbox Windows `32704336190` / `97362155343`, and Smoke `32704336226` / `97362155302` completed SUCCESS with all three combined statuses green; `smoke-real` `97362155978` was SKIPPED, not PASS.
 - [2026-08-24 15:07:32 UTC+07:00][recorded_at] Result: Package D **COMPLETE**. State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED; E/G/H/F remain unopened. Stop before the next package.
+
+### [2026-08-24 15:21:55 UTC+07:00] Package E1 — npm vulnerability exact inventory
+
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Explicit user approval opened inventory-only E1. Live checkout was clean/current at `322c1009405c5cb09ebe6b04a5e0c66c5e8b253c`; local preflight PASS and exact-ref Agent Preflight `32705514343` / `97365648952` SUCCESS before the first documentation write.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Live npm audit with Node `24.16.0` / npm `11.13.0`: repository root 0 findings; frontend full tree 6 vulnerable nodes (`3 moderate / 3 high`) and 32 advisory records; frontend production view 3 moderate nodes and no high nodes.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] The exact advisory/path/fixed-range/reachability/owner/risk matrix and four proposed E2 batches are recorded in `PACKAGE_E1_NPM_VULNERABILITY_INVENTORY.md`. No remediation command or dependency mutation was performed.
+- [2026-08-24 15:21:55 UTC+07:00][recorded_at] Result: Package E1 inventory is **COMPLETE**. E2/E3/E4/G/H/F/F9 remain unopened; state/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`. Stop and request separate E2 approval.
