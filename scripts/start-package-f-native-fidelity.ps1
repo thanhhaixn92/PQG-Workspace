@@ -47,7 +47,8 @@ $metadata = [ordered]@{
 function Save-Metadata { $metadata | ConvertTo-Json -Depth 16 | Set-Content -Encoding utf8 -LiteralPath $metadataPath }
 function Start-Recorded([string]$Name, [string]$FilePath, [string[]]$Arguments, [string]$WorkingDirectory) {
     $stdout = Join-Path $EvidenceRoot "$Name.stdout.log"; $stderr = Join-Path $EvidenceRoot "$Name.stderr.log"
-    $process = Start-Process -FilePath $FilePath -ArgumentList $Arguments -WorkingDirectory $WorkingDirectory -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+    $quotedArguments = $Arguments | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }
+    $process = Start-Process -FilePath $FilePath -ArgumentList $quotedArguments -WorkingDirectory $WorkingDirectory -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     $metadata.launch[$Name] = @{ pid=$process.Id; start_time=$process.StartTime.ToString('o'); command="$FilePath $($Arguments -join ' ')"; stdout_log=$stdout; stderr_log=$stderr; exited=$false }
     Save-Metadata; return $process
 }
