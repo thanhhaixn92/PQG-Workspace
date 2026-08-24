@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      manifest: true,
+    },
     server: {
       proxy: {
         '/api/health': {
