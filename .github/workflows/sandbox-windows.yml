@@ -1,0 +1,51 @@
+name: Sandbox Windows
+
+on:
+  push:
+    branches:
+      - pqg-workspace
+      - 'security/**'
+      - 'work/**'
+    paths:
+      - '.github/workflows/sandbox-windows.yml'
+      - 'backend/app/services/sandbox_io.py'
+      - 'backend/app/services/sandbox_io_windows.py'
+      - 'backend/app/services/security_*.py'
+      - 'backend/app/mcp/server.py'
+      - 'backend/tests/test_sandbox_io_b.py'
+  pull_request:
+    branches:
+      - pqg-workspace
+    paths:
+      - '.github/workflows/sandbox-windows.yml'
+      - 'backend/app/services/sandbox_io.py'
+      - 'backend/app/services/sandbox_io_windows.py'
+      - 'backend/app/services/security_*.py'
+      - 'backend/app/mcp/server.py'
+      - 'backend/tests/test_sandbox_io_b.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hostile-swap:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install backend dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run Package B Windows hostile-swap suite
+        run: python -m pytest -v -ra --tb=short tests/test_sandbox_io_b.py

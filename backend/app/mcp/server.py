@@ -36,6 +36,11 @@ def get_mcp_session_id() -> str:
 def setup_mcp(fast_api_app):
     """Mount FastMCP server on the FastAPI app."""
     import app.mcp.tools  # This registers the tools
+    from app.services.security_overrides import install_security_overrides
+
+    # Package B swaps only filesystem-sensitive route/tool implementations. The
+    # public paths, MCP names and capability allowlist remain unchanged.
+    install_security_overrides(fast_api_app, mcp_server)
 
     registered = {tool.name for tool in mcp_server._tool_manager.list_tools()}
     if registered != MCP_COMPAT_TOOL_NAMES:
