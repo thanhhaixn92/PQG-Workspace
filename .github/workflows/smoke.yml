@@ -120,7 +120,17 @@ jobs:
 
       - name: Install backend dependencies
         run: |
-          pip install -e ".[dev]"
+          python -m pip install --upgrade -c constraints-ci.txt pip
+          python -m pip --version | grep -Eq '^pip 26\.2\.1 '
+          python -m pip install --help | grep -Fq -- '--build-constraint'
+          python -m pip install \
+            -c constraints-ci.txt \
+            --build-constraint constraints-ci.txt \
+            -e ".[dev]"
+          python -m pip check
+
+      - name: Validate backend constraints authority
+        run: python ../scripts/ci/validate_backend_constraints.py
 
       - name: Run backend tests with skip reasons
         run: |

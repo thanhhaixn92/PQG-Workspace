@@ -37,12 +37,19 @@ cd backend
 py -3.11 -m venv .venv
 .venv\Scripts\activate
 
-# Install with dev extras
+# Developer-convenience install with dev extras (not the canonical CI path)
 pip install -e ".[dev]"
 
 # Copy env template (edit values if needed)
 copy .env.example .env
 ```
+
+Canonical Linux Smoke and Windows Sandbox resolution uses the single
+[`backend/constraints-ci.txt`](backend/constraints-ci.txt) authority. Those
+workflows bootstrap exact `pip==26.2.1`, verify `--build-constraint`, then use
+the file for both regular and isolated-build constraints. The convenience path
+above remains suitable for local development, but is not a reproducible CI
+install claim.
 
 Start the development server:
 

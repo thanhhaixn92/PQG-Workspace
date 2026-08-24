@@ -12,7 +12,10 @@ on:
       - 'backend/app/services/sandbox_io_windows.py'
       - 'backend/app/services/security_*.py'
       - 'backend/app/mcp/server.py'
+      - 'backend/constraints-ci.txt'
+      - 'backend/pyproject.toml'
       - 'backend/tests/test_sandbox_io_b.py'
+      - 'scripts/ci/validate_backend_constraints.py'
   pull_request:
     branches:
       - pqg-workspace
@@ -22,7 +25,10 @@ on:
       - 'backend/app/services/sandbox_io_windows.py'
       - 'backend/app/services/security_*.py'
       - 'backend/app/mcp/server.py'
+      - 'backend/constraints-ci.txt'
+      - 'backend/pyproject.toml'
       - 'backend/tests/test_sandbox_io_b.py'
+      - 'scripts/ci/validate_backend_constraints.py'
   workflow_dispatch:
 
 permissions:
@@ -64,7 +70,21 @@ jobs:
           cache: pip
 
       - name: Install backend dependencies
-        run: pip install -e ".[dev]"
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade -c constraints-ci.txt pip
+          $pipVersion = python -m pip --version
+          if ($pipVersion -notmatch '^pip 26\.2\.1 ') {
+            throw "Expected pip 26.2.1 after constrained bootstrap; got: $pipVersion"
+          }
+          if (-not ((python -m pip install --help) -match '--build-constraint')) {
+            throw 'pip 26.2.1 capability check failed: --build-constraint is unavailable'
+          }
+          python -m pip install -c constraints-ci.txt --build-constraint constraints-ci.txt -e ".[dev]"
+          python -m pip check
+
+      - name: Validate backend constraints authority
+        run: python ../scripts/ci/validate_backend_constraints.py
 
       - name: Run Package B Windows hostile-swap suite
         run: python -m pytest -v -ra --tb=short tests/test_sandbox_io_b.py
