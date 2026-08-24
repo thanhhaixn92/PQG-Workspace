@@ -140,7 +140,44 @@ Secrets belong in:
 - n8n is optional for v2.2 and must remain loopback-only when enabled.
 - If n8n is configured, a persistent `/home/node/.n8n` volume and fixed `N8N_ENCRYPTION_KEY` are required. An unconfigured sidecar must report unavailable without a fake-ready state.
 
-## 9. Rejection Criteria
+## 9. Interactive local-user admin boundary
+
+The v2.2 administrative claim is **interactive local-user admin**, not
+cryptographic proof of human presence. The constitutional Module mutation
+routes (`attach`, `detach`, display-name `rename`, and `reorder`) enforce:
+
+- a loopback request;
+- an approved, canonical local browser `Origin`;
+- same-origin/same-site Fetch Metadata when the browser supplies it; and
+- a non-empty actor identity bound by server configuration, never `X-Actor` or
+  another client/model field.
+
+These checks provide a local-browser/CSRF boundary. They do not distinguish a
+sufficiently privileged hostile local process that can reproduce HTTP headers
+from the interactive user. They must not be described as WebAuthn, Windows
+Hello, hardware-backed identity, biometrics, or proof of human presence.
+
+The current admin-risk inventory is:
+
+| Operation class | Public UI/API | Model-visible | Authorization / actor source | Approval | Docs claim / actual control | Mismatch | Package C action |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Module attach | Yes, local Settings and `/api/admin/modules/{id}/attach` | No | Loopback + approved Origin + Fetch Metadata; actor from server config | Explicit UI action; no model approval path | Interactive local-user; revisioned mutation and audit | Wording/tests previously incomplete | Code-contract wording + positive/negative tests + docs |
+| Module detach | Yes, local Settings and `/api/admin/modules/{id}/detach` | No | Same as attach; actor from server config | Explicit UI action; no model approval path | Interactive local-user; preserves data; revisioned audit | Wording/tests previously incomplete | Code-contract wording + positive/negative tests + docs |
+| Module display-name rename | Yes, local Settings and `PATCH /api/admin/modules/{id}` | No | Same as attach; actor from server config | Explicit UI action; no model approval path | Interactive local-user; identity/route/data unchanged | Wording/tests previously incomplete | Shared boundary tests + docs |
+| Module reorder | Yes, local Settings and `/api/admin/modules/reorder` | No | Same as attach; actor from server config | Explicit UI action; no model approval path | Interactive local-user; complete-set revision binding and audit | Wording/tests previously incomplete | Shared boundary tests + docs |
+| Module install/settings/update/rollback/uninstall/data deletion | No constitutional Module route in v2.2 | No | Absent/fail closed | Not applicable | Not implemented in this surface | No | Expanded negative capability inventory only |
+| Provider/model administration and credentials | Local Settings/API only | No | Existing local API validation; audit actor is a server-owned local-user constant; credentials stay in Credential Manager | Explicit local UI action; no GYO approval path | Local operator surface, not a GYO capability; current headers do not prove a human | No model-exposure mismatch; local-process limitation applies | Characterize and document only; provider/credential changes remain out of scope |
+| Marketplace install/rollback/uninstall | Local Settings/API only; installed code remains disabled when isolation is unavailable | No | Verified server catalog; audit actor is a server-owned local-user constant | Explicit local UI action; no GYO approval path | Disabled execution state and audit | No model-exposure mismatch | Characterize and document only |
+| Privacy/permission administration | No dedicated v2.2 admin route/capability | No | Absent/fail closed | Not applicable | Not implemented as a model action | No | Expanded negative capability inventory only |
+| Local backup/readiness; restore execution | Backup/readiness UI exists; live restore execution is absent | No | Existing local-data integrity/readiness contract; server-owned local-user audit where applicable | Explicit local UI action where implemented | Restore remains unavailable | No model-exposure mismatch | Characterize; restore capability negative test |
+| Skill create/review/enable/disable | Local review UI/API only | Admin actions: No | Existing Skill lifecycle; audit actor is server-owned by the applicable route/service contract | Explicit local UI action; no model admin approval path | GYO learning creates disabled candidates only | No model-exposure mismatch | Expanded admin-Skill negative capability inventory |
+
+Admin-risk or unknown capability IDs must be absent from the model-visible
+CapabilityRegistry. Model lookup fails closed with `capability_not_found`
+before any approval request is created. This exposure rule is separate from
+Package D executable-binding consistency validation.
+
+## 10. Rejection Criteria
 
 Codex must reject a phase if:
 

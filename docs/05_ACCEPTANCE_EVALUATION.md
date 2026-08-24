@@ -103,6 +103,25 @@ Task 1/3/5 đạt 5/5, Task 2/4 đạt 5/5, không Critical/Major, zero real
 provider/approval/executor. Đây là **synthetic agent evaluation**, không phải
 human usability evidence, không Gate PASS và không thay đổi checkpoint.
 
+## 5.2 V2.2 admin-boundary acceptance
+
+Package C acceptance is limited to the **interactive local-user admin**
+contract. Automated evidence must prove both the positive local-browser path
+and the fail-closed cases for a missing Origin, a cross-origin request, a
+cross-site Fetch Metadata value, a remote client, and a missing or forged
+actor. Audit evidence must use the server-bound actor.
+
+The model-visible CapabilityRegistry must exclude Foundation/provider/Module,
+privacy/permission, restore, deletion and admin-Skill capabilities. Forbidden
+and unknown IDs must return `capability_not_found` without creating an approval
+request. Existing non-admin capabilities must remain available.
+
+Passing these checks is not proof of human presence: a sufficiently privileged
+hostile local process remains outside what HTTP Origin/Fetch Metadata can
+distinguish. Package C does not authorize WebAuthn/Windows Hello, capability
+executable-binding work, provider/credential changes, F9, deployment, or a
+checkpoint/state promotion.
+
 ## 6. Quality Rubric
 
 Score each phase 0-2:

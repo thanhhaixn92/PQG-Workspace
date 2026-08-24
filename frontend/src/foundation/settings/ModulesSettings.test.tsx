@@ -52,6 +52,14 @@ describe('ModulesSettings', () => {
     });
   });
 
+  it('states the local interactive boundary without claiming proof of a human', () => {
+    render(<ModulesSettings />);
+
+    expect(screen.getByText(/chỉ được gửi từ giao diện local được cho phép/i)).toBeDefined();
+    expect(screen.getByText(/GYO không có các quyền quản trị này/i)).toBeDefined();
+    expect(screen.queryByText(/chứng minh|proof|xác thực.*con người/i)).toBeNull();
+  });
+
   it('attaches a Module with its current revision and exposes no delete control', async () => {
     vi.mocked(modulesApi.attachModule).mockResolvedValue(
       moduleInstance('documents', 'Tài liệu', true, 40, 2),

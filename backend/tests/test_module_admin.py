@@ -158,6 +158,47 @@ async def test_admin_mutation_rejects_cross_site_origin(client):
 
 
 @pytest.mark.asyncio
+async def test_admin_mutation_rejects_cross_site_fetch_metadata_with_valid_origin(client):
+    work = await _module(client, "work")
+    response = await client.post(
+        "/api/admin/modules/work/detach",
+        json={"expected_revision": work["revision"]},
+        headers={"Origin": "http://localhost:5173", "Sec-Fetch-Site": "cross-site"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "USER_ADMIN_CROSS_SITE_DENIED"
+
+
+@pytest.mark.asyncio
+async def test_admin_mutation_rejects_remote_client_even_with_browser_headers(
+    migrated_db_path,
+):
+    settings = Settings(
+        db_path=str(migrated_db_path),
+        cors_origins=["http://localhost:5173"],
+        hermes_dev_mock=False,
+        log_level="WARNING",
+        outbox_dispatcher_enabled=False,
+        local_actor_subject="local-owner",
+    )
+    application = create_app(settings_override=settings)
+    from app.dependencies import get_trusted_actor
+
+    application.dependency_overrides[get_trusted_actor] = lambda: "local-owner"
+    async with AsyncClient(
+        transport=ASGITransport(app=application, client=("192.0.2.10", 12345)),
+        base_url="http://testserver",
+    ) as remote_client:
+        response = await remote_client.post(
+            "/api/admin/modules/work/detach",
+            json={"expected_revision": 1},
+            headers=ADMIN_HEADERS,
+        )
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "USER_ADMIN_LOCAL_ONLY"
+
+
+@pytest.mark.asyncio
 async def test_forged_actor_header_cannot_create_admin_identity(temp_db_path):
     await run_migrations(temp_db_path)
     settings = Settings(

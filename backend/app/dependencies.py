@@ -83,7 +83,7 @@ def require_interactive_local_user_admin(
     actor: str = Depends(get_trusted_actor),
     settings: Settings = Depends(get_settings),
 ) -> str:
-    """Require a direct, loopback browser-originated user-admin request.
+    """Require the v2.2 interactive local-user admin HTTP boundary.
 
     This dependency is intentionally stricter than the general trusted actor:
     Foundation/Module administration is constitutionally user-only.  A server
@@ -92,6 +92,11 @@ def require_interactive_local_user_admin(
     configured Vite/UI origin or the loopback backend origin itself (for a
     future same-origin packaged UI).  ``Sec-Fetch-Site`` is enforced when a
     browser supplies it but is not treated as an identity source.
+
+    These request checks are a local-browser/CSRF boundary, not cryptographic
+    proof of human presence.  A sufficiently privileged hostile local process
+    can reproduce HTTP headers and is not distinguished from the interactive
+    user by this dependency.  Actor identity remains server-owned separately.
     """
     client_host = request.client.host if request.client else ""
     if client_host not in _LOOPBACK_HOSTS:

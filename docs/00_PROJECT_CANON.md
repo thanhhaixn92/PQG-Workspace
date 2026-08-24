@@ -46,4 +46,6 @@ Neu cac tai lieu co noi dung xung dot, ap dung thu tu sau:
 - Moi thao tac write/external/destructive phai co audit.
 - External/destructive actions luon can human approval.
 - Codex duoc duyet ky thuat trong pham vi plan, khong duoc duyet thay user cho rui ro cao.
+- Admin boundary v2.2 chi chung minh mot request tuong tac qua giao dien local duoc cho phep, voi actor do server gan. Loopback, Origin va Fetch Metadata khong phai bang chung mat ma ve su hien dien cua con nguoi va khong phan biet duoc mot local process co du quyen.
+- CapabilityRegistry ma GYO/model thay duoc khong chua Foundation/provider/Module/privacy/permission/restore/admin-Skill capabilities. Capability bi cam hoac khong biet phai fail closed voi `capability_not_found` truoc approval flow.
 

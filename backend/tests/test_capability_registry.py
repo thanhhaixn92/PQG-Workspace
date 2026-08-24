@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
 
+from app.api.approvals import pending_approvals
 from app.mcp.server import HERMES_MCP_TOOL_ALLOWLIST, mcp_server, setup_mcp
 import app.mcp.tools  # noqa: F401 - registers the existing compatibility tool surface
 from app.services.action_packages import P0_INTERNAL_CAPABILITIES
@@ -54,20 +55,31 @@ def test_model_visible_catalog_excludes_admin_risk_classes():
         "module.detach",
         "module.rename",
         "module.reorder",
+        "module.settings.update",
         "module.install",
+        "module.update",
+        "module.rollback",
         "module.uninstall",
+        "module.data.delete",
         "provider.credentials.update",
         "provider.admin",
         "privacy.policy.update",
+        "permission.settings.update",
         "memory.activate",
         "backup.restore",
+        "skill.install",
+        "skill.enable",
+        "skill.disable",
     ],
 )
 def test_admin_capabilities_are_absent_from_model_lookup(capability_id):
+    pending_before = dict(pending_approvals)
+
     with pytest.raises(CapabilityNotFound) as exc_info:
         resolve_model_capability(capability_id)
 
     assert exc_info.value.code == "capability_not_found"
+    assert pending_approvals == pending_before
 
 
 def test_unknown_capability_fails_closed():

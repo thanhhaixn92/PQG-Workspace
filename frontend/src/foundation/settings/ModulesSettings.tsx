@@ -104,7 +104,7 @@ export function ModulesSettings() {
     <section className="model-settings-panel" aria-labelledby="module-settings-title">
       <header>
         <h2 id="module-settings-title">Modules</h2>
-        <p>Chỉ bạn quản trị việc gắn, tháo, đổi tên hiển thị và sắp xếp Module. Trợ lý GYO không có các quyền quản trị này.</p>
+        <p>Các thao tác quản trị này chỉ được gửi từ giao diện local được cho phép. Trợ lý GYO không có các quyền quản trị này.</p>
       </header>
 
       {message && (
