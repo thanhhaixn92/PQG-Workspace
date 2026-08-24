@@ -57,9 +57,12 @@ Still not authorized under this plan:
 
 ## 3. Global execution rules
 
-### 3.1 Single-agent sequencing
+### 3.1 Sequential writes; bounded parallel review
 
-Multi-agent execution remains paused. Execute packages sequentially in the locked order unless the user explicitly changes that decision.
+Package writes, integration and final validation remain sequential under one
+owner. Independent read-only research, review and test lanes may run in
+parallel when their scopes do not overlap; no parallel agent may change shared
+state or the same implementation flow.
 
 ### 3.2 Fresh exact-ref preflight before each implementation package
 
@@ -103,7 +106,13 @@ Do not advance to the next package until the current package meets its acceptanc
 | C | Admin boundary contract reconciliation | P1 | **COMPLETE** | Auth/security contract | source `fe2ad41…`; Preflight/Smoke success; focused admin/capability/UI proof |
 | D | Capability executable-binding validator | P1 | **COMPLETE** | **Capability/security boundary** | source `36b2fef…`; negative drift + backend/startup/Preflight/Smoke success |
 | E1 | npm vulnerability exact inventory | P2 | **COMPLETE** | Dependency analysis | exact 6-node / 32-advisory inventory + four proposed E2 batches |
-| E2 | Selective dependency remediation + backend reproducibility/warnings | P2 | **IN PROGRESS — E2-A COMPLETE** | **Dependencies/tool versions** | E2-A source `dc1a462…`; Mermaid/DOMPurify fixed; E2-B/C/D and backend warning work unopened |
+| E2 | Selective dependency remediation | P2 | **IN PROGRESS — E2-A COMPLETE** | **Dependencies/tool versions** | E2-A source `dc1a462…`; remaining fault domains are separately gated below |
+| P-TRACK | Bounded tracking-equivalence CI | P1 process | **PARTIAL — local candidate** | CI/process | exact SOURCE full receipt, then exact T1 tracking receipt |
+| P-MEM | Project Memory/Context normalization | P2 docs | **NOT STARTED** | Docs/evidence | T2 only after P-TRACK COMPLETE |
+| E2-B | Monaco bundled DOMPurify | P1 security | **NOT STARTED — upstream-aware** | Dependency/security evidence | fresh artifact discovery; fixed upstream release or explicit BLOCKED-UPSTREAM |
+| E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted same-major resolution + frontend/full Smoke |
+| E2-D | jsdom/Undici test chain | P2 | **NOT STARTED** | Dependencies/tool versions | targeted Undici resolution without default jsdom-major upgrade |
+| E2-E | Backend deterministic constraints + warning closure | P2 | **NOT STARTED** | Dependency/test environment | clean Linux/Windows install, `pip check`, warning disposition |
 | E3 | GitHub Actions major upgrade + immutable SHA pins | P2 | **NOT STARTED** | **Tool/supply-chain** | pinned action SHAs + fresh Preflight/Smoke |
 | E4 | Bounded native current-GYO acceptance | P1 evidence | **NOT STARTED** | **Provider/network/credential use** | local Windows native GYO receipt; no skip-as-success |
 | F | Migration registry maintainability | P3 | **DEFERRED** | **Migration** | reopen only if separately justified |
@@ -340,19 +349,141 @@ Acceptance: advisory-targeted updates only; deterministic clean install; full ba
 - [2026-08-24 16:15:15 UTC+07:00][recorded_at] Live audit moved from six to five vulnerable nodes: full `2 moderate / 3 high`; production `2 moderate / 0 high`. Mermaid and Mermaid-owned DOMPurify are absent from the remaining findings. Remaining nodes are exactly Monaco/DOMPurify (E2-B), PostCSS/Nanoid (E2-C), and Undici (E2-D).
 - [2026-08-24 16:15:15 UTC+07:00][recorded_at] Focused 19 PASS; full frontend 52 files / 330 tests, lint, type-check and build PASS. A2 bundle receipt remains fail-closed and confirms `mermaidIsDynamicEntry=true`, `mermaidInInitialGraph=false`.
 - [2026-08-24 16:15:15 UTC+07:00][recorded_at] Exact-source Agent Preflight `32710121468` / `97379518811` and Smoke `32710112957` / `97379488765` SUCCESS. Smoke backend 548 PASS / 81 SKIP / 2 existing warnings; frontend 52 files / 330 tests; runtime/readiness/cleanup PASS; `smoke-real` `97379490095` SKIPPED.
-- [2026-08-24 16:15:15 UTC+07:00][recorded_at] E2 overall remains **IN PROGRESS**. E2-B/C/D and backend reproducibility/warning remediation were neither authorized nor executed; no `npm audit fix`, schema/migration, provider/credential, E3/E4/G/H/F/F9, deployment or state/checkpoint change occurred.
+- [2026-08-24 16:15:15 UTC+07:00][recorded_at] E2 overall remains **IN PROGRESS**. E2-B/C/D/E and backend reproducibility/warning remediation were neither authorized nor executed; no `npm audit fix`, schema/migration, provider/credential, E3/E4/G/H/F/F9, deployment or state/checkpoint change occurred.
+
+## P-TRACK — Fail-closed tracking equivalence gate
+
+**Status: APPROVED INSERTION BEFORE E2-B / IN PROGRESS.**
+
+P-TRACK may optimize only the normal Smoke decision path. It keeps every
+existing trigger active and defaults to full validation. Pull requests remain
+full; PR topology is not solved by this package. A tracking candidate must be a
+single direct-child push to `pqg-workspace` that modifies only existing files
+in the exact tracking allowlist. New-branch and multi-commit pushes,
+rename/delete/add operations, classifier uncertainty and every path outside the
+allowlist remain full Smoke.
+
+Tracking ancestry is non-recursive and bounded to at most two consecutive
+tracking commits: `S(full) -> T1(P-TRACK completion) -> T2(P-MEM)`. T1 verifies
+the dedicated `pqg/smoke-full` receipt and completed Actions run on S. T1 also
+carries the short `PROJECT_CONTEXT.md` aggregate/full/tracking invariant as a
+completion candidate; that wording becomes durable only when exact T1 itself
+passes `pqg/tracking-integrity` and `pqg/smoke`, without a T1.5 receipt commit. T2
+verifies both the `pqg/tracking-integrity` run on T1 and the full run on S; the
+cumulative first-parent diff `S..T2` must still contain only modifications to
+allowlisted existing files. A third consecutive tracking commit or any later
+source/runtime commit resets to full validation.
+
+Status fields alone are insufficient provenance. The run ID extracted from the
+canonical status target URL must resolve through the Actions API to this exact
+repository, validation SHA and `.github/workflows/smoke.yml`, with a completed
+successful run and the exact expected `smoke-full`, `tracking-integrity` and
+`smoke-result` job conclusions. The final `always()` aggregator publishes
+`pqg/smoke` only when exactly one expected current path succeeds and the other
+is skipped; every other combination fails closed. A P-TRACK completion
+candidate is COMPLETE only when its exact HEAD itself has successful
+`pqg/tracking-integrity` and `pqg/smoke`; no extra receipt commit is required.
+
+Acceptance requires focused classifier/receipt negative tests, workflow syntax
+validation, `git diff --check`, scope review and an exact-source full Smoke on
+the workflow/script change. The following allowlisted tracking child must then
+prove the tracking path without relabeling runtime tests as executed on that
+child. Until both live receipts exist, P-TRACK remains PARTIAL / NOT PROVEN.
+External-fork PR compatibility is not yet evidenced: PRs remain full, but a
+fork token can lack permission for custom commit-status publication. Treat that
+case as NOT RUN and resolve it only if the repository's contributor topology
+requires it; do not weaken the canonical internal PR/full-path gate.
+
+P-TRACK excludes parallel jobs, Node/action upgrades, dependency caching,
+concurrency, product/runtime behavior, Project Memory normalization, state and
+checkpoint changes. Its SOURCE may append only minimal receipt/provenance facts
+to `PROJECT_MEMORY.md` and `PROJECT_CHANGELOG.md`; full normalization remains
+P-MEM. Package G must later reconcile the accepted P-TRACK model with PR-first
+integration topology; that residual is recorded, not solved here.
+
+## P-MEM — Project Memory normalization
+
+**Status: APPROVED AS A SEPARATE DOCS PACKAGE AFTER P-TRACK / NOT STARTED.**
+
+P-MEM must not be folded into P-TRACK. It will define one canonical home per
+fact while preserving historical receipts in the changelog and Git history.
+Its exact rewrite/retention scope requires a fresh preflight and focused review
+after P-TRACK acceptance and before E2-B begins. `PROJECT_CONTEXT.md` retains
+only durable authority, architecture, security, state-promotion and CI evidence
+semantics; `PROJECT_MEMORY.md` becomes a current snapshot; and
+`PROJECT_CHANGELOG.md` remains append-only owner of historical receipts. The
+historical `REMEDIATION_MASTER_PLAN_CONTEXT.md` is not deleted, but P-MEM must
+mark it superseded for current continuity and point to these three live files.
+
+## E2-B — Monaco bundled DOMPurify
+
+**Status: NOT STARTED — DISCOVERY-FIRST / UPSTREAM-AWARE.**
+
+At execution, re-resolve the Monaco release and inspect the installed shipped
+artifact, not only the consumer lock graph. The current upstream issue reports
+that `monaco-editor@0.56.0` bundles DOMPurify `3.4.8` into shipped artifacts,
+so a consumer npm override alone does not prove remediation. If a compatible
+upstream release fixes the bundle, make the smallest upgrade and prove editor
+lazy-load, edit/save, markdown/hover sanitization, malformed/error recovery,
+A2 bundle invariants, audit and full frontend/Smoke. If not, mark
+**BLOCKED-UPSTREAM** with practical conditional reachability and retained
+internal-sanitizer boundary; vendor patching requires separate user approval.
+
+## E2-C — Vite/PostCSS/Nanoid dev toolchain
+
+**Status: NOT STARTED.**
+
+Resolve the current compatible Vite 8.x patch only at execution, with
+PostCSS `>=8.5.23` and Nanoid `>=3.3.18`. Require a clean install, `npm ls vite
+postcss nanoid`, audit, full frontend test/lint/type-check/build, unchanged
+Mermaid/Monaco lazy boundaries and A2 bundle receipt. Do not use `npm audit
+fix`, raise `chunkSizeWarningLimit`, or broaden the dependency update.
+
+## E2-D — jsdom/Undici test chain
+
+**Status: NOT STARTED.**
+
+Prefer the smallest compatible Undici `>=7.29.0` resolution within the existing
+jsdom 29 line; do not default to a jsdom major upgrade merely to clear the
+advisory. Acceptance requires `npm ls jsdom undici`, audit, the full frontend
+suite with async/race-sensitive coverage, lint/type-check/build and exact-source
+Smoke.
+
+## E2-E — Backend deterministic constraints and warning closure
+
+**Status: NOT STARTED.**
+
+First select and validate one canonical CI resolution authority: the committed
+`uv.lock` with its matching installer, or generated `backend/constraints-ci.txt`
+for pip. Do not introduce constraints while leaving `uv.lock` independently
+authoritative. If pip constraints are selected, generate them only from a clean
+validated Python 3.11 environment; `pyproject.toml` remains compatibility/
+declaration intent, and Smoke and Sandbox Windows install with `python -m pip
+install -c constraints-ci.txt -e ".[dev]"` followed by `python -m pip check`.
+Preserve valid platform markers rather than forcing one wheel graph across Linux
+and Windows.
+
+Investigate warnings with a minimal version/reproduction matrix before changing
+app code: retain the PQG Settings model unchanged for the MCP FastMCP
+`lifespan` upstream issue; do not use a PQG `model_rebuild()` workaround, MCP
+v2 migration, or silent suppression. Inventory the broad actual TestClient
+surface before proposing `httpx2`; add it only if a clean reproduction and
+compatibility regression prove it appropriate. Runtime `httpx` remains for
+GYO/provider traffic. Acceptance is deterministic clean Linux and Windows
+installation, `pip check`, full backend and runtime/startup, with each warning
+either closed or explicitly recorded as upstream residual.
 
 ## E3 — GitHub Actions upgrade and immutable pinning
 
-For each active official action: resolve appropriate current major at implementation time, verify runner compatibility, validate upgrade, pin immutable commit SHA, and retain human-readable release/major comment. Resolve SHAs fresh; do not copy stale pins from this plan.
+For each active official action: resolve appropriate current major at implementation time, verify runner compatibility and known regressions, validate upgrade, pin immutable commit SHA, and retain a human-readable release/major comment. Resolve SHAs fresh; do not copy stale pins from this plan. Add an explicit project-compatible Node environment and npm download cache while retaining `npm ci`; do not cache `node_modules`, parallelize Smoke, or add cancellation concurrency without later measured bottleneck evidence.
 
 Acceptance: fresh Agent Preflight + Smoke on pinned actions and no avoidable Node20-target deprecation warning.
 
 ## E4 — Retire legacy real-smoke; bounded native current-GYO acceptance
 
-Replace legacy Hermes/ACP active acceptance semantics with bounded local Windows native GYO acceptance using existing Credential Manager configuration and synthetic Work.
+Replace legacy Hermes/ACP active acceptance semantics with bounded local Windows native GYO acceptance using existing Credential Manager configuration and synthetic Work. Retire the active legacy `smoke-real` semantic so credential-unavailable/skip can never appear as a green real-provider acceptance result. The normal provider-independent CI may retain public historical runtime/readiness keys where compatibility requires them; changing those API/test contracts is a separately reviewed E4 decision, not an implicit job deletion.
 
-Contract: isolated temp SQLite/workspace, synthetic context only, approved/current provider/model profile, bounded request/cost count, no real user data, no credential leakage, redacted provenance receipt, no fallback after first token, cleanup receipt, explicit PASS/FAIL/NOT RUN-SKIPPED. Never green-by-skip.
+Contract: isolated temp SQLite/workspace, synthetic context only, approved/current provider/model profile, bounded request/cost count, no real user data, no credential leakage, redacted provenance receipt, no fallback after first token, stream/context/source/cancel/late-output-discard at API/durable-run layer and cleanup receipts, explicit PASS/FAIL/NOT RUN-SKIPPED. Never green-by-skip. A real provider-generated Action Proposal is NOT RUN if absent; automated Action Package/executor evidence remains separately evaluated. Provider credential use/network request is protected: obtain fresh explicit authorization at E4 and never print, copy or mutate a credential.
 
 Retire/remove misleading legacy Hermes/ACP active acceptance while preserving Git history. This package is not F9 authorization.
 
@@ -382,11 +513,11 @@ Acceptance requires live branch-rule verification and a representative PR showin
 
 ## H1 — Authoritative evidence normalization
 
-Create/update an authoritative matrix with feature/gate, exact source SHA, receipt/run/artifact ID, PASS/PARTIAL/NOT RUN/SKIPPED, what it proves/does not prove, superseded evidence and current applicability. Normalize current-GYO stream/context/source/cancel, AP/executor evidence, F1 cancellation, F3 fidelity, G-SYNTHETIC, R1 durable runs, F7 broker, B/C/D remediation and dependency/supply-chain acceptance. Preserve historical evidence as superseded rather than deleting it.
+Create/update an authoritative matrix with feature/gate, exact source SHA, receipt/run/artifact ID, PASS/PARTIAL/NOT RUN/SKIPPED, what it proves/does not prove, superseded evidence and current applicability. It must distinguish old `pqg/smoke`, `pqg/smoke-full`, `pqg/tracking-integrity`, canonical aggregate `pqg/smoke`, source SHA and tracking SHA. Normalize current-GYO stream/context/source/cancel, AP/executor evidence, F1 cancellation, F3 fidelity, G-SYNTHETIC, R1 durable runs, F7 broker, B/C/D remediation and dependency/supply-chain acceptance. Preserve historical evidence as superseded rather than deleting it.
 
 ## H2 — Final exact-head automated acceptance
 
-On final source: fresh exact-head Agent Preflight; complete backend with skip reasons reviewed; full frontend; lint; type-check; production build + bundle receipt; migration/startup; health/runtime/readiness/cleanup; sandbox/security including Windows evidence; capability-binding regressions; final committed-diff review; `pqg/smoke=success`. Anything unrun remains NOT RUN.
+On final source: fresh exact-head Agent Preflight; complete backend with skip reasons and unexpected stderr/warning inventory reviewed; full frontend; lint; type-check; production build + bundle receipt; migration/startup; health/runtime/readiness/cleanup; sandbox/security including Windows evidence; capability-binding regressions; dependency/audit checks; final committed-diff review; `pqg/smoke-full` and canonical `pqg/smoke=success`. Each remaining React `act(...)` warning must be fixed or classified expected; do not create a separate P-TEST package. Anything unrun remains NOT RUN.
 
 ## H3 — Final current-source browser/UAT
 
@@ -398,7 +529,7 @@ After E4, run bounded native current-GYO acceptance against the final source rev
 
 ## H5 — Documentation/state evidence reconciliation
 
-Reconcile state/risk/checkpoint/acceptance docs, Project Context and this tracker without silently rewriting history. Q8 remains synthetic-not-human-evidence; Q9 remains local-cancel boundary with remote provider stop unproven.
+Reconcile state/risk/checkpoint/acceptance docs, Project Context and this tracker without silently rewriting history: mark superseded evidence, point to H1, reconcile Risk Register and remove contradictory next-action prose. Keep `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL` and `human_approval_required=true`; H5 is not promotion. Q8 remains synthetic-not-human-evidence; Q9 remains local-cancel boundary with remote provider stop unproven.
 
 ## H6 — Final promotion decision
 
@@ -415,10 +546,13 @@ F9 is not part of this execution plan. No package authorizes Work/user-data web-
 # 5. Locked execution order
 
 ```text
-A0 → A1 → A2 → B → C → D → E1 → E2 → E3 → E4 → G → H1 → H2 → H3 → H4 → H5 → H6
+A0 → A1 → A2 → B → C → D → E1 → E2-A → P-TRACK → P-MEM → E2-B → E2-C → E2-D → E2-E → E3 → E4 → G → H1 → H2 → H3 → H4 → H5 → H6
 ```
 
 `F` remains deferred unless separately justified. `F9` remains closed.
+If E2-B is **BLOCKED-UPSTREAM**, record the exact blocker and continue
+E2-C/D/E, E3, E4 and G; re-check E2-B immediately before H1/H2 rather than
+calling it complete from a consumer override.
 
 ## 6. Per-package completion template
 
@@ -544,3 +678,17 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 16:15:15 UTC+07:00][recorded_at] Audit after remediation: full frontend five vulnerable nodes (`2 moderate / 3 high`), production two moderate nodes and no high nodes. Neither Mermaid nor its nested DOMPurify remains in the findings; no blanket audit remediation was used.
 - [2026-08-24 16:15:15 UTC+07:00][recorded_at] Local focused 19 PASS; full frontend 52 files / 330 tests, lint, type-check, build and A2 lazy-boundary gate PASS. Exact-source Preflight `32710121468` / `97379518811` and Smoke `32710112957` / `97379488765` SUCCESS; Smoke backend 548 PASS / 81 SKIP / 2 warnings; `smoke-real` `97379490095` SKIPPED.
 - [2026-08-24 16:15:15 UTC+07:00][recorded_at] Result: E2-A **COMPLETE**, E2 overall **IN PROGRESS**. Stop before separately gated E2-B/C/D, backend reproducibility/warnings, E3/E4/G/H/F/F9, schema/migration, provider/credential, deployment or state/checkpoint promotion.
+
+### [2026-08-24 16:34:28 UTC+07:00] Package P-TRACK — approved start
+
+- [2026-08-24 16:34:28 UTC+07:00][recorded_at] Explicit user approval inserts only P-TRACK before E2-B and applies risk-based local validation immediately. P-MEM is approved as a separate docs package after P-TRACK.
+- [2026-08-24 16:34:28 UTC+07:00][recorded_at] P-TRACK scope is fail-closed tracking equivalence with a dedicated full-source receipt, exact tracking allowlist, bounded non-recursive ancestry, distinct tracking receipt and final `pqg/smoke` aggregator.
+- [2026-08-24 16:34:28 UTC+07:00][recorded_at] Parallel Smoke, setup-node/action upgrade, dependency caching, concurrency, Project Memory normalization, product/runtime behavior and state/checkpoint changes remain outside P-TRACK.
+- [2026-08-24 16:34:28 UTC+07:00][recorded_at] P-TRACK is **IN PROGRESS**. No completion or live GitHub receipt is claimed until the changed workflow/script passes exact-source full Smoke and a following allowlisted docs child proves tracking integrity.
+
+### [2026-08-24 17:57:29 UTC+07:00] Remaining-roadmap research amendment
+
+- [2026-08-24 17:57:29 UTC+07:00][recorded_at] The locked order is refined to `P-TRACK -> P-MEM -> E2-B -> E2-C -> E2-D -> E2-E -> E3 -> E4 -> G -> H1..H6`; no downstream package is opened before exact P-TRACK S/T1 live receipts.
+- [2026-08-24 17:57:29 UTC+07:00][recorded_at] E2-B is discovery-first and may be **BLOCKED-UPSTREAM**: [Monaco upstream issue #5454](https://github.com/microsoft/monaco-editor/issues/5454) reports that `0.56.0` bundles DOMPurify `3.4.8` into shipped artifacts, so a consumer override is not a closure proof. E2-E is a separate reproducibility/warning package and must choose one CI resolution authority before changing installers or lock/constraint files.
+- [2026-08-24 17:57:29 UTC+07:00][recorded_at] E3 remains the only action/toolchain package; no parallel Smoke or concurrency package is authorized without measured post-E3 bottleneck. E4 must preserve or explicitly review historical runtime-contract compatibility and requires fresh provider/credential/network authorization before any native real-GYO request.
+- [2026-08-24 17:57:29 UTC+07:00][recorded_at] This amendment changes planning/evidence wording only. It does not change dependencies, lockfiles, runtime/API behavior, provider credentials, branch protection, state/checkpoint or F9.

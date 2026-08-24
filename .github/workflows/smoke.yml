@@ -18,18 +18,37 @@ env:
   HERMES_AUTH_READY: "1"
 
 permissions:
+  actions: read
   contents: read
   statuses: write
 
 jobs:
-  smoke:
+  classify:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
+    outputs:
+      mode: ${{ steps.gate.outputs.mode }}
+      reason: ${{ steps.gate.outputs.reason }}
+      anchor_sha: ${{ steps.gate.outputs.anchor_sha }}
+      predecessor_sha: ${{ steps.gate.outputs.predecessor_sha }}
+      tracking_depth: ${{ steps.gate.outputs.tracking_depth }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 4
+
+      - name: Publish pqg/smoke pending status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body -sS \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"PQG smoke validation is running\",\"context\":\"pqg/smoke\"}"
 
       - name: Validate committed diff formatting
         env:
@@ -53,7 +72,38 @@ jobs:
             git -C "${GITHUB_WORKSPACE}" show --check --oneline --no-renames "${GITHUB_SHA}"
           fi
 
-      - name: Publish pqg/smoke pending status
+      - name: Fetch push base for tracking classification
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: git fetch --no-tags --depth=1 origin "${BEFORE_SHA}"
+
+      - name: Classify full versus tracking validation
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          python scripts/ci/smoke_tracking_gate.py classify \
+            --event-name "${EVENT_NAME}" \
+            --ref-name "${REF_NAME}" \
+            --before-sha "${BEFORE_SHA:-}" \
+            --head-sha "${GITHUB_SHA}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+  smoke-full:
+    needs: classify
+    if: needs.classify.outputs.mode == 'full'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish pqg/smoke-full pending status
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,7 +114,7 @@ jobs:
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"PQG smoke validation is running\",\"context\":\"pqg/smoke\"}"
+            -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"PQG full runtime smoke is running\",\"context\":\"pqg/smoke-full\"}"
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -166,16 +216,16 @@ jobs:
           print(f"CLEANUP OK — archived {archived_count} smoke session(s)")
           PY
 
-      - name: Publish pqg/smoke final status
+      - name: Publish pqg/smoke-full final status
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           JOB_STATUS: ${{ job.status }}
         run: |
           case "${JOB_STATUS}" in
-            success) state="success"; description="PQG smoke validation passed" ;;
-            failure) state="failure"; description="PQG smoke validation failed" ;;
-            *) state="error"; description="PQG smoke validation did not complete" ;;
+            success) state="success"; description="PQG full runtime smoke passed" ;;
+            failure) state="failure"; description="PQG full runtime smoke failed" ;;
+            *) state="error"; description="PQG full runtime smoke did not complete" ;;
           esac
           curl --fail-with-body -sS \
             -X POST \
@@ -183,7 +233,179 @@ jobs:
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "{\"state\":\"${state}\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"${description}\",\"context\":\"pqg/smoke\"}"
+            -d "{\"state\":\"${state}\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"${description}\",\"context\":\"pqg/smoke-full\"}"
+
+  tracking-integrity:
+    needs: classify
+    if: needs.classify.outputs.mode == 'tracking'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish pqg/tracking-integrity pending status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body -sS \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"PQG tracking integrity is running\",\"context\":\"pqg/tracking-integrity\"}"
+
+      - name: Select full-runtime receipt on validation anchor
+        id: anchor-receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANCHOR_SHA: ${{ needs.classify.outputs.anchor_sha }}
+        run: |
+          curl --fail-with-body -sS \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${ANCHOR_SHA}/status?per_page=100" \
+            > "${RUNNER_TEMP}/anchor-status.json"
+          python scripts/ci/smoke_tracking_gate.py select-receipt \
+            --payload "${RUNNER_TEMP}/anchor-status.json" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --expected-sha "${ANCHOR_SHA}" \
+            --kind full \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Verify full-runtime Actions provenance on validation anchor
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANCHOR_SHA: ${{ needs.classify.outputs.anchor_sha }}
+          RUN_ID: ${{ steps.anchor-receipt.outputs.run_id }}
+        run: |
+          curl --fail-with-body -sS \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" \
+            > "${RUNNER_TEMP}/anchor-run.json"
+          curl --fail-with-body -sS \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs?per_page=100" \
+            > "${RUNNER_TEMP}/anchor-jobs.json"
+          python scripts/ci/smoke_tracking_gate.py verify-run \
+            --run-payload "${RUNNER_TEMP}/anchor-run.json" \
+            --jobs-payload "${RUNNER_TEMP}/anchor-jobs.json" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --expected-sha "${ANCHOR_SHA}" \
+            --shape full
+
+      - name: Select predecessor tracking receipt for depth two
+        if: needs.classify.outputs.tracking_depth == '2'
+        id: predecessor-receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREDECESSOR_SHA: ${{ needs.classify.outputs.predecessor_sha }}
+        run: |
+          curl --fail-with-body -sS \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${PREDECESSOR_SHA}/status?per_page=100" \
+            > "${RUNNER_TEMP}/predecessor-status.json"
+          python scripts/ci/smoke_tracking_gate.py select-receipt \
+            --payload "${RUNNER_TEMP}/predecessor-status.json" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --expected-sha "${PREDECESSOR_SHA}" \
+            --kind tracking \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Verify predecessor tracking Actions provenance for depth two
+        if: needs.classify.outputs.tracking_depth == '2'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREDECESSOR_SHA: ${{ needs.classify.outputs.predecessor_sha }}
+          RUN_ID: ${{ steps.predecessor-receipt.outputs.run_id }}
+        run: |
+          curl --fail-with-body -sS \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" \
+            > "${RUNNER_TEMP}/predecessor-run.json"
+          curl --fail-with-body -sS \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs?per_page=100" \
+            > "${RUNNER_TEMP}/predecessor-jobs.json"
+          python scripts/ci/smoke_tracking_gate.py verify-run \
+            --run-payload "${RUNNER_TEMP}/predecessor-run.json" \
+            --jobs-payload "${RUNNER_TEMP}/predecessor-jobs.json" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --expected-sha "${PREDECESSOR_SHA}" \
+            --shape tracking
+
+      - name: Publish pqg/tracking-integrity final status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          case "${JOB_STATUS}" in
+            success) state="success"; description="PQG tracking equivalence verified" ;;
+            failure) state="failure"; description="PQG tracking integrity failed" ;;
+            *) state="error"; description="PQG tracking integrity did not complete" ;;
+          esac
+          curl --fail-with-body -sS \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"${state}\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"${description}\",\"context\":\"pqg/tracking-integrity\"}"
+
+  smoke-result:
+    needs:
+      - classify
+      - smoke-full
+      - tracking-integrity
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve final pqg/smoke result
+        id: result
+        env:
+          MODE: ${{ needs.classify.outputs.mode }}
+          CLASSIFY_RESULT: ${{ needs.classify.result }}
+          FULL_RESULT: ${{ needs.smoke-full.result }}
+          TRACKING_RESULT: ${{ needs.tracking-integrity.result }}
+        run: |
+          python scripts/ci/smoke_tracking_gate.py decide-final \
+            --mode "${MODE}" \
+            --classify-result "${CLASSIFY_RESULT}" \
+            --full-result "${FULL_RESULT}" \
+            --tracking-result "${TRACKING_RESULT}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Publish final pqg/smoke status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATE: ${{ steps.result.outputs.state }}
+          DESCRIPTION: ${{ steps.result.outputs.description }}
+        run: |
+          curl --fail-with-body -sS \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"${STATE}\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"${DESCRIPTION}\",\"context\":\"pqg/smoke\"}"
+
+          [[ "${STATE}" == "success" ]]
 
   smoke-real:
     if: github.event_name == 'workflow_dispatch' && vars.HERMES_REAL_CI == '1'
