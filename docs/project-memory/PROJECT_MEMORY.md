@@ -114,6 +114,16 @@
 - [2026-08-24 13:59:57 UTC+07:00][recorded_at] If the user later opens Package C, begin from a fresh live fetch and exact-ref Agent Preflight, then follow the master plan without carrying Package B test claims onto a different SHA.
 - [2026-08-24 14:37:06 UTC+07:00][recorded_at] Package C is **COMPLETE** at source-validation HEAD `fe2ad41052fc4cde3ae49543fd9978d12a692d4c`; preserve its exact-source Preflight/Smoke receipts and the separate docs-only tracking child.
 - [2026-08-24 14:37:06 UTC+07:00][recorded_at] Stop after Package C. Package D and all E/G/H/F/F9 work require their own authorization and fresh exact-ref preflight; state/checkpoint remain unchanged.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Package D is **COMPLETE** at source-validation HEAD `36b2fef6817dff9b97e15ee58d1004ab9a067ce6`; preserve its exact-source Preflight/Smoke/Sandbox receipts and keep the following tracking-only child distinct.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Stop after Package D. E1/E2/E3/E4/G/H/F/F9 require separate authorization and a fresh exact-ref preflight; state/checkpoint remain unchanged.
+
+## Package D — completed evidence
+
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] The executable-binding gap is closed by an immutable server-owned mapping of capability ID, execution surface, route key, authoritative handler key and risk/execution/replay invariants, validated against actual MCP callables after filesystem security overrides and the existing Action Package handlers at startup.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Source diff is four files and 389 insertions / 64 deletions. Action Package dispatch now uses the immutable two-handler map while preserving all existing AP semantics; no model-visible admin capability or F9/network capability was added.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Local validation: capability/binding 41 PASS; MCP + Action Package 27 PASS; full backend 547 PASS / 82 explicit SKIP / 2 warnings; compile, temporary-DB migrations/startup/health and diff check PASS.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Exact-source Agent Preflight `32704348381` / `97362194625`, Sandbox Windows `32704336190` / `97362155343`, and Smoke `32704336226` / `97362155302` all SUCCESS. Smoke: backend 548 PASS / 81 SKIP / 2 warnings; frontend 50 files / 322 tests; lint/type/build/startup/health/runtime/seven readiness checks/cleanup PASS; `smoke-real` `97362155978` SKIPPED.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 CLOSED / NOT APPROVED; E/G/H/F remain unopened.
 
 ## Package C — completed evidence
 

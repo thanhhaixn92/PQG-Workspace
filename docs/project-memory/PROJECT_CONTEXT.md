@@ -46,6 +46,8 @@
 - [2026-08-24 06:39:02 UTC+07:00][imported_at] `app.db` owns visible Work/conversation/Assistant history; browser calls backend REST/SSE only; FastAPI is the security/policy boundary; GYO/provider output is untrusted.
 - [2026-08-24 06:39:02 UTC+07:00][imported_at] Work mutation remains Action Package → explicit approval → idempotent executor. Memory/Skill candidates never self-activate and Memory does not implicit-share between Work.
 - [2026-08-24 06:39:02 UTC+07:00][imported_at] Legacy Hermes/ACP is compatibility/history only and must not be restored as current runtime fallback without architecture approval.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Every model-visible capability has exactly one server-owned executable binding to an MCP or Action Package route. Startup fails closed on missing, orphan, duplicate, incompatible or handler-identity drift and on registry risk/execution/replay mismatch; the binding layer is policy validation, not a replacement executor.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Action Package executable binding remains exactly `work_plan_step_update` and `work_status_update`; Package D does not alter proposal, approval, revision, idempotency, budget or mutation semantics.
 
 ## F7 Resource Catalog + Context Broker
 

@@ -101,7 +101,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | A2 | Module/heavy-feature code splitting | P0 | **COMPLETE** | No new security/schema/dependency | source `5fce3270…`; Preflight #17; Smoke #126; eager 486,620 bytes; Monaco/Mermaid outside initial graph |
 | B | Sandbox hostile-local-process TOCTOU hardening | P1 | **COMPLETE** | **Security boundary** | source `140df75…`; preflight/sandbox-windows/Smoke success; backend + F7 + route-contract regression |
 | C | Admin boundary contract reconciliation | P1 | **COMPLETE** | Auth/security contract | source `fe2ad41…`; Preflight/Smoke success; focused admin/capability/UI proof |
-| D | Capability executable-binding validator | P1 | **NOT STARTED** | **Capability/security boundary** | negative drift tests + full backend/startup/Smoke |
+| D | Capability executable-binding validator | P1 | **COMPLETE** | **Capability/security boundary** | source `36b2fef…`; negative drift + backend/startup/Preflight/Smoke success |
 | E1 | npm vulnerability exact inventory | P2 | **NOT STARTED** | Dependency analysis | advisory/path/reachability matrix |
 | E2 | Selective dependency remediation + backend reproducibility/warnings | P2 | **NOT STARTED** | **Dependencies/tool versions** | selective updates + deterministic constraints + full validation |
 | E3 | GitHub Actions major upgrade + immutable SHA pins | P2 | **NOT STARTED** | **Tool/supply-chain** | pinned action SHAs + fresh Preflight/Smoke |
@@ -300,6 +300,15 @@ No new model-visible admin capability, no AP approval/idempotency semantic chang
 
 Require focused negative drift tests + existing registry/MCP/AP tests + full backend + startup + exact-head Smoke.
 
+### Completed evidence
+
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Package D is **COMPLETE** at source-validation HEAD `36b2fef6817dff9b97e15ee58d1004ab9a067ce6`; the following plan/memory update is a distinct tracking-only child.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] The server-owned immutable binding table now associates all 11 model-visible capabilities with exactly one execution surface, route key, authoritative Python handler key and expected risk/execution/replay metadata. FastAPI startup validates the post-hardening MCP callable inventory and the existing two-entry Action Package handler inventory fail closed.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Action Package dispatch was factored into an immutable map for the existing `work_plan_step_update` and `work_status_update` handlers without changing payload, approval, revision, idempotency, execution budget or mutation semantics.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Local evidence: capability/binding 41 PASS; existing MCP + Action Package 27 PASS; full backend 547 PASS / 82 explicit SKIP / 2 warnings; compile, fresh temporary-DB migrations/startup/health and `git diff --check` PASS.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Exact-source Agent Preflight Run `32704348381` / job `97362194625`, Sandbox Windows Run `32704336190` / job `97362155343`, and Smoke Run `32704336226` / job `97362155302` all completed SUCCESS and published `pqg/preflight`, `pqg/sandbox-windows`, and `pqg/smoke` success. Smoke recorded backend 548 PASS / 81 SKIP / 2 warnings, frontend 50 files / 322 tests, lint 0 warnings / 0 errors, type-check/build/startup/health/runtime/seven readiness checks/cleanup PASS; `smoke-real` job `97362155978` was SKIPPED.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] No E/G/H/F/F9, schema/migration, dependency/tool, provider/credential, deployment or checkpoint/state scope was opened.
+
 ---
 
 # Phase E — Dependency, supply chain, and current-GYO acceptance
@@ -496,3 +505,11 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 14:37:06 UTC+07:00][recorded_at] Local evidence: backend focused 48 PASS; Modules Settings 6 PASS; full backend 537 PASS / 82 SKIP / 2 warnings; full frontend 50 files / 322 tests; lint/type-check/build and diff check PASS.
 - [2026-08-24 14:37:06 UTC+07:00][recorded_at] Exact-source CI: Agent Preflight `32701981820` / `97355230052` SUCCESS; Smoke `32701968596` / `97355187719` SUCCESS with backend 538 PASS / 81 SKIP / 2 warnings, frontend 50 files / 322 tests, lint/type/build/runtime/readiness/cleanup PASS; `smoke-real` `97355188770` SKIPPED.
 - [2026-08-24 14:37:06 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED; D/E/G/H/F remain closed in this execution. Stop after Package C.
+
+### [2026-08-24 15:07:32 UTC+07:00] Package D — Capability executable-binding validator
+
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Explicit user approval opened only Package D capability/security binding work. Live fetch began clean/current at tracking HEAD `cce087fec20a0f957278fbc88f047b130602f289`; local preflight PASS and preimplementation exact-ref Agent Preflight `32703253047` / `97358945387` SUCCESS.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Exact gap: CapabilityRegistry owned exposure metadata and startup checked the nine MCP names, but no fail-closed contract tied capability IDs and invariants to the actual post-security-override MCP callables or the two Action Package executor routes.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Source commit `36b2fef6817dff9b97e15ee58d1004ab9a067ce6` changes four source/test files, 389 insertions / 64 deletions. Negative drift coverage rejects missing/orphan/duplicate bindings, compatibility aliases, incompatible surfaces, metadata changes, handler replacement and Action Package allowlist drift.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Exact-source Preflight `32704348381` / `97362194625`, Sandbox Windows `32704336190` / `97362155343`, and Smoke `32704336226` / `97362155302` completed SUCCESS with all three combined statuses green; `smoke-real` `97362155978` was SKIPPED, not PASS.
+- [2026-08-24 15:07:32 UTC+07:00][recorded_at] Result: Package D **COMPLETE**. State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED; E/G/H/F remain unopened. Stop before the next package.
