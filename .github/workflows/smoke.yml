@@ -33,7 +33,7 @@ jobs:
       tracking_depth: ${{ steps.gate.outputs.tracking_depth }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 4
 
@@ -97,7 +97,7 @@ jobs:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Publish pqg/smoke-full pending status
         if: always()
@@ -113,7 +113,7 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"PQG full runtime smoke is running\",\"context\":\"pqg/smoke-full\"}"
 
       - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@9191ea1a55b1e7028943ee5647bf579e1182b42d # post-v7.0.0 security fix, PR #1350
         with:
           python-version: "3.11"
           cache: pip
@@ -135,6 +135,13 @@ jobs:
       - name: Run backend tests with skip reasons
         run: |
           pytest -v -ra --tb=short
+
+      - name: Setup Node 24.16.0
+        uses: actions/setup-node@1acbd4c02f0ca4d959e23850ad70c50828476634 # post-v7.0.0 security-fixed descendant
+        with:
+          node-version: "24.16.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Validate full frontend regression
         working-directory: frontend
@@ -247,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Publish pqg/tracking-integrity pending status
         if: always()
@@ -380,7 +387,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Resolve final pqg/smoke result
         id: result
@@ -421,10 +428,10 @@ jobs:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@9191ea1a55b1e7028943ee5647bf579e1182b42d # post-v7.0.0 security fix, PR #1350
         with:
           python-version: "3.11"
           cache: pip
