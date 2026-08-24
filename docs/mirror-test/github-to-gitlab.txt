@@ -1,0 +1,3 @@
+timestamp_utc=2026-08-24T17:06:50.096Z
+marker=GITHUB_TO_GITLAB_MIRROR_TEST
+base_commit_sha=b11120749a13334456ce409cd5ecab6a2b731bdc
