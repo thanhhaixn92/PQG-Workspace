@@ -106,13 +106,13 @@ Do not advance to the next package until the current package meets its acceptanc
 | C | Admin boundary contract reconciliation | P1 | **COMPLETE** | Auth/security contract | source `fe2ad41…`; Preflight/Smoke success; focused admin/capability/UI proof |
 | D | Capability executable-binding validator | P1 | **COMPLETE** | **Capability/security boundary** | source `36b2fef…`; negative drift + backend/startup/Preflight/Smoke success |
 | E1 | npm vulnerability exact inventory | P2 | **COMPLETE** | Dependency analysis | exact 6-node / 32-advisory inventory + four proposed E2 batches |
-| E2 | Selective dependency remediation | P2 | **IN PROGRESS — E2-A COMPLETE** | **Dependencies/tool versions** | E2-A source `dc1a462…`; remaining fault domains are separately gated below |
+| E2 | Selective dependency remediation | P2 | **IN PROGRESS — E2-A/C/D COMPLETE; E2-B BLOCKED-UPSTREAM; E2-E tracking closeout pending** | **Dependencies/tool versions** | E2-E source `479c339…`; exact Linux Smoke `32738509343` and Windows Sandbox `32738509351` PASS |
 | P-TRACK | Bounded tracking-equivalence CI | P1 process | **COMPLETE** | CI/process | source `2ac0e831…` full receipt; T1 `42b16fcb…` tracking receipt |
 | P-MEM | Project Memory/Context normalization | P2 docs | **COMPLETE** | Docs/evidence | T2 fail-closed; full recovery `0994a6b…` plus tracking closeout pending this exact SHA |
 | E2-B | Monaco bundled DOMPurify | P1 security | **BLOCKED-UPSTREAM** | Dependency/security evidence | latest 0.56.0 bundles vulnerable DOMPurify 3.4.8; recheck upstream release/artifact |
 | E2-C | Vite/PostCSS/Nanoid dev toolchain | P2 | **COMPLETE** | Dependencies/tool versions | source `03d2869…`; exact full Smoke `32729794074` PASS |
 | E2-D | jsdom/Undici test chain | P2 | **COMPLETE** | Dependencies/tool versions | source `8e3f2fd…`; exact full Smoke `32733404512` PASS |
-| E2-E | Backend deterministic constraints + warning closure | P2 | **NOT STARTED** | Dependency/test environment | clean Linux/Windows install, `pip check`, warning disposition |
+| E2-E | Backend deterministic constraints + warning closure | P2 | **SOURCE VALIDATED — tracking closeout pending** | Dependency/test environment | source `479c339…`; exact Linux Smoke `32738509343` + Windows Sandbox `32738509351` PASS |
 | E3 | GitHub Actions major upgrade + immutable SHA pins | P2 | **NOT STARTED** | **Tool/supply-chain** | pinned action SHAs + fresh Preflight/Smoke |
 | E4 | Bounded native current-GYO acceptance | P1 evidence | **NOT STARTED** | **Provider/network/credential use** | local Windows native GYO receipt; no skip-as-success |
 | F | Migration registry maintainability | P3 | **DEFERRED** | **Migration** | reopen only if separately justified |
@@ -459,17 +459,50 @@ Smoke.
 
 ## E2-E — Backend deterministic constraints and warning closure
 
-**Status: NOT STARTED.**
+**Status: SOURCE VALIDATED — tracking closeout pending.**
 
 First select and validate one canonical CI resolution authority: the committed
 `uv.lock` with its matching installer, or generated `backend/constraints-ci.txt`
 for pip. Do not introduce constraints while leaving `uv.lock` independently
 authoritative. If pip constraints are selected, generate them only from a clean
 validated Python 3.11 environment; `pyproject.toml` remains compatibility/
-declaration intent, and Smoke and Sandbox Windows install with `python -m pip
-install -c constraints-ci.txt -e ".[dev]"` followed by `python -m pip check`.
-Preserve valid platform markers rather than forcing one wheel graph across Linux
-and Windows.
+declaration intent. Smoke and Sandbox Windows bootstrap exact constrained
+`pip==26.2.1`, fail closed unless `--build-constraint` is available, then use
+the sole authority for both `-c` and `--build-constraint` editable installation
+before `python -m pip check`. Preserve valid platform markers rather than
+forcing one wheel graph across Linux and Windows.
+
+- [2026-08-24 21:28:55 UTC+07:00][recorded_at] Selected authority is the sole
+  marker-aware `backend/constraints-ci.txt`; stale unused `backend/uv.lock` was
+  deleted. The authority exact-pins direct, dev/test, transitive and Hatchling
+  isolated-build dependencies for supported Python 3.11 Linux and Windows CI
+  environments, including `pip==26.2.1`. This is deterministic version
+  resolution, not byte-for-byte or hash/hermetic artifact reproducibility.
+- [2026-08-24 21:28:55 UTC+07:00][recorded_at] Canonical Linux Smoke and Windows
+  Sandbox now constrained-bootstrap exact pip 26.2.1, fail closed unless the
+  version and `--build-constraint` capability match, use the same authority for
+  regular and PEP 517 isolated-build resolution, and run `python -m pip check`.
+  Sandbox triggers include the manifest, constraints authority and validator;
+  no Actions version/tooling upgrade occurred.
+- [2026-08-24 21:28:55 UTC+07:00][recorded_at] Source `479c3399fd0867421fb7aa1245e74246f4ac9878`
+  passed clean Windows bootstrap/install/`pip check`, focused dependency and
+  warning regression, Python compile, and full backend `549 passed, 83 skipped,
+  2 warnings`. Exact Linux push Smoke
+  [32738509343](https://github.com/thanhhaixn92/PQG-Workspace/actions/runs/32738509343)
+  passed constrained/build-constrained install, `pip check`, backend, frontend
+  and runtime payload with `pqg/smoke-full=success` and `pqg/smoke=success`.
+  Exact Windows Sandbox
+  [32738509351](https://github.com/thanhhaixn92/PQG-Workspace/actions/runs/32738509351)
+  passed with `pqg/sandbox-windows=success`. `smoke-real` was guarded SKIPPED,
+  not PASS.
+- [2026-08-24 21:28:55 UTC+07:00][recorded_at] The two fresh warning regressions
+  retain their discovery provenance: MCP v1 FastMCP `Settings.lifespan` emits
+  `IncompleteFieldDefinitionWarning` through pydantic-settings, and FastAPI's
+  TestClient bridge emits `StarletteDeprecationWarning` for `httpx`. They remain
+  documented UPSTREAM RESIDUALS; no PQG Settings patch/suppression, MCP v2,
+  `httpx2`, provider/network, schema/auth, state/checkpoint or F9 change was
+  made. E2-E becomes COMPLETE only when this direct docs child receives exact
+  `pqg/tracking-integrity=success` and `pqg/smoke=success`; stop before E3.
 
 Investigate warnings with a minimal version/reproduction matrix before changing
 app code: retain the PQG Settings model unchanged for the MCP FastMCP
