@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   hostile-swap:
@@ -37,6 +38,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Publish pqg/sandbox-windows pending status
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $headers = @{
+            Accept = 'application/vnd.github+json'
+            Authorization = "Bearer $env:GH_TOKEN"
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $body = @{
+            state = 'pending'
+            target_url = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            description = 'PQG Windows sandbox validation is running'
+            context = 'pqg/sandbox-windows'
+          } | ConvertTo-Json -Compress
+          Invoke-RestMethod -Method Post -Headers $headers -ContentType 'application/json' -Body $body -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/statuses/$env:GITHUB_SHA"
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -49,3 +68,33 @@ jobs:
 
       - name: Run Package B Windows hostile-swap suite
         run: python -m pytest -v -ra --tb=short tests/test_sandbox_io_b.py
+
+      - name: Publish pqg/sandbox-windows final status
+        if: always()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if ($env:JOB_STATUS -eq 'success') {
+            $state = 'success'
+            $description = 'PQG Windows sandbox validation passed'
+          } elseif ($env:JOB_STATUS -eq 'failure') {
+            $state = 'failure'
+            $description = 'PQG Windows sandbox validation failed'
+          } else {
+            $state = 'error'
+            $description = 'PQG Windows sandbox validation did not complete'
+          }
+          $headers = @{
+            Accept = 'application/vnd.github+json'
+            Authorization = "Bearer $env:GH_TOKEN"
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $body = @{
+            state = $state
+            target_url = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            description = $description
+            context = 'pqg/sandbox-windows'
+          } | ConvertTo-Json -Compress
+          Invoke-RestMethod -Method Post -Headers $headers -ContentType 'application/json' -Body $body -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/statuses/$env:GITHUB_SHA"
