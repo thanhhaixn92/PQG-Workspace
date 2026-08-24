@@ -100,7 +100,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | A1 | Full frontend regression in `pqg/smoke` + backend skip visibility | P0 | **COMPLETE** | CI/process | source `2c1b823…`; Preflight bootstrap `50e3bdb…`; Smoke #119 / `pqg/smoke=success`; frontend 50 files / 317 tests |
 | A2 | Module/heavy-feature code splitting | P0 | **COMPLETE** | No new security/schema/dependency | source `5fce3270…`; Preflight #17; Smoke #126; eager 486,620 bytes; Monaco/Mermaid outside initial graph |
 | B | Sandbox hostile-local-process TOCTOU hardening | P1 | **COMPLETE** | **Security boundary** | source `140df75…`; preflight/sandbox-windows/Smoke success; backend + F7 + route-contract regression |
-| C | Admin boundary contract reconciliation | P1 | **NOT STARTED** | Auth/security contract | current controls characterized; docs avoid proof-of-human claim |
+| C | Admin boundary contract reconciliation | P1 | **COMPLETE** | Auth/security contract | source `fe2ad41…`; Preflight/Smoke success; focused admin/capability/UI proof |
 | D | Capability executable-binding validator | P1 | **NOT STARTED** | **Capability/security boundary** | negative drift tests + full backend/startup/Smoke |
 | E1 | npm vulnerability exact inventory | P2 | **NOT STARTED** | Dependency analysis | advisory/path/reachability matrix |
 | E2 | Selective dependency remediation + backend reproducibility/warnings | P2 | **NOT STARTED** | **Dependencies/tool versions** | selective updates + deterministic constraints + full validation |
@@ -271,6 +271,16 @@ Keep the current local-browser/CSRF/server-owned-actor boundary while making the
 Review admin dependency and constitutional admin routes; verify actor identity is server-derived; preserve fail-closed remote/cross-origin/missing-browser-context behavior; reconcile canon/risk/acceptance wording; document that a sufficiently privileged hostile local process is not distinguished from the local user by current HTTP-header checks.
 
 Require existing/admin characterization tests. Do not introduce WebAuthn, biometrics, user DB/session redesign, or a new credential store.
+
+### Acceptance — COMPLETE
+
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Source-validation HEAD `fe2ad41052fc4cde3ae49543fd9978d12a692d4c` reconciles the claim to interactive local-user administration and explicitly records that loopback/Origin/Fetch Metadata are not cryptographic proof of human presence.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Constitutional Module attach/detach/rename/reorder routes retain loopback, approved-Origin, Fetch Metadata, server-owned actor, revision and audit controls; new tests prove remote-client and valid-Origin/cross-site denial.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Model-visible admin-risk capabilities remain absent; the negative inventory covers Foundation/provider/Module/privacy/permission/restore/delete/admin-Skill classes and verifies `capability_not_found` without creating an approval request.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Local focused evidence: backend 48 PASS / 1 existing warning; frontend Modules Settings 6 PASS. Local full backend: 537 PASS / 82 platform/legacy SKIP / 2 existing warnings. Full frontend: 50 files / 322 tests PASS; lint, type-check and production build PASS; `git diff --check` PASS.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Exact-source Agent Preflight Run `32701981820` / job `97355230052` completed SUCCESS and published `pqg/preflight=success`.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Exact-source Smoke Run `32701968596` / job `97355187719` completed SUCCESS and published `pqg/smoke=success`: backend 538 PASS / 81 SKIP / 2 warnings; frontend 50 files / 322 tests; lint 0 warnings / 0 errors; type-check/build/startup/health/runtime/seven readiness checks/cleanup PASS. `smoke-real` job `97355188770` was SKIPPED, not PASS.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] No schema/migration, provider/credential, dependency/tool, Action Package semantic, executable-binding D, F9, deployment, checkpoint or state change occurred.
 
 ---
 
@@ -476,3 +486,13 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact-source CI: Agent Preflight `32699303000` / `97347423658` SUCCESS; Sandbox Windows `32699302690` / `97347419706` SUCCESS with 12 PASS; Smoke `32699302749` / `97347420230` SUCCESS with backend 528 PASS / 81 SKIP, frontend 50 files / 321 tests, lint/type/build/runtime/readiness/cleanup PASS. `smoke-real=SKIPPED`.
 - [2026-08-24 13:59:57 UTC+07:00][recorded_at] Scope remained Package B only. State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; C/D/E/G/H/F9, migrations/schema, dependencies/tools, providers/credentials, Action Package expansion and deployment remain CLOSED.
 - [2026-08-24 13:59:57 UTC+07:00][recorded_at] Exact next action: commit and independently verify this docs/memory-only tracking child, then stop; no Package C implementation is authorized in this execution.
+
+### [2026-08-24 14:37:06 UTC+07:00] Package C — Admin boundary contract reconciliation
+
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Status: **COMPLETE** at source-validation HEAD `fe2ad41052fc4cde3ae49543fd9978d12a692d4c`; the following tracker/memory write is a distinct docs-only child.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Fresh execution began clean at live HEAD `a35b4cc5027ef30864522e8eec25a21414b88dd3`; local preflight PASS and preimplementation Agent Preflight Run `32700713627` / job `97351465720` SUCCESS before the first Package C write.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Exact gap was claim/characterization drift: current HTTP controls prove an approved interactive local-browser path, not human presence; remote and valid-Origin/cross-site failure modes plus the complete forbidden admin-capability classes were not directly locked by regression tests.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Changed eight source/contract/test files with 127 insertions / 3 deletions; the Package C source does not implement capability executable binding or alter provider/credential semantics.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Local evidence: backend focused 48 PASS; Modules Settings 6 PASS; full backend 537 PASS / 82 SKIP / 2 warnings; full frontend 50 files / 322 tests; lint/type-check/build and diff check PASS.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Exact-source CI: Agent Preflight `32701981820` / `97355230052` SUCCESS; Smoke `32701968596` / `97355187719` SUCCESS with backend 538 PASS / 81 SKIP / 2 warnings, frontend 50 files / 322 tests, lint/type/build/runtime/readiness/cleanup PASS; `smoke-real` `97355188770` SKIPPED.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED; D/E/G/H/F remain closed in this execution. Stop after Package C.

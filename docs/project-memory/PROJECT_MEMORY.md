@@ -103,6 +103,7 @@
 - [2026-08-24 08:39:57 UTC+07:00][recorded_at] A2 initial/eager >500 kB finding is closed: final largest eager is 486,620 bytes. A 662,650-byte lazy chunk remains intentionally non-startup and continues to trigger Vite's generic >500 kB warning; this is accepted A2 residual, not an eager/startup regression.
 - [2026-08-24 13:59:57 UTC+07:00][recorded_at] Sandbox pathname TOCTOU finding is closed by Package B at source HEAD `140df75e907444437844a1328455e6d1c23c7e51`; the two backend dependency/version warnings remain assigned to later dependency work rather than hidden.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Admin boundary wording/characterization remains package C; capability executable binding remains package D.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] The Package C admin wording/characterization residual is closed at source-validation HEAD `fe2ad41052fc4cde3ae49543fd9978d12a692d4c`; capability executable binding remains unopened Package D.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Dependency/supply-chain residuals remain for E1–E3: npm baseline 6 vulnerabilities (3 moderate, 3 high), backend reproducibility/warnings, GitHub Actions Node-version warnings and mutable action tags.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Legacy `smoke-real` remains Hermes/ACP and can false-green on skip; E4 must replace it with bounded native current-GYO evidence.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Branch protection remains deferred until G after A0, A1 and E3 are truthful/stable prerequisites.
@@ -111,3 +112,13 @@
 
 - [2026-08-24 13:59:57 UTC+07:00][recorded_at] No further implementation package is authorized in this execution. Preserve the Package B source and docs/memory lineage, verify the docs-only child independently, and stop before Package C or any protected scope.
 - [2026-08-24 13:59:57 UTC+07:00][recorded_at] If the user later opens Package C, begin from a fresh live fetch and exact-ref Agent Preflight, then follow the master plan without carrying Package B test claims onto a different SHA.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Package C is **COMPLETE** at source-validation HEAD `fe2ad41052fc4cde3ae49543fd9978d12a692d4c`; preserve its exact-source Preflight/Smoke receipts and the separate docs-only tracking child.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Stop after Package C. Package D and all E/G/H/F/F9 work require their own authorization and fresh exact-ref preflight; state/checkpoint remain unchanged.
+
+## Package C — completed evidence
+
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Package C reconciled docs, UI wording and the admin dependency contract to **interactive local-user admin**, explicitly excluding any proof-of-human/WebAuthn/Windows Hello claim and documenting the sufficiently privileged hostile-local-process limitation.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Module attach/detach/rename/reorder continue to require loopback, approved Origin, allowed Fetch Metadata and server-owned actor identity. Remote, missing-Origin, cross-origin, cross-site and forged/missing-actor paths fail closed; audit uses the server actor.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] GYO/model-visible CapabilityRegistry remains free of Foundation/provider/Module/privacy/permission/restore/delete/admin-Skill capabilities. Forbidden/unknown lookup returns `capability_not_found` and does not create an approval request.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Source diff: eight files, 127 insertions / 3 deletions; local focused backend 48 PASS, focused frontend 6 PASS, full backend 537 PASS / 82 SKIP / 2 warnings, full frontend 50 files / 322 tests, lint/type-check/build/diff check PASS.
+- [2026-08-24 14:37:06 UTC+07:00][recorded_at] Exact-source Agent Preflight Run `32701981820` / job `97355230052` SUCCESS. Smoke Run `32701968596` / job `97355187719` SUCCESS with `pqg/smoke=success`, backend 538 PASS / 81 SKIP / 2 warnings, frontend 50 files / 322 tests and runtime/readiness/cleanup PASS; `smoke-real` job `97355188770` SKIPPED.
