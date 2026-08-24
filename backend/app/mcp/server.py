@@ -2,7 +2,11 @@ import contextvars
 
 from mcp.server.fastmcp import FastMCP
 
-from app.services.capabilities import MCP_COMPAT_TOOL_NAMES
+from app.services.capabilities import (
+    MCP_COMPAT_TOOL_NAMES,
+    ExecutionSurface,
+    validate_executable_bindings,
+)
 from app.services.security_overrides import install_security_api_overrides, install_security_mcp_overrides
 from app.settings import get_settings
 
@@ -46,13 +50,26 @@ def setup_mcp(fast_api_app):
     # replacing only the three filesystem-sensitive implementations.
     install_security_mcp_overrides(mcp_server)
 
-    registered = {tool.name for tool in mcp_server._tool_manager.list_tools()}
+    registered_tools = list(mcp_server._tool_manager.list_tools())
+    registered = {tool.name for tool in registered_tools}
     if registered != MCP_COMPAT_TOOL_NAMES:
         missing = sorted(MCP_COMPAT_TOOL_NAMES - registered)
         unexpected = sorted(registered - MCP_COMPAT_TOOL_NAMES)
         raise RuntimeError(
             f"Hermes MCP tool allowlist mismatch; missing={missing}, unexpected={unexpected}"
         )
+
+    from app.services.action_packages import ACTION_PACKAGE_HANDLERS, P0_INTERNAL_CAPABILITIES
+
+    if frozenset(ACTION_PACKAGE_HANDLERS) != P0_INTERNAL_CAPABILITIES:
+        raise RuntimeError("Action Package handler allowlist drift")
+
+    validate_executable_bindings(
+        {
+            ExecutionSurface.MCP: {tool.name: tool.fn for tool in registered_tools},
+            ExecutionSurface.ACTION_PACKAGE: ACTION_PACKAGE_HANDLERS,
+        }
+    )
 
     # MCP 1.x session managers are single-run objects. Each FastAPI app
     # instance (including isolated test apps) therefore gets its own manager;

@@ -12,7 +12,9 @@ import json
 import time
 import uuid
 from hashlib import sha256
-from typing import Any
+from collections.abc import Awaitable, Callable
+from types import MappingProxyType
+from typing import Any, Mapping
 
 import aiosqlite
 
@@ -314,64 +316,93 @@ async def _target_version(conn: aiosqlite.Connection, package: aiosqlite.Row, st
     return (f"work:{package['session_id']}", row["version"] if row else -1)
 
 
-async def _execute_step(conn: aiosqlite.Connection, package: aiosqlite.Row, step: aiosqlite.Row) -> dict[str, Any]:
+async def _execute_work_plan_step_update(
+    conn: aiosqlite.Connection,
+    package: aiosqlite.Row,
+    step: aiosqlite.Row,
+) -> dict[str, Any]:
     data = json.loads(step["input_json"])
     now = int(time.time())
-    if step["kind"] == "work_plan_step_update":
-        step_id = str(data.get("step_id", ""))
-        allowed = {"title", "description", "result", "status"}
-        updates = {key: value for key, value in data.get("changes", {}).items() if key in allowed}
-        if not step_id or not updates:
-            raise ValueError("A plan-step update must name a step and at least one supported change")
-        async with conn.execute(
-            "SELECT plan.session_id, plan.version FROM work_plan_steps plan "
-            "JOIN sessions work ON work.id = plan.session_id "
-            "WHERE plan.id = ? AND work.archived = 0",
-            (step_id,),
-        ) as cur:
-            target = await cur.fetchone()
-        if target is None or target[0] != package["session_id"]:
-            raise ValueError("The plan step is not part of this Work")
-        expected = _expected_version(step)
-        if expected is not None and expected.get("expected_version") != target[1]:
-            raise OptimisticVersionConflict(
-                f"Plan step {step_id} changed since approval (expected v{expected.get('expected_version')}, "
-                f"now v{target[1]}); re-authorise the package."
-            )
-        fields = list(updates)
-        await conn.execute(
-            f"UPDATE work_plan_steps SET {', '.join(f'{key} = ?' for key in fields)}, version = version + 1, updated_at = ? WHERE id = ?",
-            [updates[key] for key in fields] + [now, step_id],
+    step_id = str(data.get("step_id", ""))
+    allowed = {"title", "description", "result", "status"}
+    updates = {key: value for key, value in data.get("changes", {}).items() if key in allowed}
+    if not step_id or not updates:
+        raise ValueError("A plan-step update must name a step and at least one supported change")
+    async with conn.execute(
+        "SELECT plan.session_id, plan.version FROM work_plan_steps plan "
+        "JOIN sessions work ON work.id = plan.session_id "
+        "WHERE plan.id = ? AND work.archived = 0",
+        (step_id,),
+    ) as cur:
+        target = await cur.fetchone()
+    if target is None or target[0] != package["session_id"]:
+        raise ValueError("The plan step is not part of this Work")
+    expected = _expected_version(step)
+    if expected is not None and expected.get("expected_version") != target[1]:
+        raise OptimisticVersionConflict(
+            f"Plan step {step_id} changed since approval (expected v{expected.get('expected_version')}, "
+            f"now v{target[1]}); re-authorise the package."
         )
-        return {"updated_step_id": step_id, "fields": fields}
-    if step["kind"] == "work_status_update":
-        status = data.get("work_status")
-        progress = data.get("progress_percent")
-        if status not in {"not_started", "in_progress", "paused"}:
-            raise ValueError("Unsupported Work status")
-        if not isinstance(progress, int) or not 0 <= progress <= 100:
-            raise ValueError("Progress must be an integer from 0 to 100")
-        async with conn.execute(
-            "SELECT version, archived FROM sessions WHERE id = ?", (package["session_id"],)
-        ) as cur:
-            work = await cur.fetchone()
-        if work is None or work[1]:
+    fields = list(updates)
+    await conn.execute(
+        f"UPDATE work_plan_steps SET {', '.join(f'{key} = ?' for key in fields)}, version = version + 1, updated_at = ? WHERE id = ?",
+        [updates[key] for key in fields] + [now, step_id],
+    )
+    return {"updated_step_id": step_id, "fields": fields}
+
+
+async def _execute_work_status_update(
+    conn: aiosqlite.Connection,
+    package: aiosqlite.Row,
+    step: aiosqlite.Row,
+) -> dict[str, Any]:
+    data = json.loads(step["input_json"])
+    now = int(time.time())
+    status = data.get("work_status")
+    progress = data.get("progress_percent")
+    if status not in {"not_started", "in_progress", "paused"}:
+        raise ValueError("Unsupported Work status")
+    if not isinstance(progress, int) or not 0 <= progress <= 100:
+        raise ValueError("Progress must be an integer from 0 to 100")
+    async with conn.execute(
+        "SELECT version, archived FROM sessions WHERE id = ?", (package["session_id"],)
+    ) as cur:
+        work = await cur.fetchone()
+    if work is None or work[1]:
+        raise ValueError("The Work is no longer available for an approved change")
+    expected = _expected_version(step)
+    if expected is not None and expected.get("expected_version") != work[0]:
+        raise OptimisticVersionConflict(
+            f"Work {package['session_id']} changed since approval (expected v{expected.get('expected_version')}, "
+            f"now v{work[0]}); re-authorise the package."
+        )
+    await conn.execute(
+        "UPDATE sessions SET work_status = ?, progress_percent = ?, version = version + 1, updated_at = ? WHERE id = ? AND archived = 0",
+        (status, progress, now, package["session_id"]),
+    )
+    async with conn.execute("SELECT changes()") as cur:
+        if (await cur.fetchone())[0] != 1:
             raise ValueError("The Work is no longer available for an approved change")
-        expected = _expected_version(step)
-        if expected is not None and expected.get("expected_version") != work[0]:
-            raise OptimisticVersionConflict(
-                f"Work {package['session_id']} changed since approval (expected v{expected.get('expected_version')}, "
-                f"now v{work[0]}); re-authorise the package."
-            )
-        await conn.execute(
-            "UPDATE sessions SET work_status = ?, progress_percent = ?, version = version + 1, updated_at = ? WHERE id = ? AND archived = 0",
-            (status, progress, now, package["session_id"]),
-        )
-        async with conn.execute("SELECT changes()") as cur:
-            if (await cur.fetchone())[0] != 1:
-                raise ValueError("The Work is no longer available for an approved change")
-        return {"work_status": status, "progress_percent": progress}
-    raise ValueError("Unsupported action kind")
+    return {"work_status": status, "progress_percent": progress}
+
+
+ActionPackageHandler = Callable[
+    [aiosqlite.Connection, aiosqlite.Row, aiosqlite.Row],
+    Awaitable[dict[str, Any]],
+]
+ACTION_PACKAGE_HANDLERS: Mapping[str, ActionPackageHandler] = MappingProxyType(
+    {
+        "work_plan_step_update": _execute_work_plan_step_update,
+        "work_status_update": _execute_work_status_update,
+    }
+)
+
+
+async def _execute_step(conn: aiosqlite.Connection, package: aiosqlite.Row, step: aiosqlite.Row) -> dict[str, Any]:
+    handler = ACTION_PACKAGE_HANDLERS.get(step["kind"])
+    if handler is None:
+        raise ValueError("Unsupported action kind")
+    return await handler(conn, package, step)
 
 
 async def execute_one_approved_package(settings: Settings, worker_id: str) -> bool:

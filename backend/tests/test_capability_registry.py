@@ -1,4 +1,4 @@
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from types import SimpleNamespace
 
 import pytest
@@ -7,19 +7,22 @@ from fastapi import FastAPI
 from app.api.approvals import pending_approvals
 from app.mcp.server import HERMES_MCP_TOOL_ALLOWLIST, mcp_server, setup_mcp
 import app.mcp.tools  # noqa: F401 - registers the existing compatibility tool surface
-from app.services.action_packages import P0_INTERNAL_CAPABILITIES
+from app.services.action_packages import ACTION_PACKAGE_HANDLERS, P0_INTERNAL_CAPABILITIES
 from app.services.capabilities import (
     ACTION_PACKAGE_CAPABILITY_IDS,
     ADMIN_RISK_CLASSES,
     DEFAULT_CAPABILITY_REGISTRY,
+    EXECUTABLE_BINDINGS,
     MCP_COMPAT_TOOL_NAMES,
     Capability,
     CapabilityNotFound,
     CapabilityRegistry,
     ExecutionMode,
+    ExecutionSurface,
     ReplayClass,
     RiskClass,
     resolve_model_capability,
+    validate_executable_bindings,
 )
 
 
@@ -140,11 +143,26 @@ def test_setup_mcp_fails_if_unregistered_tool_appears(monkeypatch):
         setup_mcp(FastAPI())
 
 
+def test_setup_mcp_fails_if_action_package_allowlist_drifts(monkeypatch):
+    import app.services.action_packages as action_packages
+
+    monkeypatch.setattr(
+        action_packages,
+        "P0_INTERNAL_CAPABILITIES",
+        frozenset({"work_plan_step_update", "unbound_action"}),
+    )
+
+    with pytest.raises(RuntimeError, match="handler allowlist drift"):
+        setup_mcp(FastAPI())
+
+
 def test_registry_metadata_is_immutable_and_not_an_executor():
     capability = resolve_model_capability("read_workspace_file")
 
     with pytest.raises(FrozenInstanceError):
         capability.risk_class = RiskClass.SYSTEM_ADMIN  # type: ignore[misc]
+    with pytest.raises(FrozenInstanceError):
+        EXECUTABLE_BINDINGS[0].risk_class = RiskClass.SYSTEM_ADMIN  # type: ignore[misc]
     assert not hasattr(DEFAULT_CAPABILITY_REGISTRY, "execute")
 
 
@@ -161,3 +179,92 @@ def test_callers_cannot_override_server_owned_risk_or_execution_metadata():
     assert capability.risk_class is RiskClass.EXTERNAL_SIDE_EFFECT
     assert capability.execution_mode is ExecutionMode.LEGACY_APPROVAL
     assert capability.replay_class is ReplayClass.UNSAFE
+
+
+def _actual_runtime_handlers():
+    from app.services.security_overrides import install_security_mcp_overrides
+
+    install_security_mcp_overrides(mcp_server)
+    return {
+        ExecutionSurface.MCP: {
+            tool.name: tool.fn for tool in mcp_server._tool_manager.list_tools()
+        },
+        ExecutionSurface.ACTION_PACKAGE: ACTION_PACKAGE_HANDLERS,
+    }
+
+
+def test_server_owned_executable_bindings_match_actual_handlers():
+    validate_executable_bindings(_actual_runtime_handlers())
+
+
+def test_action_package_binding_uses_the_existing_executor_routes():
+    assert frozenset(ACTION_PACKAGE_HANDLERS) == P0_INTERNAL_CAPABILITIES
+    assert {
+        binding.route_key
+        for binding in EXECUTABLE_BINDINGS
+        if binding.execution_surface is ExecutionSurface.ACTION_PACKAGE
+    } == P0_INTERNAL_CAPABILITIES
+
+
+def test_duplicate_executable_binding_fails_closed():
+    with pytest.raises(RuntimeError, match="Duplicate executable binding"):
+        validate_executable_bindings(
+            _actual_runtime_handlers(),
+            bindings=(*EXECUTABLE_BINDINGS, EXECUTABLE_BINDINGS[0]),
+        )
+
+
+def test_missing_model_visible_binding_fails_closed():
+    with pytest.raises(RuntimeError, match="missing=.*propose_work_update"):
+        validate_executable_bindings(
+            _actual_runtime_handlers(),
+            bindings=EXECUTABLE_BINDINGS[1:],
+        )
+
+
+def test_orphan_executable_binding_fails_closed():
+    orphan = replace(EXECUTABLE_BINDINGS[0], capability_id="unregistered")
+    with pytest.raises(RuntimeError, match="orphan=.*unregistered"):
+        validate_executable_bindings(
+            _actual_runtime_handlers(),
+            bindings=(orphan, *EXECUTABLE_BINDINGS[1:]),
+        )
+
+
+def test_compatibility_name_cannot_bypass_registry_binding():
+    bypass = replace(EXECUTABLE_BINDINGS[0], route_key="compatibility_alias")
+    with pytest.raises(RuntimeError, match="MCP compatibility binding mismatch"):
+        validate_executable_bindings(
+            _actual_runtime_handlers(),
+            bindings=(bypass, *EXECUTABLE_BINDINGS[1:]),
+        )
+
+
+def test_action_package_mode_cannot_bind_to_mcp_surface():
+    incompatible = replace(
+        EXECUTABLE_BINDINGS[-1],
+        execution_surface=ExecutionSurface.MCP,
+    )
+    with pytest.raises(RuntimeError, match="Incompatible MCP binding"):
+        validate_executable_bindings(
+            _actual_runtime_handlers(),
+            bindings=(*EXECUTABLE_BINDINGS[:-1], incompatible),
+        )
+
+
+def test_server_owned_metadata_drift_fails_closed():
+    drifted = replace(EXECUTABLE_BINDINGS[0], replay_class=ReplayClass.UNSAFE)
+    with pytest.raises(RuntimeError, match="metadata mismatch"):
+        validate_executable_bindings(
+            _actual_runtime_handlers(),
+            bindings=(drifted, *EXECUTABLE_BINDINGS[1:]),
+        )
+
+
+def test_runtime_handler_replacement_fails_closed():
+    handlers = _actual_runtime_handlers()
+    handlers[ExecutionSurface.MCP] = dict(handlers[ExecutionSurface.MCP])
+    handlers[ExecutionSurface.MCP]["propose_work_update"] = lambda: None
+
+    with pytest.raises(RuntimeError, match="changed_handlers=.*propose_work_update"):
+        validate_executable_bindings(handlers)
