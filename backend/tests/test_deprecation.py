@@ -132,4 +132,4 @@ async def test_no_active_consumers_false_after_hit(client: AsyncClient) -> None:
     await client.get(f"/api/sessions/{sid}/task-runs/latest")
 
     from app.services.deprecation import metrics as m
-    assert m.no_active_consumers(grace_hours=0) is False
+    assert m.no_active_consumers(grace_hours=1) is False

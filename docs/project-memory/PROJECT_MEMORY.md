@@ -15,6 +15,9 @@
 
 ## Latest completed package and active gate
 
+- [2026-08-25 02:31:00 UTC+07:00][recorded_at] Supersession: post-E3 work is normalized in `docs/implementation/V22_FINAL_EVIDENCE_MATRIX.md` and `V22_FINAL_GATE_REPORT.md`. E4 source `04873a2…` retired legacy Hermes/ACP real-smoke and exact full Smoke `32764327655` passed, but E4 is **PARTIAL** because aggregate activity made four provider dispatches against the planned cap of three; remote provider compute/billing stop remains `NOT PROVEN`.
+- [2026-08-25 02:31:00 UTC+07:00][recorded_at] G is PASS: `pqg-workspace` requires a PR and only `pqg/smoke`; force-push and branch deletion are disabled. Representative PR #2 passed full Smoke `32764969168` and merged. H1 merged in PR #3; latest source before this docs reconciliation is `b3a10eb…`, whose PR #5 full Smoke `32768141938` passed.
+
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] P-TRACK is COMPLETE. SOURCE has exact `pqg/smoke-full=success` and canonical `pqg/smoke=success`; T1 has exact `pqg/tracking-integrity=success` and canonical `pqg/smoke=success`. Tracking-equivalence is not runtime execution on T1.
 - [2026-08-24 19:14:52 UTC+07:00][recorded_at] P-MEM is COMPLETE. T2 `603fdd19139e5cd3c76797e6576c25a746f79e40` failed closed on shallow ancestry, then corrective SOURCE `0994a6b7077964bd57e2043657ea4f5cec52d320` completed exact full Smoke `32725628340` with `pqg/smoke-full=success` and canonical `pqg/smoke=success`.
 - [2026-08-24 21:28:55 UTC+07:00][recorded_at] E2-C is COMPLETE: source `03d2869…` resolves `vite 8.2.2 -> postcss 8.5.26 -> nanoid 3.3.18`; push `32729774355` is the canonical source-status target and workflow_dispatch `32729794074` is corroborating full evidence.
@@ -24,6 +27,9 @@
 - [2026-08-24 23:16:11 UTC+07:00][recorded_at] E3 exact-source receipts are Agent Preflight `32749299759`, Windows Sandbox `32749299689`, and full Smoke `32749299548`, all SUCCESS with exact `pqg/preflight=success`, `pqg/sandbox-windows=success`, `pqg/smoke-full=success`, and canonical `pqg/smoke=success`. Source Smoke recorded backend **551 passed / 81 skipped / 2 warnings**, frontend **54 files / 334 tests PASS**, lint/type-check/build/runtime/readiness/cleanup PASS, Node `24.16.0`, npm `11.13.0`; avoidable Node20-target action warnings were not observed on the E3 source executions.
 
 ## Open residuals and next action
+
+- [2026-08-25 02:31:00 UTC+07:00][recorded_at] E2-B remains **BLOCKED-UPSTREAM** after recheck: Monaco `0.56.0` still ships bundled DOMPurify `3.4.8` in ESM/min artifacts and issue #5454 remains open. Current production audit is 2 moderate / 0 high / 0 critical. No consumer override, dedupe or dependency update was performed.
+- [2026-08-25 02:31:00 UTC+07:00][recorded_at] H3 is **PARTIAL**: the repaired isolated runner produced AppShell dark/light/theme artifacts but no terminal receipt covers its full frozen matrix. H4 is **NOT RUN**: a further real-provider run would exceed the already-breached E4 request budget. H5/H6 do not promote state; final readiness is NO.
 
 - [2026-08-24 19:25:16 UTC+07:00][recorded_at] E2-B B1 is **BLOCKED-UPSTREAM**: PQG locks Monaco `0.55.1`/DOMPurify `3.2.7`; latest stable Monaco `0.56.0` still ships bundled DOMPurify `3.4.8`. Consumer override/dedupe/npm-tree output cannot replace shipped code. Browser reachability is conditional through user-managed content in the lazy editor; sandbox/UTF-8/size controls are mitigations, not closure.
 - [2026-08-24 23:16:11 UTC+07:00][recorded_at] E3 leaves pre-existing frontend React `act(...)` stderr warnings for H2 warning fix/classification and leaves legacy guarded `smoke-real` as **SKIPPED**, not PASS; E4 owns retirement/replacement of that legacy Hermes/ACP acceptance semantic.
