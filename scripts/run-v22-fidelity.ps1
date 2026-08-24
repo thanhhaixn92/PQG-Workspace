@@ -32,7 +32,7 @@ $frontend = $null
 $session = "v22-$batchSlug-$stamp"
 $cli = @("--yes", "--package", "@playwright/cli", "playwright-cli", "-s=$session")
 $previousEnv = @{}
-foreach ($name in @("DB_PATH", "DEFAULT_WORKSPACE_ROOT", "CORS_ORIGINS", "HERMES_DEV_MOCK", "OUTBOX_DISPATCHER_ENABLED", "VITE_API_BASE_URL", "VITE_API_PROXY_TARGET", "VITE_SHOW_TEST_WORKS")) {
+foreach ($name in @("DB_PATH", "DEFAULT_WORKSPACE_ROOT", "CORS_ORIGINS", "HERMES_DEV_MOCK", "OUTBOX_DISPATCHER_ENABLED", "LOCAL_ACTOR_SUBJECT", "VITE_API_BASE_URL", "VITE_API_PROXY_TARGET", "VITE_SHOW_TEST_WORKS")) {
     $previousEnv[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
 }
 $metadata = [ordered]@{
@@ -44,6 +44,9 @@ $metadata = [ordered]@{
     not_run = @("browser zoom 200 percent", "five-person usability (deferred by product owner)")
 }
 function Save-Metadata { $metadata | ConvertTo-Json -Depth 8 | Set-Content -Path $metadataPath -Encoding utf8 }
+function Quote-ProcessArguments([string[]]$Arguments) {
+    return $Arguments | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }
+}
 function Invoke-Cli([string[]]$Arguments, [string]$LogName = "") {
     $output = & npx @cli @Arguments 2>&1
     $exitCode = $LASTEXITCODE
@@ -145,11 +148,13 @@ async (page) => { await page.reload(); await page.waitForTimeout(500); const sel
 Save-Metadata
 try {
     $env:DB_PATH = Join-Path $tempRoot "app.db"; $env:DEFAULT_WORKSPACE_ROOT = Join-Path $tempRoot "workspace"
-    $env:CORS_ORIGINS = "http://127.0.0.1:$FrontendPort"; $env:HERMES_DEV_MOCK = "1"; $env:OUTBOX_DISPATCHER_ENABLED = "0"
+    $env:CORS_ORIGINS = "http://127.0.0.1:$FrontendPort"; $env:HERMES_DEV_MOCK = "1"; $env:OUTBOX_DISPATCHER_ENABLED = "0"; $env:LOCAL_ACTOR_SUBJECT = "uat-codex-fidelity"
     Remove-Item Env:VITE_API_BASE_URL -ErrorAction SilentlyContinue
     $env:VITE_API_PROXY_TARGET = "http://127.0.0.1:$BackendPort"; $env:VITE_SHOW_TEST_WORKS = "1"
-    $backend = Start-Process -FilePath (Join-Path $repo "backend\.venv\Scripts\python.exe") -ArgumentList @("-m","uvicorn","app.main:app","--host","127.0.0.1","--port","$BackendPort") -WorkingDirectory (Join-Path $repo "backend") -WindowStyle Hidden -RedirectStandardOutput (Join-Path $batchRoot "backend.stdout.log") -RedirectStandardError (Join-Path $batchRoot "backend.stderr.log") -PassThru
-    $frontend = Start-Process -FilePath "node.exe" -ArgumentList @((Join-Path $repo "frontend\node_modules\vite\bin\vite.js"),"--host","127.0.0.1","--port","$FrontendPort","--strictPort") -WorkingDirectory (Join-Path $repo "frontend") -WindowStyle Hidden -RedirectStandardOutput (Join-Path $batchRoot "frontend.stdout.log") -RedirectStandardError (Join-Path $batchRoot "frontend.stderr.log") -PassThru
+    $backendArgs = Quote-ProcessArguments @("-m","uvicorn","app.main:app","--host","127.0.0.1","--port","$BackendPort")
+    $frontendArgs = Quote-ProcessArguments @((Join-Path $repo "frontend\node_modules\vite\bin\vite.js"),"--host","127.0.0.1","--port","$FrontendPort","--strictPort")
+    $backend = Start-Process -FilePath (Join-Path $repo "backend\.venv\Scripts\python.exe") -ArgumentList $backendArgs -WorkingDirectory (Join-Path $repo "backend") -WindowStyle Hidden -RedirectStandardOutput (Join-Path $batchRoot "backend.stdout.log") -RedirectStandardError (Join-Path $batchRoot "backend.stderr.log") -PassThru
+    $frontend = Start-Process -FilePath "node.exe" -ArgumentList $frontendArgs -WorkingDirectory (Join-Path $repo "frontend") -WindowStyle Hidden -RedirectStandardOutput (Join-Path $batchRoot "frontend.stdout.log") -RedirectStandardError (Join-Path $batchRoot "frontend.stderr.log") -PassThru
     $metadata.backend_pid=$backend.Id; $metadata.frontend_pid=$frontend.Id; Save-Metadata; Wait-Ready
     Invoke-Cli @("open", "http://127.0.0.1:$FrontendPort") "open.log" | Out-Null
     if ($Batch -eq "AsyncStates") { Capture-Set "empty" @(@{width=390;height=667},@{width=1440;height=900}) }
@@ -157,7 +162,11 @@ try {
     switch ($Batch) {
         "AppShell" {
             Capture-Set "app-shell-dark" @(@{width=389;height=667},@{width=390;height=667},@{width=391;height=667},@{width=767;height=1024},@{width=768;height=1024},@{width=769;height=1024},@{width=1023;height=600},@{width=1024;height=600},@{width=1025;height=600},@{width=1440;height=900}) "" "" "appShell"
-            Invoke-Cli @("resize","390","667") | Out-Null; Invoke-Cli @("click","button[aria-label='Chuyển sang giao diện sáng']") | Out-Null
+            Invoke-Cli @("resize","390","667") | Out-Null
+            $themeSnapshot = Join-Path $batchRoot "theme-toggle-snapshot.md"
+            Invoke-Cli @("snapshot", "--filename", $themeSnapshot, "--boxes") "theme-toggle-snapshot.log" | Out-Null
+            $themeCode = 'async (page) => { const collapse = page.getByRole("button", { name: "Thu gọn" }); if (await collapse.isVisible()) { await collapse.click(); } await page.getByRole("button", { name: "Chuyển sang giao diện sáng" }).click(); }'
+            Invoke-Cli @("run-code", $themeCode) "theme-toggle.log" | Out-Null
             Capture-Set "app-shell-light" @(@{width=390;height=667},@{width=1024;height=600},@{width=1440;height=900}) "" "" "appShell"
             Invoke-Cli @("reload") | Out-Null; Capture-Set "theme-persisted" @(@{width=390;height=667}) "" "" "appShell"
         }
