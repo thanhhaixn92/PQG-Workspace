@@ -97,7 +97,7 @@ Do not advance to the next package until the current package meets its acceptanc
 | Package | Scope | Priority | Status | Protected? | Completion evidence |
 | --- | --- | --- | --- | --- | --- |
 | A0 | CI/preflight topology repair | P0 | **COMPLETE** | CI/process | source `c6b7d1af…`; Preflight #11/#15; Smoke #115/#116/#117 |
-| A1 | Full frontend regression in `pqg/smoke` + backend skip visibility | P0 | **NOT STARTED** | CI/process | full frontend suite + classified skip visibility + exact-head `pqg/smoke` |
+| A1 | Full frontend regression in `pqg/smoke` + backend skip visibility | P0 | **COMPLETE** | CI/process | source `2c1b823…`; Preflight bootstrap `50e3bdb…`; Smoke #119 / `pqg/smoke=success`; frontend 50 files / 317 tests |
 | A2 | Module/heavy-feature code splitting | P0 | **NOT STARTED** | No new security/schema/dependency | focused lazy/fail-closed tests + full frontend + bundle receipt + Smoke |
 | B | Sandbox hostile-local-process TOCTOU hardening | P1 | **NOT STARTED** | **Security boundary** | Linux/POSIX + Windows hostile-swap suites + full backend + Smoke |
 | C | Admin boundary contract reconciliation | P1 | **NOT STARTED** | Auth/security contract | current controls characterized; docs avoid proof-of-human claim |
@@ -172,9 +172,16 @@ Classify skips into:
 
 Do not automatically turn intentional skips into failures.
 
-### Acceptance
+### Acceptance — COMPLETE
 
-Exact-head `pqg/smoke=success` must mean full backend suite, full frontend Vitest suite, lint, type-check, production build, migrations/startup, health/runtime, readiness and cleanup completed successfully. Real-provider evidence remains explicitly separate.
+- Fresh pre-implementation A1 bootstrap HEAD `50e3bdb83054b3e27d6c20105bfc4e326ce2dd9e` had `pqg/preflight=success` (Run ID `32674453029`) before the implementation commit.
+- A1 source-validation HEAD is `2c1b8238921bd0e99367802cfb29c5218ef87e6f`; exact implementation diff from the bootstrap HEAD changes only `.github/workflows/smoke.yml` (4 additions / 4 deletions).
+- Smoke Test Run #119 / ID `32674524485` on exact source HEAD completed SUCCESS and published `pqg/smoke=success`.
+- Backend command is `pytest -v -ra --tb=short`: 597 collected; **516 passed / 81 skipped / 2 warnings**. Skip reasons are visible: 80 are superseded Hermes/ACP characterization/runtime/UAT cases and 1 is the Windows-only restore-local-data environment case; no unexplained backend skip was observed in this run.
+- Frontend command is the full `npm run test`: **50 test files / 317 tests PASS**. Lint is **0 warnings / 0 errors** over 144 files / 103 rules; type-check PASS; production build PASS.
+- Migrations through 0038, backend startup, health/runtime checks, 7 readiness checks and cleanup PASS.
+- `smoke-real` job is **SKIPPED** and remains explicitly separate from A1 PASS evidence.
+- Known non-blocking residuals remain: two backend dependency/version warnings, React test `act(...)` stderr warnings, npm 6 vulnerabilities (3 moderate / 3 high), GitHub Actions Node/action-version warnings, and initial/eager frontend chunks above 500 kB. These belong to later packages and were not hidden or remediated in A1.
 
 ## A2 — Module/heavy-feature code splitting
 
@@ -400,8 +407,22 @@ A package is not COMPLETE merely because source was edited; package acceptance e
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Initial zero-SHA task-branch proof exposed a committed-diff bug: shallow checkout could not resolve parent and historical snapshot whitespace caused failure. This failure is preserved as evidence; it was not mislabeled PASS.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Final zero-SHA handling deepens the task branch by one commit, resolves `HEAD^`, and runs `git diff --check parent→HEAD`, preserving committed-diff validation without scanning unrelated historical whitespace.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Default-source Smoke Run #115 / ID `32673879015` on exact source HEAD `c6b7d1afab3f066a4aa7f99639104441db1d69fa` completed SUCCESS; all normal smoke steps passed and `smoke-real=SKIPPED`.
-- [2026-08-24 06:39:02 UTC+07:00][recorded_at] Representative zero-SHA branch-creation Smoke Run #116 / ID `32673886997` on `work/a0-verified-topology-proof-20260824` at source HEAD `c6b7d1af…` completed SUCCESS; `Validate committed diff formatting` passed and `smoke-real=SKIPPED`.
+- [2026-08-24 06:39:02 UTC+07:00][recorded_at] Representative zero-SHA branch-creation Smoke Run #116 / ID `32673886997` on `work/a0-verified-topology-proof-20260824` at source HEAD `c6b7d1af…` completed SUCCESS, `Validate committed diff formatting` passed and `smoke-real=SKIPPED`.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] Final task-trigger proof commit `a4fbaacad3fa46be32a6d38a053dd59995ac5c3a` produced Agent Preflight Run #15 / ID `32673916000` SUCCESS with exact-SHA `pqg/preflight=success` and Smoke Run #117 / ID `32673916078` SUCCESS; `smoke-real=SKIPPED`.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] A0 does not prove full frontend regression: the active Smoke semantics during A0 still ran the pre-A1 focused frontend set. Full frontend regression + backend skip visibility remains A1.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] No application/runtime, schema/migration, dependency/action-major, branch-protection, auth/security semantic, provider/credential, deployment, F9, or checkpoint/state change occurred in A0.
 - [2026-08-24 06:39:02 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED. Next package is **A1** after this tracking/memory persistence is verified.
+
+### [2026-08-24 07:20:44 UTC+07:00] Package A1 — Full frontend regression + backend skip visibility
+
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Status: **COMPLETE**.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Session-start drift reconciliation found live `pqg-workspace` at `2c1b8238921bd0e99367802cfb29c5218ef87e6f`, 12 commits ahead of handoff `e84cb0a030f6be54ab9f341b6065f562e301f7b0`; the drift contained completed A0 tracking plus the A1 bootstrap and implementation rather than unrelated divergence.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Fresh A1 pre-implementation bootstrap HEAD `50e3bdb83054b3e27d6c20105bfc4e326ce2dd9e` had `pqg/preflight=success` from Run ID `32674453029`; `pqg/smoke` also succeeded on that bootstrap HEAD.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 source-validation HEAD is `2c1b8238921bd0e99367802cfb29c5218ef87e6f`; exact compare from bootstrap HEAD is ahead 1 / behind 0 and changes only `.github/workflows/smoke.yml` (4 additions / 4 deletions).
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Smoke Test Run #119 / ID `32674524485` on exact A1 source completed SUCCESS and published exact-SHA `pqg/smoke=success`; normal `smoke` job passed, while `smoke-real` was **SKIPPED**.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Backend A1 evidence: `pytest -v -ra --tb=short`, 597 collected, **516 passed / 81 skipped / 2 warnings**. Visible skip summary accounts for 80 superseded Hermes/ACP characterization/runtime/UAT cases and 1 Windows restore-local-data environment case; no unexplained backend skip was observed.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Frontend A1 evidence: full `npm run test` = **50 files / 317 tests PASS**; lint = **0 warnings / 0 errors** over 144 files / 103 rules; type-check PASS; production build PASS.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Runtime A1 evidence: migrations through `0038_durable_assistant_runs`, startup, health/runtime, 7 readiness checks and cleanup all PASS.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] Residuals were preserved, not hidden: two backend dependency/version warnings; React `act(...)` test stderr warnings; npm reports 6 vulnerabilities (3 moderate / 3 high); GitHub Actions Node/action-version warnings; Vite build still reports eager/initial chunks `chunk-KEIR6QF5…` 662.65 kB and `index-BcNgI1tV.js` 667.45 kB. Bundle remediation remains A2.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] A1 made no application/runtime behavior, schema/migration, dependency/tool-version, branch-protection, auth/security semantic, provider/credential, F9, deployment or checkpoint/state change.
+- [2026-08-24 07:20:44 UTC+07:00][recorded_at] State/checkpoint remain `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 remains CLOSED / NOT APPROVED. Next package is **A2 — Module/heavy-feature code splitting** after A1 tracking/memory persistence and a fresh exact-ref A2 Agent Preflight.
