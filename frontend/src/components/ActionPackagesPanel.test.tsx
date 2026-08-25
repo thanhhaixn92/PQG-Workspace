@@ -65,7 +65,7 @@ describe('ActionPackagesPanel', () => {
       { expectedRevision: 1, expectedPayloadHash: 'payload-hash' },
       'test-decision-key',
     ));
-    expect(api.createActionPackageIdempotencyKey).toHaveBeenCalledAfter(api.getActionPackagePreflight as ReturnType<typeof vi.fn>);
+    expect(api.createActionPackageIdempotencyKey).toHaveBeenCalledWith('action-package-approve');
   });
 
   it('blocks approval when the click-time preflight binding is stale and refreshes authoritative state', async () => {
