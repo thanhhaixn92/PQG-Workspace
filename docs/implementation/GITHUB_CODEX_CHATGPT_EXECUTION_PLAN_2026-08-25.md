@@ -3,11 +3,17 @@
 > **Trạng thái:** thiết kế vận hành được đề xuất; chưa thay đổi checkpoint sản phẩm,
 > chưa thay thế governance hiện hành và chưa tự cấp quyền implementation mới.
 >
-> **Hiệu lực của tài liệu:** việc review/merge tài liệu này chỉ phê duyệt thiết kế
-> và roadmap. Luồng ChatGPT Web + GitHub connector trở thành đường write/implementation
+> **Hiệu lực của tài liệu:** review/merge tài liệu này chỉ phê duyệt thiết kế và
+> roadmap. Luồng ChatGPT Web + GitHub connector trở thành đường implementation
 > thông thường **chỉ sau khi OP-1 governance reconciliation được review và merge**.
 > Trước mốc đó, `AGENTS.md`, canon, state/checkpoint, operating contract, routing và
 > workflow governance hiện hành tiếp tục là authority thực thi.
+>
+> **Nguyên tắc delivery được đề xuất:** mọi write do **ChatGPT Web** hoặc
+> **Codex Desktop** thực hiện đều đi qua **feature branch + GitHub Pull Request**.
+> Agent direct-push `pqg-workspace` bị cấm. Quyền admin/bypass, nếu connector hoặc
+> tài khoản có, **không phải delivery path** và không được dùng để né branch
+> protection, PR hoặc canonical CI.
 >
 > **Định hướng tạm thời:** GitHub là canonical source/PR/merge authority. GitLab và
 > GitLab Duo được đề xuất cô lập khỏi coding/merge/acceptance thường ngày; tài liệu
@@ -16,34 +22,43 @@
 
 ## 1. Mục tiêu và giới hạn
 
-Mục tiêu là giảm chi phí điều phối khi hạn mức Codex Desktop hạn chế nhưng vẫn
-bảo toàn exact-SHA evidence, branch ownership, local Windows proof và human
-approval. Thiết kế đích là:
+Mục tiêu là giảm chi phí điều phối và validation không liên quan mà vẫn bảo toàn:
+
+- feature-branch isolation;
+- exact-SHA evidence;
+- canonical `pqg/smoke`;
+- one-writer ownership;
+- local Windows/browser proof khi thực sự cần;
+- human approval cho merge và protected/risky scope.
+
+Thiết kế đích:
 
 ```text
 Yêu cầu / task
       |
-      +--> ChatGPT Web + GitHub connector: research / implementation nặng
-      |          |                         trên scoped feature branch
-      |          v
-      +--> GitHub Actions: Agent Preflight trước edit + canonical CI trên source SHA
+      +--> ChatGPT Web hoặc Codex Desktop: scoped feature branch
       |          |
-      |          v
-      +--> Codex Desktop: coordinator/verifier + Windows/local/browser proof khi cần
-      |          |
-      |          v
-      +--> GitHub PR: independent review + user approval + governed merge
+      |          +--> Quick PR ---------+
+      |          |                      |
+      |          +--> Standard PR ------+--> canonical pqg/smoke
+      |                                 |
+      +--> Codex independent/local proof khi lane yêu cầu
+                                        |
+                                        v
+                              user-reviewed governed merge
+                                        |
+                                        v
+                                  pqg-workspace
 ```
 
 Không thuộc phạm vi của kế hoạch này:
 
+- agent direct-main hoặc admin/bypass delivery;
 - thay đổi `PROJECT_STATE.md`, `AI_STATE.json`, checkpoint, F9 hoặc release state;
 - deploy/publish, credential/provider/2FA/visibility, migration hoặc dữ liệu thật;
-- coi ChatGPT, Codex Cloud, Codespaces, GitLab hoặc scanner là authority thay cho
-  repository contract, deterministic test, exact-SHA evidence và user approval;
-- cài MCP/memory agent, agent loop tự động, dependency/tool mới hoặc CI mới chỉ vì
-  có nhiều tính năng;
-- thay đổi GitLab/GitHub settings chỉ để chứng minh mô hình này được áp dụng.
+- cài MCP/memory agent, agent loop, dependency/tool mới hoặc CI mới chỉ vì có nhiều tính năng;
+- đổi branch protection/ruleset/Actions settings/GitLab settings;
+- thay đổi semantics hiện hành của `pqg/smoke` hoặc mở rộng P-TRACK trong plan PR này.
 
 State gốc vẫn là `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`,
 `human_approval_required=true`; F9 vẫn `CLOSED / NOT APPROVED`. Tài liệu hoặc
@@ -51,34 +66,33 @@ package completion không tự promote gate.
 
 ## 2. Lựa chọn vận hành
 
-| Phương án | Điểm mạnh | Vấn đề với PQG hiện tại | Quyết định |
+| Phương án | Điểm mạnh | Vấn đề với PQG | Quyết định |
 | --- | --- | --- | --- |
-| Codex Desktop đơn lẻ | Windows, terminal, browser | Hạn mức không phù hợp cho mọi phân tích/code nặng | Coordinator + local verifier |
-| ChatGPT Web + GitHub connector đơn lẻ | Repo-scale analysis, GitHub diff/PR | Không chứng minh Windows/local runtime | Remote executor sau activation gate |
-| GitHub-only Minimal Plus | Một source/merge authority, exact-SHA Actions | Cần governance reconciliation và handoff chặt | **Thiết kế chọn** |
-| GitHub + GitLab song song | Thêm scanner/board | Mirror lag/SHA drift/điều phối dư | GitLab advisory quarantine |
-| Codespaces mặc định | Linux shell tái lập | Không thay Windows proof; chưa có ROI/prebuild case | Fallback theo yêu cầu |
-| MCP/memory/agent loop mới | Tự động hóa thêm | Trùng authority/memory, khó audit | Không đưa vào mặc định |
+| PR cho mọi agent write + Quick/Standard lane | Audit rõ, rollback tốt, không cần bypass | Có PR ceremony nhỏ | **Thiết kế chọn** |
+| Human owner direct-main micro-doc | Rất nhanh cho thao tác tay | CI trên commit direct-main là hậu kiểm | Chỉ là human exception nếu user tự chọn; không phải agent lane |
+| Agent admin/bypass direct-main | Ít bước API | Làm suy yếu branch/CI gate và auditability | **Cấm** |
+| Ruleset exception cho direct-main | Có thể actor-specific | Không phân loại semantic risk đáng tin cậy | Không dùng cho fast lane |
+| Docs-light PR CI sau này | Giữ PR boundary, có thể giảm nhiều thời gian | Thay CI acceptance semantics | Deferred, approval riêng sau metrics |
 
-Nguyên tắc tối giản: dùng repository docs + GitHub + Actions + Codex Desktop trước;
-chỉ thêm tool/process khi có bottleneck đo được, owner, rollback và acceptance test.
+Nguyên tắc tối giản: tối ưu bằng **Quick PR + chỉ chạy validation liên quan**, không
+đánh đổi branch governance để tiết kiệm vài thao tác.
 
 ## 3. Authority, writer ownership và trách nhiệm
 
 | Thành phần | Được làm trong mô hình đích | Không được tự làm | Evidence |
 | --- | --- | --- | --- |
 | User | Chọn scope, approve protected/risky work, duyệt merge | Không phải chạy lại check agent có thể tự chạy | Approval rõ |
-| GitHub | Canonical source, branch, PR, Actions, merge history | Không chứng minh Windows chỉ vì CI xanh | URL/run + SHA |
-| ChatGPT Web + GitHub connector | Research; scoped branch write sau OP-1; draft PR/handoff khi được phép | Direct-push default, merge, protected-state/credential changes | Receipt + ownership SHA + diff/evidence |
-| Codex Desktop | Điều phối, independent verification, Windows/local/browser work | Merge/deploy/protected change thay user | Local receipt + SHA/process/browser proof |
-| GitHub Actions | Agent Preflight, canonical `pqg/smoke`, scoped existing jobs | Human approval/state promotion | Workflow run + exact SHA |
+| GitHub | Canonical source, feature branches, PR, Actions, merge history | Không chứng minh Windows chỉ vì CI xanh | URL/run + SHA |
+| ChatGPT Web + GitHub connector | Research; scoped feature-branch write sau OP-1; tạo/cập nhật PR khi task cho phép | Direct-push default, admin/bypass delivery, merge, protected-state/credential change | Receipt + ownership + diff/evidence |
+| Codex Desktop | Điều phối, implementation trên feature branch, independent verification, Windows/local/browser work | Direct-push default, admin/bypass delivery, merge/deploy/protected change thay user | Local receipt + SHA/process/browser proof |
+| GitHub Actions | Agent Preflight, canonical `pqg/smoke`, scoped existing jobs | Human approval/state promotion | Workflow run + validation SHA |
 | Codespaces | Fallback Linux khi user yêu cầu | Second simultaneous writer, Windows PASS claim | SHA + Linux-only output |
 | GitLab/GitLab Duo | Historical/advisory reference ngoài ordinary path | Code write/merge/approval/acceptance | Exact SHA nếu tham chiếu |
 
 ### 3.1 Một branch một writer — optimistic exact-SHA ownership
 
 Không tạo lock service, MCP coordinator hay state database mới. Mỗi writer epoch
-được khóa bằng ba giá trị:
+được khóa bằng:
 
 - `writer_owner`;
 - `ownership_start_sha`;
@@ -86,37 +100,87 @@ Không tạo lock service, MCP coordinator hay state database mới. Mỗi write
 
 Quy tắc:
 
-1. Trước **mỗi write**, đọc remote branch HEAD.
+1. Trước **mỗi write**, đọc remote feature-branch HEAD.
 2. Nếu HEAD khác `expected_remote_head`, dừng `BLOCKED`; không overwrite, rebase,
-   force-push hay tự đoán thay đổi của writer khác.
+   force-push hoặc tự đoán thay đổi của writer khác.
 3. Sau commit do chính writer tạo, cập nhật `expected_remote_head` sang commit mới.
-4. Chuyển ChatGPT <-> Codex chỉ bằng handoff tại một exact SHA; writer mới phải
-   xác nhận remote HEAD đó trước khi edit.
-5. Read-only reviewer có thể làm việc song song; không được write branch đang có owner khác.
+4. Chuyển ChatGPT <-> Codex chỉ bằng handoff tại một exact source SHA; writer mới
+   phải xác nhận remote HEAD đó trước khi edit.
+5. Read-only reviewer có thể làm song song; không được write branch đang có owner khác.
+6. `pqg-workspace` không bao giờ là writer branch của ChatGPT/Codex.
 
-Đây là concurrency guard tối thiểu; không biến Project Memory hoặc Issue text thành lock.
+Quyền admin/bypass không thay đổi sáu quy tắc trên.
 
-## 4. Phân loại tác vụ và đường đi tối thiểu
+## 4. Lane policy — tối đa ba lane
 
-| Loại task | Owner mặc định sau activation | Branch/PR | Validation tối thiểu |
-| --- | --- | --- | --- |
-| Read-only audit/research | ChatGPT | Không cần branch | Ref/SHA/source/evidence |
-| Docs thuần | ChatGPT hoặc Codex | Branch + PR nếu merge | Preflight theo contract, exact diff, canonical policy hiện hành |
-| Backend/frontend behavior | ChatGPT remote executor | Feature branch + draft PR | Preflight, focused regression, affected type/lint/build, canonical CI |
-| Windows/runtime/browser | Codex Desktop | Cùng governed branch, một writer | Exact checkout/process/SHA + relevant local/browser proof |
-| Security/auth/data/migration/provider | Chỉ sau explicit approval | PR riêng | Task canon/security + fail-closed evidence |
-| Multi-PR/blocker/dependency | Issue khi thực sự cần | Milestones nhỏ | Cross-link + exact receipt cho từng PR |
+### 4.1 Direct-main micro change
 
-Không tạo Issue/template cho task nhỏ chỉ để tuân thủ hình thức.
+**Không phải agent lane.**
 
-## 5. Receipt và semantics của Agent Preflight
+- ChatGPT Web: `BLOCKED`.
+- Codex Desktop: `BLOCKED`.
+- Admin/bypass capability: không được dùng làm delivery path.
+- Human owner có thể tự thực hiện một manual micro-doc exception nếu user chủ động
+  quyết định ngoài agent workflow; exception đó không cấp quyền tương tự cho agent.
+
+### 4.2 Quick PR
+
+Dùng khi thay đổi nhỏ, dễ review, impact hẹp và không chạm trust boundary.
+
+Eligible:
+
+- typo/format/prose trong ordinary documentation;
+- localized frontend/backend fix có contract rõ và risk thấp;
+- thay đổi một hoặc vài file nhưng vẫn có blast radius hẹp.
+
+Không eligible:
+
+- governance/process/canon/plan/project-memory/state/checkpoint/evidence policy;
+- test runner, script, workflow, CI config;
+- dependency/lockfile;
+- auth/security/provider/network/database/schema/migration;
+- local Windows/browser behavior là acceptance target;
+- mixed/ambiguous scope hoặc thay đổi public/shared contract đáng kể.
+
+Quick PR không dùng số dòng làm criterion chính. Một diff một dòng chạm runtime hoặc
+trust boundary phải escalation sang Standard PR.
+
+Target process sau OP-1:
+
+1. feature branch;
+2. one writer;
+3. preflight theo governance đang có hiệu lực cho loại change đó;
+4. focused validation đúng affected surface;
+5. PR có thể mở **ready-for-review ngay**, không bắt buộc draft;
+6. canonical `pqg/smoke` theo policy hiện hành;
+7. independent Codex review **không bắt buộc mặc định**, trừ khi escalation condition xuất hiện;
+8. user merge.
+
+### 4.3 Standard PR
+
+Bắt buộc cho:
+
+- governance/process/canon/plan/project-memory;
+- test/script/workflow/CI;
+- dependency/lockfile/tool version;
+- auth/security/permission/audit/provider/network/database/schema/migration;
+- behavior có shared/public contract hoặc blast radius không hẹp;
+- Windows/browser/runtime evidence là một phần acceptance;
+- bất kỳ task nào Quick PR classifier không thể chứng minh an toàn.
+
+Standard PR yêu cầu preflight, focused fail-closed evidence, canonical
+`pqg/smoke`, và independent verification tương xứng với risk. Windows/browser,
+real provider hoặc migration chỉ chạy khi task scope/approval thực sự yêu cầu.
+
+## 5. Receipt và Agent Preflight
 
 ### 5.1 Receipt trước edit
 
 ```markdown
 ## Receipt — <TASK-ID>
 
-- Target branch: `<branch>`
+- Target branch: `<feature-branch>`
+- Lane: `QUICK_PR | STANDARD_PR`
 - Writer owner: `<ChatGPT Web | Codex Desktop>`
 - Ownership start SHA: `<sha>`
 - Expected remote HEAD: `<sha>`
@@ -124,197 +188,224 @@ Không tạo Issue/template cho task nhỏ chỉ để tuân thủ hình thức.
 - Risk / approval boundary: …
 - Gate: `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; F9 không đổi
 - Required sources read: …
-- Preflight branch: `<branch>`
+- Preflight branch: `<feature-branch>`
 - Preflight SHA: `<pre-edit sha>`
 - Preflight run: `<URL/ID>`
-- Preflight status: `pqg/preflight=success | BLOCKED`
+- Preflight status: `pqg/preflight=success | NOT REQUIRED | BLOCKED`
 - Planned files: …
 - Validation plan: …
 ```
 
-### 5.2 Preflight SHA không phải final implementation SHA
+### 5.2 Preflight SHA không phải acceptance SHA
 
-Agent Preflight là **pre-edit execution prerequisite**. Nếu trigger-file bootstrap
-được dùng, run/status gắn với bootstrap/pre-edit SHA. Không được trình bày receipt
-này như thể preflight đã chạy trên final PR HEAD.
+Agent Preflight là **pre-edit execution prerequisite** theo governance đang có hiệu
+lực. Preflight receipt không được relabel thành final PR acceptance.
 
-Trong một writer epoch, preflight pre-edit có thể tiếp tục làm receipt cho các
-commit descendant do **cùng writer** tạo khi đồng thời thỏa:
+Trong một writer epoch, receipt có thể tiếp tục áp dụng cho descendant do cùng
+writer tạo khi branch/ancestry/scope/approval boundary không đổi và không có foreign
+write/rebase/reset/force move. Writer transfer có tracked edit hoặc contract liên
+quan thay đổi thì lấy fresh preflight trước edit.
 
-- branch không đổi và ancestry vẫn là fast-forward descendant của preflight SHA;
-- remote HEAD trước mỗi write khớp expected head;
-- không có writer transfer, rebase/reset/force move hoặc foreign commit;
-- preflight/governance contract liên quan không thay đổi trong epoch;
-- task scope/approval boundary không mở rộng.
+`pqg/smoke` là acceptance evidence riêng; preflight PASS không thay canonical CI.
 
-Phải lấy fresh preflight trước edit tiếp theo nếu một trong các điều kiện trên mất,
-hoặc writer mới tiếp quản và sẽ sửa tracked code/test/schema/config.
+### 5.3 Future safe-prose exemption — chưa có hiệu lực
 
-`pqg/smoke` trên final source SHA là acceptance evidence riêng; nó không thay
-preflight. Ngược lại preflight PASS không thay canonical CI.
+Sau OP-1, repository **có thể** cho phép ordinary prose-only docs bỏ Agent Preflight
+nếu governance định nghĩa explicit safe allowlist. Exemption tương lai này:
 
-### 5.3 Connector execution path
-
-- Có `workflow_dispatch`: chạy Agent Preflight trên exact target ref.
-- Không dispatch nhưng có branch write: trigger `.github/agent-preflight-trigger.txt`
-  theo contract; trigger commit chỉ mở preflight path.
-- Không có cả hai: `BLOCKED`, yêu cầu user/Codex điều phối run; không giả lập local PowerShell.
+- không tự có hiệu lực vì plan được merge;
+- không bao gồm `AGENTS.md`, canon, operating contract, routing, `docs/15...`;
+- không bao gồm implementation plan, project memory, evidence ledger, state/checkpoint;
+- không bao gồm source/test/script/workflow/config/dependency;
+- unknown/mixed scope phải fail closed sang preflight-required.
 
 ## 6. Chuỗi thực thi chuẩn sau activation gate
 
 ### A. ChatGPT Web + GitHub connector
 
-1. Nhận TASK-ID, target branch, acceptance, non-goals và approval boundary.
+1. Nhận TASK-ID, lane, feature branch, acceptance, non-goals và approval boundary.
 2. Đọc required state/checkpoint/routing/contract và focused source/tests.
-3. Xác nhận writer ownership bằng exact remote HEAD.
-4. Đạt fresh Agent Preflight theo mục 5 trước implementation edit.
+3. Xác nhận branch **không phải `pqg-workspace`** và khóa writer ownership bằng
+   exact remote HEAD.
+4. Đạt Agent Preflight nếu governance hiện hành yêu cầu.
 5. Sửa smallest coherent scope; thêm regression test khi behavior đổi.
-6. Commit/push feature branch theo one-writer protocol; không direct-push default.
-7. Mở/cập nhật draft PR khi task cần PR; không merge.
-8. Chờ canonical Actions trên final head; medium/high-risk task nhận **Codex Desktop
-   independent review** khi acceptance yêu cầu. Automated/Cloud review nếu có chỉ là
-   advisory và không thành merge authority.
-9. Handoff theo mục 8. Windows/local/browser evidence chưa chạy phải ghi `NOT RUN`
-   hoặc `PENDING_CODEX_LOCAL_VERIFICATION`.
+6. Commit/push feature branch theo one-writer protocol.
+7. Quick PR có thể mở ready-for-review ngay; Standard PR có thể dùng draft khi
+   implementation/evidence chưa hoàn tất.
+8. Chờ canonical Actions. Không dùng admin/bypass để đưa commit vào default branch.
+9. Handoff với source SHA và actual validation SHA theo mục 7/8.
+10. Không merge.
 
 ### B. Codex Desktop
 
-1. Nếu chỉ coordinate/read diff/SHA/Actions hoặc chạy verification không sửa tracked
-   files, **không rerun local preflight chỉ để lặp lại remote preflight**.
-2. Nếu Codex chuẩn bị sửa tracked code/test/schema/config, tiếp quản writer tại exact
-   SHA và chạy fresh local `scripts/agent-preflight.ps1` trước edit.
-3. Đối chiếu `preflight_sha`, final PR head, Actions run và diff scope; không dùng
-   smoke từ branch/parent khác làm exact-head evidence.
+1. Nếu chỉ coordinate/read diff/SHA/Actions hoặc verify mà không edit tracked files,
+   không rerun local preflight chỉ để lặp remote evidence.
+2. Nếu Codex chuẩn bị edit, tiếp quản writer tại exact feature-branch SHA và chạy
+   preflight theo governance đang có hiệu lực.
+3. Đối chiếu source head, actual validation SHA, workflow event/run và diff scope.
 4. Chỉ chạy local khi Windows/browser/path/process/runtime acceptance cần nó hoặc
-   GitHub evidence không đủ. Trước browser PASS phải chứng minh checkout/process/port
-   thuộc exact source SHA; tooling hiện chưa tự động bảo đảm toàn bộ provenance này.
-5. Real-provider/network/credential smoke luôn cần approval riêng; local smoke không
-   được mặc định suy ra là mock/isolated nếu chưa chứng minh.
-6. Báo riêng `PASS`, `FAIL`, `PARTIAL`, `NOT RUN`, `BLOCKED` theo từng evidence scope.
+   GitHub evidence không đủ.
+5. Trước local/browser PASS phải chứng minh checkout/process/port thuộc exact source
+   revision được test; tooling chưa tự động bảo đảm toàn bộ provenance này.
+6. Real-provider/network/credential smoke luôn cần approval riêng.
+7. Báo riêng `PASS`, `FAIL`, `PARTIAL`, `NOT RUN`, `NOT REQUIRED`, `BLOCKED` theo scope.
 
 ### C. Review và merge
 
-1. PR đi vào `pqg-workspace` theo governance hiện hành tại thời điểm merge.
-2. Required `pqg/smoke` và các check bắt buộc khác phải thuộc exact head/merge shape
-   mà governance yêu cầu.
-3. Merge chỉ sau user approval; không dùng plan này để tự bật auto-merge.
-4. Sau merge chỉ chạy local verification nếu acceptance yêu cầu; không update
-   state/checkpoint/F9 nếu package promotion chưa được phê duyệt riêng.
+1. Mọi agent-authored change đi vào `pqg-workspace` qua PR.
+2. Required `pqg/smoke` và check bắt buộc phải thuộc actual validation SHA/merge shape
+   mà GitHub workflow/governance hiện hành dùng.
+3. User quyết định merge; plan không cấp auto-merge hoặc admin bypass.
+4. Sau merge, default-branch `pqg/smoke` nếu được workflow tạo là post-merge exact-SHA
+   evidence riêng, không làm thay đổi claim của PR validation run.
+5. Không update state/checkpoint/F9 nếu package promotion chưa được phê duyệt riêng.
 
-## 7. Evidence reuse và CI tối giản
+## 7. Exact-SHA evidence cho Pull Request
 
-Một evidence receipt tối thiểu có bốn khóa:
+### 7.1 Không đồng nhất source head và validation SHA
 
-`commit SHA + workflow/run + environment + scope`.
+Với GitHub `pull_request`, workflow có thể chạy trên test-merge/synthetic merge commit.
+Do đó không dùng một field chung `PR head SHA` để mô tả mọi CI evidence.
+
+Receipt/handoff bắt buộc tách:
+
+- `source_head_sha`: exact commit ở feature branch do writer tạo;
+- `validation_sha`: exact SHA mà workflow run thực sự checkout/validate/publish status;
+- `validation_event`: ví dụ `pull_request`, `push`, `workflow_dispatch`;
+- `workflow_run_id` hoặc URL;
+- `environment`;
+- `scope`.
+
+Canonical evidence key:
+
+`source_head_sha + validation_sha + workflow_run + event + environment + scope`.
+
+Không được nói `pqg/smoke` PASS trên source head nếu status/run thực tế thuộc synthetic
+merge SHA. Khi source head đổi, validation receipt cũ không tự chuyển sang source mới.
+
+### 7.2 Evidence reuse
 
 | Trường hợp | Reuse | Quy tắc |
 | --- | --- | --- |
-| PR comment/body đổi, head SHA không đổi | Có | Đọc lại exact-SHA status; không rerun chỉ vì metadata |
-| Final code HEAD đổi | Không cho canonical acceptance | New final-head CI |
-| Cùng writer epoch sau preflight | Chỉ reuse pre-code receipt | Giữ `preflight_sha` riêng, không relabel thành final-head run |
-| Writer transfer sẽ có edit | Không | Fresh preflight cho writer mới |
-| Rebase/reset/foreign write | Không | BLOCKED rồi fresh receipt sau reconciliation |
-| Windows/browser source thay đổi liên quan | Không | Rerun scoped local proof |
-| Docs-only change không ảnh hưởng local scenario | Old local evidence không được relabel | Ghi `NOT REQUIRED`/`NOT RUN` cho child |
-
-### 7.1 P-TRACK là ngoại lệ hẹp, không phải evidence inheritance
-
-CI hiện có bounded tracking-equivalence trên default-branch tracking-only commits.
-Khi classifier hiện hành cho phép tracking path:
-
-- tracking child phải có **receipt riêng trên exact child SHA** gồm
-  `pqg/tracking-integrity` và canonical `pqg/smoke`;
-- full runtime execution vẫn chỉ được claim cho full-validation anchor;
-- không nói runtime tests đã chạy trên tracking child nếu chúng không chạy;
-- pull request và unknown/non-eligible classification tiếp tục đi full path theo
-  workflow hiện hành.
-
-Không sửa hoặc mở rộng P-TRACK trong plan PR này.
-
-### 7.2 Roadmap CI sau này
-
-Current workflow đã có classifier full/tracking và npm/pip cache. Vì vậy **không**
-đưa generic `governance/backend/frontend/full` classifier hoặc cache layer mới vào
-near-term roadmap.
-
-Thứ tự nếu cần tối ưu:
-
-1. Đo duration/job breakdown của ít nhất 20 `pqg/smoke` runs đại diện.
-2. Ghi tỷ lệ run bị superseded do push mới trên cùng PR.
-3. Chỉ khi dữ liệu cho thấy waste đáng kể, thử PR riêng thêm concurrency cancellation
-   cho **cùng PR**.
-4. Không cancel default-branch push.
-5. Không dùng top-level `paths-ignore` làm biến mất required `pqg/smoke`.
-6. Generic classifier/cache optimization chỉ được mở lại bằng scope/approval riêng sau
-   ROI + threat model + tests; unknown phải fail-closed sang full.
+| PR comment/body đổi, source head không đổi | Có | Đọc lại same validation relationship/status; không rerun chỉ vì metadata |
+| Source head đổi | Không cho canonical acceptance | Chờ new PR validation run |
+| Cùng writer epoch sau preflight | Chỉ reuse pre-code receipt | Không relabel preflight thành acceptance |
+| Writer transfer sẽ có edit | Không | Fresh preflight theo contract |
+| Rebase/reset/foreign write | Không | BLOCKED rồi reconcile |
+| Windows/browser-relevant source đổi | Không | Rerun scoped local proof |
+| Docs-only change không liên quan local scenario | Old local evidence không relabel | `NOT REQUIRED` hoặc `NOT RUN` |
 
 ## 8. Handoff ChatGPT -> Codex
 
 ```markdown
 ## Handoff — <TASK-ID>
 
+- Lane: `QUICK_PR | STANDARD_PR`
 - Writer owner / next writer: …
 - Branch / PR: …
 - Ownership start SHA: …
 - Preflight branch / SHA / run / status: …
-- Base SHA -> implementation head SHA: … -> …
+- Base SHA -> source_head_sha: … -> …
+- validation_sha / validation_event / workflow_run_id: …
 - Changed files / reason: …
 - Focused evidence: …
-- Canonical CI run / exact head status: …
-- NOT RUN / BLOCKED: …
+- Canonical `pqg/smoke` evidence: …
+- NOT RUN / NOT REQUIRED / BLOCKED: …
 - Local Windows/browser evidence required: …
 - Known residuals: …
 - Protected scopes unchanged: state/checkpoint/F9/credential/migration/deploy/etc.
 ```
 
-`READY_FOR_USER_REVIEW` chỉ có nghĩa là Codex đã đối chiếu scope/evidence cần thiết;
-nó không có nghĩa user đã approve merge.
+`READY_FOR_USER_REVIEW` chỉ nghĩa là scope/evidence cần thiết đã được verifier đối
+chiếu; không có nghĩa user đã approve merge.
 
-## 9. Phased roadmap — smallest sufficient process
+## 9. P-TRACK và CI tối giản
+
+### 9.1 P-TRACK giữ nguyên
+
+CI hiện có bounded tracking-equivalence trên default-branch tracking-only commits.
+Plan này **không mở rộng P-TRACK sang Pull Request, Quick PR hoặc runtime code**.
+
+Khi classifier hiện hành cho phép tracking path:
+
+- tracking child có receipt riêng trên exact child SHA;
+- full runtime vẫn chỉ được claim cho full-validation anchor;
+- không nói runtime tests chạy trên tracking child nếu chúng không chạy;
+- PR/unknown/non-eligible tiếp tục theo workflow hiện hành.
+
+### 9.2 Những validation có thể giảm sau OP-1
+
+Mục tiêu là cắt duplicate/unrelated work, không tạo false PASS:
+
+- ordinary safe prose docs: future preflight exemption có thể được cân nhắc sau OP-1;
+- connector-only task: không giả lập local `git diff --check`; dùng exact GitHub diff
+  và check mà CI thực sự chạy, ghi local command `NOT RUN`;
+- Quick PR: independent Codex review không required mặc định;
+- non-UI/non-Windows change: local Windows/browser proof `NOT REQUIRED`;
+- code dù chỉ một dòng: focused tests + canonical `pqg/smoke` vẫn required theo
+  policy hiện hành.
+
+### 9.3 Docs-light PR CI — deferred, approval riêng
+
+Không sửa CI semantics trong plan PR này. Chỉ mở lại sau khi đo ít nhất 20 runs và
+chứng minh ordinary docs PR đang gây waste đáng kể.
+
+Nếu được phê duyệt riêng về sau:
+
+- dùng classifier riêng, fail-closed;
+- explicit named safe-prose allowlist, không broad `docs/**`;
+- unknown/mixed/add/delete/rename phải full;
+- không dùng top-level `paths-ignore` làm biến mất required `pqg/smoke`;
+- vẫn publish canonical `pqg/smoke` trên actual validation SHA;
+- không sửa P-TRACK để gánh semantics mới.
+
+Bất kỳ docs-light mode nào cũng là **CI acceptance semantics change** và cần user
+approval riêng.
+
+## 10. Phased roadmap — smallest sufficient process
 
 Plan PR này **không thực hiện** bất kỳ OP nào dưới đây.
 
 | Thứ tự | ID | Scope chính xác | Owner | Validation | Rollback / condition |
 | ---: | --- | --- | --- | --- | --- |
-| 1 | OP-1 | Reconcile tối thiểu `AGENTS.md`, role wording cần thiết trong canon, `docs/14_AGENT_OPERATING_CONTRACT.md`, `docs/AI_AGENT_ROUTING.md`, `docs/15_GITHUB_GITLAB_CODEX_WORKFLOW.md` để không còn hai operating models | ChatGPT draft; Codex independent review | Docs consistency + exact-ref preflight + canonical policy hiện hành | Revert docs PR; **activation gate** cho remote write |
-| 2 | OP-4 | Reconcile `PROJECT_CONTEXT.md`, `PROJECT_MEMORY.md` và append correction vào `PROJECT_CHANGELOG.md`; không rewrite lịch sử | ChatGPT/Codex | Timestamp/provenance review | Revert snapshot/correction; bắt đầu sau OP-1 wording ổn định |
-| 3 | OP-2 | Rà `run-codex.ps1`, `run-codex.sh`, `agent-loop.sh`; deprecate autonomous/stale paths, không duy trì agent loop và không dùng AI_STATE lock như branch lock | ChatGPT patch; Codex local verify | Static/shell/PowerShell contract + local safety check | Revert PR; approval riêng nếu launcher semantics đổi |
-| 4 | OP-5 | Harden local provenance: exact checkout SHA, PID/command line/root/port, isolated/mock default; real provider vẫn approval riêng | Codex Desktop chủ trì | Windows exact-SHA local proof | Revert script PR; không mở provider scope |
-| 5 | OP-3 | Chạy 3 task operating pilot bằng receipt -> preflight -> one writer -> PR/handoff; **chưa thêm template/tool mặc định** | ChatGPT + Codex | Lead time, omissions, duplicate validation, blockers | Quay lại Codex-led execution nếu process không ổn |
-| 6 | OP-6 | Chỉ measurement CI >=20 runs; optional same-PR concurrency nếu ROI rõ. Generic classifier/cache vẫn deferred | ChatGPT + Codex review | p50/p95, superseded-run rate, P-TRACK regressions | Revert concurrency PR; không đổi canonical `pqg/smoke` semantics |
+| 1 | OP-1 | Reconcile `AGENTS.md`, role wording cần thiết trong canon, `docs/14_AGENT_OPERATING_CONTRACT.md`, `docs/AI_AGENT_ROUTING.md`, `docs/15_GITHUB_GITLAB_CODEX_WORKFLOW.md`: agent PR-only, Quick/Standard lane, evidence source-vs-validation SHA | ChatGPT draft; Codex independent review | Docs consistency + preflight + canonical policy hiện hành | Revert docs PR; **activation gate** |
+| 2 | OP-4 | Reconcile `PROJECT_CONTEXT.md`, `PROJECT_MEMORY.md` và append correction vào `PROJECT_CHANGELOG.md`; không rewrite lịch sử | ChatGPT/Codex | Timestamp/provenance review | Revert snapshot/correction |
+| 3 | OP-2 | Rà `run-codex.ps1`, `run-codex.sh`, `agent-loop.sh`; deprecate autonomous/stale paths, không dùng AI_STATE lock như branch lock | ChatGPT patch; Codex local verify | Static/shell/PowerShell contract + local safety check | Revert PR; approval riêng nếu launcher semantics đổi |
+| 4 | OP-5 | Harden local provenance: exact checkout SHA, PID/command line/root/port, isolated/mock default | Codex Desktop chủ trì | Windows exact-SHA local proof | Revert script PR; real provider vẫn approval riêng |
+| 5 | OP-3 | Chạy 3 task operating pilot bằng receipt -> feature branch -> Quick/Standard PR -> handoff | ChatGPT + Codex | Lead time, omissions, duplicate validation, blockers | Quay lại Codex-led execution nếu process không ổn |
+| 6 | OP-6 | Measurement CI >=20 runs; docs-light PR hoặc same-PR concurrency chỉ khi ROI rõ | ChatGPT + Codex review | p50/p95, superseded-run rate, regressions | Revert CI PR; không đổi `pqg/smoke` nếu chưa approval semantics |
 
 OP-1 là governance activation gate. Không suy diễn việc plan được merge là OP-1 đã xong.
 
-## 10. Tooling — quyết định tối giản
+## 11. Tooling — quyết định tối giản
 
 | Tool/ý tưởng | Quyết định | Điều kiện xem lại |
 | --- | --- | --- |
 | `CODEGRAPH.md` | Giữ | Update khi entry point/boundary thực sự đổi |
-| Serena | Deferred | Chỉ pilot read-only nếu sau operating pilot có navigation bottleneck đo được; không persistent memory/write |
-| ast-grep | Deferred | Chỉ khi có recurring AST task rõ và không trùng tool hiện có |
-| Headroom | Giữ docs-only | Không thêm compression proxy mặc định |
-| Ponytail | Không mặc định | Planning/receipt hiện đủ |
-| CodeGraph AI | Không mặc định | Chưa có ROI vượt static CODEGRAPH/search |
-| codebase-memory-mcp | Không | Không cần persistent competing memory; upstream claim chưa xác minh không dùng làm sole reason |
-| agentmemory | Không | Tránh auto-capture prompt/tool retention surface |
-| Agent Reach | Không | External scraping/login không phải coding bottleneck hiện tại |
-| Lore/GitHub Skills | Selective only | Pin exact source/commit, license/security review, task-specific acceptance |
-| TimesFM | Không | Không liên quan coding workflow |
-| Refactor agent | Dùng capability hiện có | Refactor vẫn qua branch/test/PR, không agent loop |
-| Codespaces | Fallback theo yêu cầu | Một writer, exact SHA, Linux-only evidence; không thay Windows proof |
+| Serena | Deferred | Chỉ pilot read-only nếu có navigation bottleneck đo được |
+| ast-grep | Deferred | Chỉ khi recurring AST task rõ |
+| Headroom | Giữ docs-only | Không compression proxy mặc định |
+| Ponytail/CodeGraph AI | Không mặc định | Chưa có ROI vượt static docs/search |
+| codebase-memory-mcp/agentmemory | Không | Tránh competing persistent memory/retention surface |
+| Agent Reach/TimesFM | Không | Không liên quan coding bottleneck |
+| Lore/GitHub Skills | Selective only | Pin source/commit, license/security review |
+| Refactor agent | Dùng capability hiện có | Vẫn qua feature branch/test/PR |
+| Codespaces | Fallback theo yêu cầu | Một writer, exact SHA, Linux-only evidence |
 
-Không có tool bổ sung nào là prerequisite để mô hình này hoạt động.
+Không tool bổ sung nào là prerequisite để mô hình PR-only hoạt động.
 
-## 11. Chỉ số và decision points
+## 12. Metrics và decision points
 
 ### Pilot đầu tiên — 3 task
 
 Ghi cho từng task:
 
-- receipt -> preflight lead time;
-- số remote-HEAD mismatch/writer handoff;
-- số lần validation bị lặp không cần thiết;
+- receipt -> PR validation lead time;
+- Quick vs Standard classification accuracy/escalation;
+- remote-HEAD mismatch/writer handoff;
+- validation bị lặp không cần thiết;
 - finding sau independent/local verification;
+- source_head_sha vs validation_sha provenance errors;
 - blocker do connector/local environment.
 
 Nếu có bypass, writer race hoặc evidence relabeling, dừng mở rộng và sửa process trước.
@@ -323,58 +414,63 @@ Nếu có bypass, writer race hoặc evidence relabeling, dừng mở rộng và
 
 Theo dõi:
 
-- receipt -> canonical `pqg/smoke` lead time;
-- rerun count và reason;
+- source head -> canonical `pqg/smoke` lead time;
+- rerun count/reason;
 - `pqg/smoke` p50/p95;
+- tỷ lệ Quick PR phải escalation;
 - local verification effort khi thực sự cần;
 - finding escape rate;
-- Codespaces usage/cost nếu có.
+- proportion ordinary docs PR để quyết định có đáng tạo docs-light CI hay không.
 
-Giữ mô hình chỉ khi không hạ gate và coordination cost giảm hoặc ổn định.
+Giữ mô hình chỉ khi gate không yếu đi và coordination cost giảm hoặc ổn định.
 
-## 12. Prompt giao việc chuẩn sau OP-1
+## 13. Prompt giao việc chuẩn sau OP-1
 
 ```text
 Bạn là ChatGPT Web executor cho PQG Workspace. GitHub là canonical authority.
+Mọi agent write phải đi qua feature branch + PR. Không direct-push pqg-workspace
+và không dùng admin/bypass như delivery path.
+
 TASK-ID: <id>
-Target branch: <branch>
+Lane: <QUICK_PR | STANDARD_PR>
+Target feature branch: <branch>
 Writer owner: ChatGPT Web + GitHub connector
 Expected remote HEAD: <sha>
 Goal: <goal>
 Non-goals: <non-goals>
 Acceptance: <verifiable criteria>
 
-Trước mỗi write, đọc remote HEAD; mismatch => BLOCKED, không overwrite/rebase/force.
-Trước implementation edit, trả Receipt theo plan và đạt Agent Preflight trên exact
-pre-edit ref. Ghi riêng preflight SHA/run và final implementation HEAD; không relabel
-preflight thành final-head acceptance. Sửa smallest scope; draft PR, không merge.
-Không đổi state/checkpoint/F9, credential/provider, migration, deploy hoặc external
-settings nếu task không có approval riêng.
+Trước mỗi write, đọc remote feature-branch HEAD; mismatch => BLOCKED, không
+overwrite/rebase/force. Trước edit, trả Receipt và đạt Agent Preflight nếu governance
+hiện hành yêu cầu cho lane/scope đó. Sửa smallest scope; không merge.
 
-Handoff phải có writer/next writer, ownership SHA, preflight SHA/run/status, final
-head SHA, changed files, focused evidence, canonical CI, NOT RUN/BLOCKED và local
-Windows/browser proof còn cần.
+Handoff phải tách source_head_sha với validation_sha, ghi validation_event và
+workflow_run_id; không relabel synthetic PR merge SHA thành source head evidence.
+Ghi rõ NOT RUN/NOT REQUIRED/BLOCKED và local Windows/browser proof còn cần.
+Không đổi state/checkpoint/F9, credential/provider, migration, deploy hoặc settings
+nếu task không có approval riêng.
 ```
 
 Prompt này chỉ trở thành normal remote-write launch prompt sau OP-1. Trước đó dùng
 repository governance hiện hành.
 
-## 13. Acceptance của chính kế hoạch
+## 14. Acceptance của chính kế hoạch
 
 Kế hoạch này được xem là **design-approved** khi PR tài liệu được review/merge qua
 GitHub. Điều đó **không tự động thay thế** `AGENTS.md`, canon, operating contract,
 routing hoặc `docs/15_GITHUB_GITLAB_CODEX_WORKFLOW.md`.
 
-Mô hình remote-write được xem là **operationally activated** chỉ khi:
+Mô hình được xem là **operationally activated** chỉ khi:
 
 1. OP-1 governance reconciliation đã review/merge;
-2. task đầu tiên sau activation có receipt trước edit;
-3. Agent Preflight có exact pre-edit branch/SHA/run/status;
-4. one-writer ownership được khóa bằng expected remote HEAD;
-5. handoff tách preflight SHA khỏi final implementation SHA;
-6. canonical CI thuộc exact source SHA theo policy hiện hành;
-7. Windows/browser evidence chỉ được claim khi thực sự chạy trên đúng source/env.
+2. ChatGPT/Codex agent write dùng feature branch + PR, không direct-main/admin-bypass;
+3. Quick PR/Standard PR classifier được áp dụng fail-closed;
+4. task có receipt/preflight theo governance active;
+5. one-writer ownership khóa bằng expected remote HEAD;
+6. handoff tách `source_head_sha` khỏi `validation_sha` và ghi event/run;
+7. canonical `pqg/smoke` thuộc actual validation SHA theo workflow policy;
+8. Windows/browser evidence chỉ claim khi thực sự chạy trên đúng source/env.
 
-Không có điều kiện nào ở đây promote product gate/checkpoint, mở F9 hoặc cấp approval
+Không điều kiện nào ở đây promote product gate/checkpoint, mở F9 hoặc cấp approval
 cho provider/credential/migration/deploy. Nếu governance hiện hành xung đột với plan
 trước khi OP-1 hoàn tất, governance hiện hành thắng và discrepancy được đưa vào OP-1.
