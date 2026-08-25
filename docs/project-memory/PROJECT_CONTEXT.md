@@ -30,3 +30,8 @@
 
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] Locked decisions Q1-Q9 remain A: real lazy boundaries; hostile-local-process sandbox defense; truthful local-user admin wording; minimal executable binding; selective dependency work; bounded native local GYO acceptance; PR-first governance; synthetic evidence only; and durable cancellation/late-output-discard boundary.
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] Execution order is `A0 -> A1 -> A2 -> B -> C -> D -> E1 -> E2-A -> P-TRACK -> P-MEM -> E2-B -> E2-C -> E2-D -> E2-E -> E3 -> E4 -> G -> H1..H6`. F remains deferred unless separately justified; F9 remains closed. Source-validation claims are never inherited by documentation or tracking ancestry.
+
+## GitHub, GitLab and Codex topology
+
+- [2026-08-25 10:12:11 UTC+07:00][recorded_at] GitHub `thanhhaixn92/PQG-Workspace` is the only code/PR/merge authority. Private GitLab project `thanhhai-group/PQG-Workspace` is a one-way pull mirror used only for advisory CI, security analysis, planning and redacted evidence; exact GitHub/GitLab/pipeline SHA equality is required before attributing a GitLab result to source.
+- [2026-08-25 10:12:11 UTC+07:00][recorded_at] GitLab, GitLab Duo and Codex Cloud must not push/fix/merge mirrored refs, promote project state, or replace canonical `pqg/smoke`. Trial-only features are optional and must fail out of the GitHub merge path when the subscription changes.

@@ -30,6 +30,7 @@ and older checkpoint wording do not authorize a change.
 | App shell or responsive UI | `DESIGN.md` plus state | AppLayout, target component, CSS, focused test | loading/error/keyboard/reflow browser evidence |
 | State/checkpoint/evidence | handoff review protocol, acceptance | active state files and exact evidence scripts | actual commands/artifacts only |
 | Migration/dependency/config | data model, security policy | migration/config/package manifest | explicit approval then isolated upgrade/rollback |
+| GitHub/GitLab/Codex CI, mirror or connector | `docs/15_GITHUB_GITLAB_CODEX_WORKFLOW.md`, security policy | `.gitlab-ci.yml`, GitHub workflows, live protection/mirror settings | exact SHA equality, CI Lint, exact pipeline receipt, secret-safe diff |
 
 ## Routing guardrails
 

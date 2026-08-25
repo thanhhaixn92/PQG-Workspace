@@ -166,4 +166,18 @@ Never fake success, weaken tests or security to make a check pass, or represent
 - `docs/02_DATA_STORAGE_MODEL.md` — ownership and migration boundaries.
 - `docs/05_ACCEPTANCE_EVALUATION.md` — acceptance conditions.
 - `docs/14_AGENT_OPERATING_CONTRACT.md` — enforced working agreement.
+- `docs/15_GITHUB_GITLAB_CODEX_WORKFLOW.md` — GitHub-canonical, GitLab
+  advisory-only CI, mirror and connector rules.
 - `HEADROOM.md` — context discipline; keep `AGENTS.md` and `CODEGRAPH.md` short.
+
+## Code Review Rules
+
+- Flag any change that makes GitLab, GitLab Duo, or Codex Cloud a second write
+  or merge authority for `pqg-workspace`, or claims GitLab evidence without
+  exact GitHub/GitLab/pipeline SHA equality.
+- Flag CI or connector changes that expose credentials, `app.db`, real user
+  data, provider secrets, managed files, or create deployment/external effects
+  outside the explicitly approved advisory-CI boundary.
+- Flag any gate or state promotion inherited from a mirror pipeline, stale SHA,
+  scanner availability, or trial-only feature. Deterministic tests and
+  canonical `pqg/smoke` remain authoritative.

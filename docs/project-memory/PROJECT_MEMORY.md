@@ -28,6 +28,10 @@
 
 ## Open residuals and next action
 
+- [2026-08-25 10:12:11 UTC+07:00][recorded_at] GitLab plugin authentication is live as user `thanhhaikk36` with Owner access to private project `thanhhai-group/PQG-Workspace` (project ID `85722132`). The one-way GitHub pull mirror is enabled, default branch `pqg-workspace` is protected, mirror-triggered pipelines and shared runners are enabled, and observed GitLab branch SHA equals GitHub/local HEAD `8fea98845d010cd91b8b6402e96fbb7913981a61`.
+- [2026-08-25 10:12:11 UTC+07:00][recorded_at] GitLab trial integration is **PARTIAL / local candidate only** on branch `codex/gitlab-trial-advisory-ci`: no GitLab pipeline exists yet, CI Lint and schedule are NOT RUN, Issues/Merge Requests remain disabled on the mirror, and live mirror setting still reports overwrite-diverged enabled. Candidate configuration is advisory only; PASS requires exact-SHA default-branch and scheduled/manual pipeline receipts after a governed GitHub PR/merge.
+- [2026-08-25 10:12:11 UTC+07:00][recorded_at] Ultimate-Trial dependency scanning/SBOM and pull mirroring are tier-dependent. SAST and pipeline secret detection are intended to remain the Free-tier baseline. No CI secret, deploy, environment, registry publish, GitLab write-back, state/checkpoint promotion, or F9 authorization is part of this setup.
+
 - [2026-08-25 02:31:00 UTC+07:00][recorded_at] E2-B remains **BLOCKED-UPSTREAM** after recheck: Monaco `0.56.0` still ships bundled DOMPurify `3.4.8` in ESM/min artifacts and issue #5454 remains open. Current production audit is 2 moderate / 0 high / 0 critical. No consumer override, dedupe or dependency update was performed.
 - [2026-08-25 02:31:00 UTC+07:00][recorded_at] H3 is **PARTIAL**: the repaired isolated runner produced AppShell dark/light/theme artifacts but no terminal receipt covers its full frozen matrix. H4 is **NOT RUN**: a further real-provider run would exceed the already-breached E4 request budget. H5/H6 do not promote state; final readiness is NO.
 
