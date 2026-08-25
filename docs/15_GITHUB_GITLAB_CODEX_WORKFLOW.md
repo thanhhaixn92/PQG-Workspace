@@ -45,7 +45,7 @@ explicitly approved maintenance window and exact SHA convergence first.
 
 - a push event on the GitLab default branch caused by pull-mirror convergence;
 - a scheduled pipeline;
-- a manually started pipeline.
+- a manually started pipeline from the GitLab UI or an authenticated API/plugin.
 
 It contains a redacted source-provenance job plus SAST, pipeline secret
 detection, and Ultimate-Trial dependency scanning/SBOM. It contains no deploy,
