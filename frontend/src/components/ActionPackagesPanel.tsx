@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, ShieldAlert, X } from 'lucide-react';
 import {
   approveActionPackage, createActionPackageIdempotencyKey, denyActionPackage,
-  getActionPackageDecisionBinding, getWorkActionPackages, type ActionPackage,
+  getActionPackageDecisionBinding, getActionPackagePreflight, getActionPackagePreflightDecisionBinding,
+  getWorkActionPackages, type ActionPackage,
 } from '../api/actionPackages';
 import { ASSISTANT_NAME } from '../branding';
 import { ApiError } from '../api/client';
@@ -40,6 +41,7 @@ export const ActionPackagesPanel: React.FC<{ workId: string }> = ({ workId }) =>
   const [items, setItems] = useState<ActionPackage[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const decisionInFlightRef = useRef<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -53,25 +55,48 @@ export const ActionPackagesPanel: React.FC<{ workId: string }> = ({ workId }) =>
   useEffect(() => { void load(); }, [load]);
 
   const decide = async (item: ActionPackage, decision: 'approve' | 'deny') => {
-    const binding = getActionPackageDecisionBinding(item);
-    if (!binding) {
+    if (decisionInFlightRef.current.has(item.id)) return;
+    const displayedBinding = getActionPackageDecisionBinding(item);
+    if (!displayedBinding) {
       setError('Gói thay đổi chưa có dữ liệu xác nhận chuẩn. Hãy làm mới trước khi quyết định.');
       return;
     }
+
+    decisionInFlightRef.current.add(item.id);
     setBusy(item.id);
+    setError(null);
     try {
+      // The package may have changed while the user was reading it. The
+      // click-time canonical preflight is authoritative, but a binding that no
+      // longer matches the rendered package is stale and must not be silently
+      // accepted as a different decision.
+      const preflight = await getActionPackagePreflight(item.id);
+      const currentBinding = getActionPackagePreflightDecisionBinding(preflight);
+      const packageMatches = preflight.package_id === item.id;
+      const bindingMatches = currentBinding?.expectedRevision === displayedBinding.expectedRevision
+        && currentBinding?.expectedPayloadHash === displayedBinding.expectedPayloadHash;
+      if (!packageMatches || !currentBinding || !bindingMatches) {
+        throw new ApiError(409, 'Gói thay đổi đã thay đổi hoặc không còn hợp lệ.');
+      }
+
+      // Allocate the idempotency key only after the current preflight has
+      // succeeded. No stale/expired/error path reaches the decision request.
       const idempotencyKey = createActionPackageIdempotencyKey(`action-package-${decision}`);
-      if (decision === 'approve') await approveActionPackage(item.id, binding, idempotencyKey);
-      else await denyActionPackage(item.id, binding, idempotencyKey);
+      if (decision === 'approve') await approveActionPackage(item.id, currentBinding, idempotencyKey);
+      else await denyActionPackage(item.id, currentBinding, idempotencyKey);
       await load();
     } catch (caught) {
+      // Fail closed: remove the stale CTA immediately, then reload the server's
+      // authoritative package state. This path is shared by 409/expiry,
+      // invalid preflight, binding mismatch and network failures.
       setItems([]);
       await load();
       setError(caught instanceof ApiError && caught.status === 409
-        ? 'Mục đã được xử lý ở nơi khác. Trạng thái đang được làm mới.'
-        : 'Quyết định chưa được ghi nhận. Trạng thái đang được làm mới.');
+        ? 'Gói thay đổi đã thay đổi, hết hạn hoặc được xử lý ở nơi khác. Trạng thái đã được làm mới.'
+        : 'Chưa thể xác minh gói thay đổi. Không có quyết định nào được gửi; trạng thái đã được làm mới.');
     } finally {
-      setBusy(null);
+      decisionInFlightRef.current.delete(item.id);
+      setBusy(current => current === item.id ? null : current);
     }
   };
 
