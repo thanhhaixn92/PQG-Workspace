@@ -7,7 +7,10 @@ import type {
   AssistantPart, AssistantThread, AssistantTurn,
   AssistantContextManifest,
 } from '../../api/assistant';
-import { getActionPackage, getActionPackagePreflight, type ActionPackage, type ActionPackagePreflight } from '../../api/actionPackages';
+import {
+  getActionPackage, getActionPackagePreflight, getActionPackagePreflightDecisionBinding,
+  type ActionPackage, type ActionPackagePreflight,
+} from '../../api/actionPackages';
 import type { Artifact } from '../../api/artifacts';
 import type { GyoModel, GyoProvider, ModelConfig } from '../../api/marketplace';
 import { ASSISTANT_NAME } from '../../branding';
@@ -402,10 +405,10 @@ function ConfirmationFooter({ confirmations, onApprove, onDeny, busy, disabled }
   return (
     <div className="gyo-confirmation-footer" role="status" aria-label="Xác nhận cho GYO thực thi">
       {confirmations.map(c => {
-        // Fail-closed: approval CTA disabled when expectedRevision (number) or expectedPayloadHash (string) missing
-        const canApprove = c.preflight?.valid === true
-          && c.preflight.binding?.revision === c.expectedRevision
-          && c.preflight.binding?.payload_hash === c.expectedPayloadHash
+        const preflightBinding = c.preflight ? getActionPackagePreflightDecisionBinding(c.preflight) : null;
+        const canApprove = c.preflight?.package_id === c.id
+          && preflightBinding?.expectedRevision === c.expectedRevision
+          && preflightBinding?.expectedPayloadHash === c.expectedPayloadHash
           && c.expectedRevision != null && typeof c.expectedRevision === 'number' && !!c.expectedPayloadHash;
         const isBusy = busy === c.id;
         return (
@@ -427,7 +430,7 @@ function ConfirmationFooter({ confirmations, onApprove, onDeny, busy, disabled }
                 onClick={() => onApprove(c.id, c.expectedRevision ?? null, c.expectedPayloadHash ?? null)}
                 disabled={isBusy || disabled || !canApprove}
                 aria-label="Xác nhận cho GYO thực thi"
-                title={canApprove ? undefined : 'Thiếu expectedRevision hoặc expectedPayloadHash — không thể xác nhận an toàn'}
+                title={canApprove ? undefined : 'Thiếu binding xác nhận canonical — không thể xác nhận an toàn'}
               >
                 {isBusy ? 'Đang xử lý…' : 'Xác nhận cho GYO thực thi'}
               </button>
@@ -485,6 +488,8 @@ export const GYOAssistant: React.FC<GYOAssistantProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const [showContext, setShowContext] = useState(false);
   const [canonicalPackages, setCanonicalPackages] = useState<Record<string, { package: ActionPackage | null; preflight: ActionPackagePreflight | null }>>({});
+  const [confirmationBusy, setConfirmationBusy] = useState<string | null>(null);
+  const confirmationInFlightRef = useRef<Set<string>>(new Set());
   const composerScopeKey = `${workId ?? ''}:${conversationId ?? ''}`;
   const composerScopeRef = useRef(composerScopeKey);
 
@@ -564,6 +569,14 @@ export const GYOAssistant: React.FC<GYOAssistantProps> = ({
     }
     return [...ids];
   }, [turns]);
+
+  const refreshCanonicalPackage = useCallback(async (id: string) => {
+    let item: ActionPackage | null = null;
+    let preflight: ActionPackagePreflight | null = null;
+    try { item = await getActionPackage(id); } catch { item = null; }
+    try { preflight = await getActionPackagePreflight(id); } catch { preflight = null; }
+    setCanonicalPackages(current => ({ ...current, [id]: { package: item, preflight } }));
+  }, []);
 
   // The message only carries a package reference. The confirmation card is
   // always hydrated from the canonical Action Package before exposing a CTA.
@@ -655,9 +668,13 @@ export const GYOAssistant: React.FC<GYOAssistantProps> = ({
     }
   };
 
-  const handleApprove = async (id: string, expectedRevision?: number | null, expectedPayloadHash?: string | null) => {
-    // Fail-closed: require both expectedRevision (number) and expectedPayloadHash (string).
-    // If either is missing, do NOT call the approval API — display a clear message instead.
+  const handleConfirmationDecision = async (
+    id: string,
+    expectedRevision: number | null | undefined,
+    expectedPayloadHash: string | null | undefined,
+    decision: 'approve' | 'deny',
+  ) => {
+    if (confirmationInFlightRef.current.has(id)) return;
     if (expectedRevision == null || typeof expectedRevision !== 'number' || !expectedPayloadHash) {
       setLocalError({
         category: 'permission',
@@ -666,32 +683,59 @@ export const GYOAssistant: React.FC<GYOAssistantProps> = ({
       });
       return;
     }
+
+    confirmationInFlightRef.current.add(id);
+    setConfirmationBusy(id);
     setLocalError(null);
+    let decisionStarted = false;
     try {
-      // The preview may have become stale while the user was reading it. Recheck
-      // the server-owned binding at click time; never rely on cached UI state.
+      // Re-preflight on the exact click. A canonical binding that differs from
+      // the package the user reviewed is stale; never silently approve/deny the
+      // newer package under the old confirmation UI.
       const preflight = await getActionPackagePreflight(id);
-      if (!preflight.valid || preflight.binding?.revision !== expectedRevision || preflight.binding?.payload_hash !== expectedPayloadHash) {
+      const currentBinding = getActionPackagePreflightDecisionBinding(preflight);
+      if (
+        preflight.package_id !== id
+        || !currentBinding
+        || currentBinding.expectedRevision !== expectedRevision
+        || currentBinding.expectedPayloadHash !== expectedPayloadHash
+      ) {
         throw new ApiError(409, 'Kế hoạch đã thay đổi hoặc không còn hợp lệ.');
       }
-      await onApproveConfirmation(id, expectedRevision, expectedPayloadHash);
+
+      decisionStarted = true;
+      if (decision === 'approve') {
+        await onApproveConfirmation(id, currentBinding.expectedRevision, currentBinding.expectedPayloadHash);
+      } else {
+        await onDenyConfirmation(id, currentBinding.expectedRevision, currentBinding.expectedPayloadHash);
+      }
+      await refreshCanonicalPackage(id);
     } catch (e: unknown) {
+      // Refresh authoritative package/preflight state even when the click-time
+      // preflight itself fails; no decision callback is reached in that case.
+      await refreshCanonicalPackage(id);
       const err = e as Error;
-      if (e instanceof ApiError && e.status === 409) {
-        setLocalError({ category: 'conflict', message: 'Mục đã được xử lý ở nơi khác.', actionable: true });
+      if (!decisionStarted && e instanceof ApiError && e.status === 409) {
+        setLocalError({ category: 'conflict', message: 'Mục đã thay đổi, hết hạn hoặc được xử lý ở nơi khác. Trạng thái đã được làm mới.', actionable: true });
+      } else if (!decisionStarted) {
+        setLocalError({ category: 'generic', message: 'Chưa thể xác minh gói thay đổi. Không có quyết định nào được gửi.', actionable: true });
+      } else if (decision === 'deny') {
+        setLocalError({ category: 'generic', message: 'Không thể từ chối.', actionable: true });
       } else {
         setLocalError({ category: 'generic', message: err?.message || 'Không thể xác nhận.', actionable: true });
       }
+    } finally {
+      confirmationInFlightRef.current.delete(id);
+      setConfirmationBusy(current => current === id ? null : current);
     }
   };
 
+  const handleApprove = async (id: string, expectedRevision?: number | null, expectedPayloadHash?: string | null) => {
+    await handleConfirmationDecision(id, expectedRevision, expectedPayloadHash, 'approve');
+  };
+
   const handleDeny = async (id: string, expectedRevision: number, expectedPayloadHash: string) => {
-    setLocalError(null);
-    try {
-      await onDenyConfirmation(id, expectedRevision, expectedPayloadHash);
-    } catch {
-      setLocalError({ category: 'generic', message: 'Không thể từ chối.', actionable: true });
-    }
+    await handleConfirmationDecision(id, expectedRevision, expectedPayloadHash, 'deny');
   };
 
   const canSubmit = draft.trim().length > 0 && !sending && !workArchived;
@@ -741,7 +785,7 @@ export const GYOAssistant: React.FC<GYOAssistantProps> = ({
             confirmations={confirmations}
             onApprove={handleApprove}
             onDeny={handleDeny}
-            busy={null}
+            busy={confirmationBusy}
             disabled={workArchived}
           />
           {/* Composer always at bottom */}
@@ -799,7 +843,7 @@ export const GYOAssistant: React.FC<GYOAssistantProps> = ({
           confirmations={confirmations}
           onApprove={handleApprove}
           onDeny={handleDeny}
-          busy={sending ? activeThread?.id ?? null : null}
+          busy={confirmationBusy}
           disabled={workArchived}
         />
 
