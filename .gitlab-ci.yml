@@ -1,0 +1,47 @@
+# GitLab is an advisory security/evidence surface for the GitHub-canonical
+# repository. It must not deploy, publish, or write to either Git remote.
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
+    - when: never
+
+stages:
+  - provenance
+  - test
+
+variables:
+  # The GitLab mirror does not use merge requests. Keep all analyzers on the
+  # default-branch, scheduled, or manually started advisory pipeline.
+  AST_ENABLE_MR_PIPELINES: "false"
+  DS_SKIP_IF_NO_SUPPORTED_FILES: "false"
+
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  # Ultimate Trial only. Remove this include if the group returns to Free and
+  # CI Lint shows that the template is no longer available for the namespace.
+  - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
+
+source-provenance:
+  stage: provenance
+  image: alpine:3.22.1
+  script:
+    - |
+      printf '%s\n' \
+        "gitlab_project=${CI_PROJECT_PATH}" \
+        "gitlab_commit_sha=${CI_COMMIT_SHA}" \
+        "gitlab_ref=${CI_COMMIT_REF_NAME}" \
+        "pipeline_source=${CI_PIPELINE_SOURCE}" \
+        "pipeline_url=${CI_PIPELINE_URL}" \
+        "recorded_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > gitlab-source-provenance.txt
+      cat gitlab-source-provenance.txt
+  artifacts:
+    name: "gitlab-source-provenance-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - gitlab-source-provenance.txt
+    expire_in: 14 days

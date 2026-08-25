@@ -10,6 +10,17 @@
 **Branch protection:** OFF / unprotected at audit<br>
 **Purpose:** define the smallest, fail-closed execution path from the post-E3 baseline through E4, G and H1–H6 without widening scope.
 
+> **Live reconciliation — 2026-08-25 10:12:11 UTC+07:00:** The historical
+> post-E3 baseline below is retained for provenance and is superseded by live
+> branch HEAD `8fea98845d010cd91b8b6402e96fbb7913981a61`. E4/G/H1/H2/H5/H6 work and
+> their exact receipts are recorded in the final evidence/state documents;
+> current H6 verdict remains `READY FOR PROMOTION = NO`. GitHub branch
+> protection now requires PR plus canonical `pqg/smoke`, with force-push and
+> deletion disabled. The approved GitLab Ultimate Trial overlay is governed by
+> `docs/15_GITHUB_GITLAB_CODEX_WORKFLOW.md`: GitHub remains canonical and
+> GitLab remains advisory-only. This overlay does not reopen completed packages,
+> authorize deployment/F9, or replace live state/checkpoint authority.
+
 ---
 
 ## 1. Authority and evidence discipline
