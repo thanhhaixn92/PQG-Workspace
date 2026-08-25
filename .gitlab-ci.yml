@@ -44,4 +44,3 @@ source-provenance:
     paths:
       - gitlab-source-provenance.txt
     expire_in: 14 days
-

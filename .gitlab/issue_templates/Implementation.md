@@ -37,4 +37,3 @@
 - Acceptance status: `PASS | PARTIAL | FAIL | NOT RUN | BLOCKED`
 - Residuals:
 - Next gate:
-

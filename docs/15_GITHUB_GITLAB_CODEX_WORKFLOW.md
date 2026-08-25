@@ -175,4 +175,3 @@ Repository preparation is `PARTIAL` until all external checks below are proven:
 
 Only then may the integration be recorded as `PASS - advisory CI operational`.
 This is not a product, release, deployment, or project-promotion PASS.
-
