@@ -12,7 +12,18 @@ import { apiFetch } from './client';
 
 export const getWorkActionPackages = (workId: string) => apiFetch<ActionPackage[]>(`/api/works/${encodeURIComponent(workId)}/action-packages`);
 export const getActionPackage = (packageId: string) => apiFetch<ActionPackage>(`/api/action-packages/${encodeURIComponent(packageId)}`);
-export interface ActionPackagePreflight { package_id: string; binding?: { revision?: number | null; payload_hash?: string | null }; valid: boolean; reasons?: string[]; snapshot?: Record<string, unknown>; preconditions?: Array<Record<string, unknown>>; budget?: Record<string, unknown>; capabilities?: string[]; expires_at?: number | null }
+export interface ActionPackagePreflight {
+  package_id?: string | null;
+  revision?: number | null;
+  payload_hash?: string | null;
+  valid: boolean;
+  errors?: string[];
+  snapshot?: Record<string, unknown>;
+  preconditions?: Array<Record<string, unknown>>;
+  budget?: Record<string, unknown>;
+  capabilities?: string[];
+  expires_at?: number | null;
+}
 /** Re-validates the exact package binding immediately before a governed decision. */
 export const getActionPackagePreflight = (packageId: string) => apiFetch<ActionPackagePreflight>(`/api/action-packages/${encodeURIComponent(packageId)}/preflight`);
 
@@ -34,6 +45,14 @@ export const getActionPackageDecisionBinding = (item: ActionPackage): ActionPack
   return { expectedRevision: item.revision, expectedPayloadHash: item.payload_hash };
 };
 
+/** Only a valid canonical click-time preflight can supply a decision binding. */
+export const getActionPackagePreflightDecisionBinding = (preflight: ActionPackagePreflight): ActionPackageDecisionBinding | null => {
+  if (preflight.valid !== true) return null;
+  if (typeof preflight.revision !== 'number' || !Number.isInteger(preflight.revision) || preflight.revision < 1) return null;
+  if (typeof preflight.payload_hash !== 'string' || preflight.payload_hash.trim() === '') return null;
+  return { expectedRevision: preflight.revision, expectedPayloadHash: preflight.payload_hash };
+};
+
 export const createActionPackageIdempotencyKey = (prefix = 'action-package-decision'): string => {
   const uuid = globalThis.crypto?.randomUUID?.();
   return uuid ? `${prefix}-${uuid}` : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -50,8 +69,7 @@ export const createActionPackageIdempotencyKey = (prefix = 'action-package-decis
  *
  * FAIL-CLOSED: If expectedRevision or expectedPayloadHash is missing/null,
  * the function throws an Error and does NOT make an API call. The caller
- * (GYOAssistant.handleApprove) checks for this condition BEFORE calling
- * this function and displays a clear UI message.
+ * checks for this condition before calling this function and displays a clear UI message.
  *
  * The CTA wording in the UI is "Xác nhận cho GYO thực thi" — not "Phê duyệt nghiệp vụ".
  *

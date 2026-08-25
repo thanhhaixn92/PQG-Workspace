@@ -20,6 +20,15 @@ vi.mock('./HistoryPanel', () => ({
 vi.mock('../../api/actionPackages', () => ({
   getActionPackage: vi.fn(),
   getActionPackagePreflight: vi.fn(),
+  getActionPackagePreflightDecisionBinding: vi.fn((preflight: { valid: boolean; revision?: number; payload_hash?: string }) => (
+    preflight.valid === true
+      && typeof preflight.revision === 'number'
+      && Number.isInteger(preflight.revision)
+      && preflight.revision >= 1
+      && preflight.payload_hash
+      ? { expectedRevision: preflight.revision, expectedPayloadHash: preflight.payload_hash }
+      : null
+  )),
 }));
 
 import { GYOAssistant } from './GYOAssistant';
@@ -43,6 +52,26 @@ const noopAsync = async () => {};
 const CANONICAL_PACKAGE = {
   id: 'pkg-1', session_id: 'work-a', title: 'Cap nhat', package_hash: 'legacy-hash', payload_hash: 'hash-1',
   revision: 1, status: 'awaiting_approval', created_at: 1, updated_at: 1, steps: [],
+};
+const CANONICAL_PREFLIGHT = {
+  package_id: 'pkg-1', valid: true, revision: 1, payload_hash: 'hash-1',
+};
+const THREAD: AssistantThread = {
+  id: 't-1', title: 'Test', work_id: 'work-a', conversation_id: 'conv-a1', status: 'active', created_at: 1, updated_at: 1,
+};
+const ACTION_TURN: AssistantTurn = {
+  id: 'turn-1', thread_id: 't-1', work_id: 'work-a', conversation_id: 'conv-a1',
+  role: 'assistant', status: 'completed', created_at: 1,
+  parts: [{
+    id: 'part-1', part_type: 'action_proposal', sort_order: 0,
+    content: {
+      title: 'Cap nhat',
+      description: 'Mo ta',
+      package_id: 'pkg-1',
+      expected_revision: 1,
+      expected_payload_hash: 'hash-1',
+    },
+  }],
 };
 
 const baseProps = {
@@ -79,8 +108,9 @@ const baseProps = {
 describe('GYOAssistant (shared surface)', () => {
   afterEach(() => cleanup());
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(actionPackagesApi.getActionPackage).mockResolvedValue(CANONICAL_PACKAGE);
-    vi.mocked(actionPackagesApi.getActionPackagePreflight).mockResolvedValue({ package_id: 'pkg-1', valid: true, binding: { revision: 1, payload_hash: 'hash-1' } });
+    vi.mocked(actionPackagesApi.getActionPackagePreflight).mockResolvedValue(CANONICAL_PREFLIGHT);
   });
 
   it('renders GYO label — not Hermes', () => {
@@ -113,28 +143,22 @@ describe('GYOAssistant (shared surface)', () => {
   });
 
   it('shows streaming indicator when a turn is running', () => {
-    const thread: AssistantThread = { id: 't-1', title: 'Test', work_id: 'work-a', conversation_id: 'conv-a1', status: 'active', created_at: 1, updated_at: 1 };
     const runningTurn: AssistantTurn = {
       id: 'turn-1', thread_id: 't-1', work_id: 'work-a', conversation_id: 'conv-a1',
       role: 'assistant', status: 'running', created_at: 1, parts: [],
     };
-    render(<GYOAssistant {...baseProps} threads={[thread]} threadId="t-1" turns={[runningTurn]} />);
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" turns={[runningTurn]} />);
     expect(screen.getByText(/đang trả lời/i)).toBeDefined();
   });
 
   it('renders composer with model selector and attachment tray', () => {
-    const thread: AssistantThread = { id: 't-1', title: 'Test', work_id: 'work-a', conversation_id: 'conv-a1', status: 'active', created_at: 1, updated_at: 1 };
-    render(<GYOAssistant {...baseProps} threads={[thread]} threadId="t-1" turns={[{
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" turns={[{
       id: 'turn-1', thread_id: 't-1', work_id: 'work-a', conversation_id: 'conv-a1',
       role: 'assistant', status: 'completed', created_at: 1, parts: [],
     }]} />);
-    // Composer should have textarea
     expect(screen.getByLabelText(/Gửi yêu cầu cho GYO/i)).toBeDefined();
-    // Submit button
     expect(screen.getByText('Gửi GYO')).toBeDefined();
-    // Model selector label (shows "Tự động" when no models available)
     expect(screen.getByText(/Tự động/i)).toBeDefined();
-    // Attachment toggle
     expect(screen.getByLabelText('Mở thùng tệp ngữ cảnh GYO')).toBeDefined();
   });
 
@@ -152,26 +176,12 @@ describe('GYOAssistant (shared surface)', () => {
     expect(screen.getByText('inputs/evidence.txt')).toBeDefined();
   });
 
-  it('renders ConfirmationFooter with correct wording', () => {
-    const thread: AssistantThread = { id: 't-1', title: 'Test', work_id: 'work-a', conversation_id: 'conv-a1', status: 'active', created_at: 1, updated_at: 1 };
-    const actionTurn: AssistantTurn = {
-      id: 'turn-1', thread_id: 't-1', work_id: 'work-a', conversation_id: 'conv-a1',
-      role: 'assistant', status: 'completed', created_at: 1,
-      parts: [{
-        id: 'part-1', part_type: 'action_proposal', sort_order: 0,
-        content: {
-          title: 'Cap nhat',
-          description: 'Mo ta',
-          package_id: 'pkg-1',
-          expected_revision: 1,
-          expected_payload_hash: 'hash-1',
-        },
-      }],
-    };
-    render(<GYOAssistant {...baseProps} threads={[thread]} threadId="t-1" turns={[actionTurn]} />);
+  it('renders ConfirmationFooter with correct wording', async () => {
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" turns={[ACTION_TURN]} />);
     const confirmBtn = screen.getByRole('button', { name: 'Xác nhận cho GYO thực thi' });
     expect(confirmBtn).toBeDefined();
     expect(screen.getByText('Xác nhận cho GYO thực thi')).toBeDefined();
+    await waitFor(() => expect((confirmBtn as HTMLButtonElement).disabled).toBe(false));
   });
 
   it('shows error state with correct label for conflict', () => {
@@ -206,8 +216,7 @@ describe('GYOAssistant (shared surface)', () => {
   });
 
   it('shows streaming cursor during active streaming', () => {
-    const thread: AssistantThread = { id: 't-1', title: 'Test', work_id: 'work-a', conversation_id: 'conv-a1', status: 'active', created_at: 1, updated_at: 1 };
-    render(<GYOAssistant {...baseProps} threads={[thread]} threadId="t-1" streamedText={{ 'turn-1': 'Hello' }} turns={[{
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" streamedText={{ 'turn-1': 'Hello' }} turns={[{
       id: 'turn-1', thread_id: 't-1', work_id: 'work-a', conversation_id: 'conv-a1',
       role: 'assistant', status: 'running', created_at: 1, parts: [],
     }]} />);
@@ -226,67 +235,81 @@ describe('GYOAssistant (shared surface)', () => {
     expect(screen.getByTestId('context-panel')).toBeDefined();
   });
 
-  it('passes expectedRevision and expectedPayloadHash to onApproveConfirmation', async () => {
-    const thread: AssistantThread = { id: 't-1', title: 'Test', work_id: 'work-a', conversation_id: 'conv-a1', status: 'active', created_at: 1, updated_at: 1 };
-    const actionTurn: AssistantTurn = {
-      id: 'turn-1', thread_id: 't-1', work_id: 'work-a', conversation_id: 'conv-a1',
-      role: 'assistant', status: 'completed', created_at: 1,
-      parts: [{
-        id: 'part-1', part_type: 'action_proposal', sort_order: 0,
-        content: {
-          title: 'Cap nhat',
-          description: 'Mo ta',
-          package_id: 'pkg-1',
-          expected_revision: 1,
-          expected_payload_hash: 'hash-1',
-        },
-      }],
-    };
+  it('re-preflights approval and passes the exact current binding to onApproveConfirmation', async () => {
     const approveSpy = vi.fn().mockResolvedValue(undefined);
-    render(<GYOAssistant {...baseProps} threads={[thread]} threadId="t-1" turns={[actionTurn]} onApproveConfirmation={approveSpy} />);
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" turns={[ACTION_TURN]} onApproveConfirmation={approveSpy} />);
     const confirmBtn = screen.getByRole('button', { name: 'Xác nhận cho GYO thực thi' });
     await waitFor(() => expect((confirmBtn as HTMLButtonElement).disabled).toBe(false));
+
     fireEvent.click(confirmBtn);
-    await waitFor(() => {
-      expect(approveSpy).toHaveBeenCalledWith('pkg-1', 1, 'hash-1');
-    });
+
+    await waitFor(() => expect(approveSpy).toHaveBeenCalledWith('pkg-1', 1, 'hash-1'));
+    expect(actionPackagesApi.getActionPackagePreflight).toHaveBeenCalledWith('pkg-1');
   });
 
-  it('disables approval CTA when expectedRevision or expectedPayloadHash is missing (fail-closed)', () => {
-    const thread: AssistantThread = { id: 't-1', title: 'Test', work_id: 'work-a', conversation_id: 'conv-a1', status: 'active', created_at: 1, updated_at: 1 };
-    // missing expected_revision
-    const actionTurnMissingRev: AssistantTurn = {
-      id: 'turn-1', thread_id: 't-1', work_id: 'work-a', conversation_id: 'conv-a1',
-      role: 'assistant', status: 'completed', created_at: 1,
-      parts: [{
-        id: 'part-1', part_type: 'action_proposal', sort_order: 0,
-        content: {
-          title: 'Cap nhat',
-          description: 'Mo ta',
-          package_id: 'pkg-1',
-          expected_payload_hash: 'hash-1',
-        },
-      }],
-    };
+  it('re-preflights deny and passes the exact current binding to onDenyConfirmation', async () => {
+    const denySpy = vi.fn().mockResolvedValue(undefined);
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" turns={[ACTION_TURN]} onDenyConfirmation={denySpy} />);
+    const denyBtn = await screen.findByRole('button', { name: 'Không thực thi' });
+    await waitFor(() => expect((denyBtn as HTMLButtonElement).disabled).toBe(false));
+
+    fireEvent.click(denyBtn);
+
+    await waitFor(() => expect(denySpy).toHaveBeenCalledWith('pkg-1', 1, 'hash-1'));
+    expect(actionPackagesApi.getActionPackagePreflight).toHaveBeenCalledWith('pkg-1');
+  });
+
+  it('disables approval CTA when the canonical package binding is missing (fail-closed)', () => {
     vi.mocked(actionPackagesApi.getActionPackage).mockRejectedValueOnce(new Error('not available'));
     const approveSpy = vi.fn().mockResolvedValue(undefined);
-    render(<GYOAssistant {...baseProps} threads={[thread]} threadId="t-1" turns={[actionTurnMissingRev]} onApproveConfirmation={approveSpy} />);
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" turns={[ACTION_TURN]} onApproveConfirmation={approveSpy} />);
 
     const confirmBtn = screen.getByRole('button', { name: 'Xác nhận cho GYO thực thi' });
     expect((confirmBtn as HTMLButtonElement).disabled).toBe(true);
     expect(approveSpy).not.toHaveBeenCalled();
   });
 
-  it('rechecks canonical preflight at click time and rejects a stale package', async () => {
-    const thread: AssistantThread = { id: 't-1', title: 'Test', work_id: 'work-a', conversation_id: 'conv-a1', status: 'active', created_at: 1, updated_at: 1 };
-    const actionTurn: AssistantTurn = { id: 'turn-1', thread_id: 't-1', work_id: 'work-a', conversation_id: 'conv-a1', role: 'assistant', status: 'completed', created_at: 1, parts: [{ id: 'part-1', part_type: 'action_proposal', sort_order: 0, content: { package_id: 'pkg-1', title: 'Cập nhật' } }] };
+  it('rechecks canonical preflight at click time and rejects an invalid package without approval', async () => {
     const approveSpy = vi.fn().mockResolvedValue(undefined);
-    render(<GYOAssistant {...baseProps} threads={[thread]} threadId="t-1" turns={[actionTurn]} onApproveConfirmation={approveSpy} />);
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" turns={[ACTION_TURN]} onApproveConfirmation={approveSpy} />);
     const confirm = await screen.findByRole('button', { name: 'Xác nhận cho GYO thực thi' });
     await waitFor(() => expect((confirm as HTMLButtonElement).disabled).toBe(false));
-    vi.mocked(actionPackagesApi.getActionPackagePreflight).mockResolvedValueOnce({ package_id: 'pkg-1', valid: false, binding: { revision: 1, payload_hash: 'hash-1' }, reasons: ['artifact changed'] });
+    vi.mocked(actionPackagesApi.getActionPackagePreflight).mockResolvedValueOnce({ package_id: 'pkg-1', valid: false, errors: ['artifact changed'] });
+
     fireEvent.click(confirm);
-    await waitFor(() => expect(screen.getByText(/Mục đã được xử lý ở nơi khác/i)).toBeDefined());
+
+    await waitFor(() => expect(screen.getByText(/Mục đã thay đổi, hết hạn hoặc được xử lý ở nơi khác/i)).toBeDefined());
     expect(approveSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a click-time binding mismatch and refreshes instead of approving a different revision', async () => {
+    const approveSpy = vi.fn().mockResolvedValue(undefined);
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" turns={[ACTION_TURN]} onApproveConfirmation={approveSpy} />);
+    const confirm = await screen.findByRole('button', { name: 'Xác nhận cho GYO thực thi' });
+    await waitFor(() => expect((confirm as HTMLButtonElement).disabled).toBe(false));
+    vi.mocked(actionPackagesApi.getActionPackagePreflight).mockResolvedValueOnce({
+      package_id: 'pkg-1', valid: true, revision: 2, payload_hash: 'hash-2',
+    });
+
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(screen.getByText(/Mục đã thay đổi, hết hạn hoặc được xử lý ở nơi khác/i)).toBeDefined());
+    expect(approveSpy).not.toHaveBeenCalled();
+  });
+
+  it('prevents double-click from duplicating a GYO confirmation decision', async () => {
+    const approveSpy = vi.fn().mockResolvedValue(undefined);
+    let resolvePreflight!: (value: typeof CANONICAL_PREFLIGHT) => void;
+    render(<GYOAssistant {...baseProps} threads={[THREAD]} threadId="t-1" turns={[ACTION_TURN]} onApproveConfirmation={approveSpy} />);
+    const confirm = await screen.findByRole('button', { name: 'Xác nhận cho GYO thực thi' });
+    await waitFor(() => expect((confirm as HTMLButtonElement).disabled).toBe(false));
+    vi.mocked(actionPackagesApi.getActionPackagePreflight).mockReturnValueOnce(new Promise(resolve => { resolvePreflight = resolve; }));
+
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    expect(approveSpy).not.toHaveBeenCalled();
+    resolvePreflight(CANONICAL_PREFLIGHT);
+    await waitFor(() => expect(approveSpy).toHaveBeenCalledTimes(1));
   });
 });
