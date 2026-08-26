@@ -27,6 +27,7 @@ from app.api.approvals import router as approvals_router
 from app.api.skills import router as skills_router
 from app.api.memory import router as memory_router
 from app.api.runtime import router as runtime_router
+from app.api.desktop import router as desktop_router
 from app.api.local_data import router as local_data_router
 from app.api.n8n import router as n8n_router
 from app.api.tasks import router as tasks_router
@@ -56,12 +57,10 @@ from app.services.action_packages import run_action_package_executor_loop
 from app.services.assistant_runs import AssistantRunClaim, run_assistant_run_worker_loop
 from app.services.gyo_learning_worker import run_gyo_learning_worker_loop
 from app.settings import Settings, get_settings as _get_settings
+from app.version import APP_VERSION
 from app.mcp.server import setup_mcp, mcp_server, mcp_session_id_var
 
 logger = logging.getLogger(__name__)
-
-APP_VERSION = "2.2.0"
-
 
 _DURABLE_ASSISTANT_ROUTE_PATHS = {
     "/api/assistant/threads/{thread_id}/runs",
@@ -207,6 +206,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     app.include_router(skills_router, prefix="/api/skills", tags=["skills"])
     app.include_router(memory_router, prefix="/api/memory", tags=["memory"])
     app.include_router(runtime_router)
+    app.include_router(desktop_router)
     app.include_router(local_data_router)
     app.include_router(n8n_router)
     app.include_router(tasks_router)
