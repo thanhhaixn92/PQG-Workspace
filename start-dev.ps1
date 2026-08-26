@@ -132,6 +132,10 @@ if ($null -ne $state) {
         $FrontendRecord=$state.frontend
         Write-Host "Reuse frontend da duoc chung minh tai http://localhost:$FrontendPort" -ForegroundColor Green
     } elseif (-not $FrontendPortWasExplicit) { $FrontendPort=$recordedFrontendPort }
+
+    if ($null -ne $BackendRecord -and $null -eq $FrontendRecord -and $FrontendPortWasExplicit -and $FrontendPort -ne $recordedFrontendPort) {
+        throw "Backend reusable dang bind CORS toi frontend port $recordedFrontendPort; tu choi launch frontend o port $FrontendPort. Hay stop-dev.ps1 truoc."
+    }
 }
 
 if ($null -eq $BackendRecord -and -not (Test-PortAvailable $BackendPort)) {
@@ -140,6 +144,7 @@ if ($null -eq $BackendRecord -and -not (Test-PortAvailable $BackendPort)) {
     Write-Host "Cong backend $oldPort dang ban nhung khong co reusable provenance. Khong adopt; dung cong moi: $BackendPort" -ForegroundColor Yellow
 }
 if ($null -eq $FrontendRecord -and -not (Test-PortAvailable $FrontendPort)) {
+    if ($null -ne $BackendRecord) { throw "Frontend port $FrontendPort dang ban trong khi backend reusable van bind CORS toi port nay. Tu choi doi port im lang; hay stop-dev.ps1 truoc." }
     $oldPort=$FrontendPort; $FrontendPort=Find-AvailablePort ($FrontendPort+1)
     Write-Host "Cong frontend $oldPort dang ban nhung khong co reusable provenance. Khong adopt; dung cong moi: $FrontendPort" -ForegroundColor Yellow
 }
