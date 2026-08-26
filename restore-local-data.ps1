@@ -7,10 +7,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$defaultTarget = [System.IO.Path]::GetFullPath((Join-Path $root 'backend\app.db'))
+$root = [System.IO.Path]::GetFullPath((Split-Path -Parent $MyInvocation.MyCommand.Path))
+. (Join-Path $root 'scripts\dev-provenance.ps1')
+
+$backendDir = Get-PqgCanonicalPath (Join-Path $root 'backend')
+$frontendDir = Get-PqgCanonicalPath (Join-Path $root 'frontend')
+$python = Get-PqgCanonicalPath (Join-Path $backendDir '.venv\Scripts\python.exe')
+$statePath = Join-Path $root '.dev\dev-state.json'
+$defaultTarget = Get-PqgCanonicalPath (Join-Path $backendDir 'app.db')
 $targetInput = if ($TargetPath) { $TargetPath } else { $defaultTarget }
-$target = [System.IO.Path]::GetFullPath($targetInput)
+$target = Get-PqgCanonicalPath $targetInput
 $backup = (Resolve-Path -LiteralPath $BackupPath).Path
 $manifest = "$backup.manifest.json"
 
@@ -24,23 +30,12 @@ if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
     throw 'Restore target must be an existing database file.'
 }
 if (-not $WhatIf -and -not $ConfirmRestore) {
-    throw 'Run with -WhatIf first, then use -ConfirmRestore only after stopping backend, Hermes, outbox and MCP.'
+    throw 'Run with -WhatIf first, then use -ConfirmRestore only after the target DB is offline.'
 }
 if ($WhatIf -and $ConfirmRestore) {
     throw 'Use either -WhatIf or -ConfirmRestore, not both.'
 }
-
-if ($ConfirmRestore -and $target -eq $defaultTarget) {
-    $busyPorts = @(8000, 8100) | Where-Object {
-        Get-NetTCPConnection -LocalPort $_ -State Listen -ErrorAction SilentlyContinue
-    }
-    if ($busyPorts) {
-        throw 'A local backend appears to be running. Stop it before an offline restore.'
-    }
-}
-
-$python = Join-Path $root 'backend\.venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $python)) {
+if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
     throw 'Backend Python environment is required to validate the backup.'
 }
 
@@ -69,8 +64,75 @@ finally:
     db.close()
 "@
 $integrity = $validation | & $python - $backup $manifest ([System.IO.Path]::GetFileName($backup))
-if ($integrity -ne 'ok') {
-    throw 'Backup integrity check failed; no data was changed.'
+if ($LASTEXITCODE -ne 0 -or $integrity -ne 'ok') {
+    throw 'Backup manifest/hash/integrity validation failed; no data was changed.'
+}
+
+function Assert-TargetDbOffline {
+    $state = $null
+    $backendProof = $null
+    $frontendProof = $null
+    $stateDbMatchesTarget = $false
+    $knownDifferentBackendRootPid = 0
+
+    if (Test-Path -LiteralPath $statePath -PathType Leaf) {
+        try {
+            $state = Read-PqgDevState -StatePath $statePath
+        } catch {
+            throw "Cannot prove target DB offline because dev-state is invalid: $($_.Exception.Message)"
+        }
+
+        $headerProof = Test-PqgStateHeader -State $state -RepositoryRoot $root
+        if ($headerProof.status -ne 'Match') {
+            throw "Cannot prove target DB offline from dev-state: $($headerProof.reason)"
+        }
+
+        $backendProof = Test-PqgProcessRecord `
+            -Record $state.backend `
+            -Role backend `
+            -ExpectedWorkingDirectory $backendDir `
+            -RequireDbPath
+        $frontendProof = Test-PqgProcessRecord `
+            -Record $state.frontend `
+            -Role frontend `
+            -ExpectedWorkingDirectory $frontendDir
+
+        if ($backendProof.status -in @('Mismatch', 'Incomplete')) {
+            throw "Cannot prove target DB offline because backend provenance is uncertain: $($backendProof.reason)"
+        }
+        if ($frontendProof.status -in @('Mismatch', 'Incomplete')) {
+            throw "Cannot perform destructive restore with incomplete dev-state: $($frontendProof.reason)"
+        }
+
+        $stateDbMatchesTarget = Test-PqgPathEqual ([string]$state.backend.dbPath) $target
+        if ($stateDbMatchesTarget) {
+            if ($backendProof.status -eq 'Match') {
+                throw "Restore blocked: recorded backend PID $($state.backend.pid) is running and is bound to target DB $target."
+            }
+            $recordedPort = ConvertTo-PqgInt $state.backend.port
+            if ($null -eq $recordedPort -or $recordedPort -le 0) {
+                throw 'Cannot prove target DB offline because recorded backend port is invalid.'
+            }
+            if (Test-PqgPortListener -Port $recordedPort) {
+                throw "Restore blocked: recorded dynamic backend port $recordedPort is still listening while target DB matches dev-state."
+            }
+        } elseif ($backendProof.status -eq 'Match') {
+            $knownDifferentBackendRootPid = [int]$state.backend.pid
+        }
+    }
+
+    $listeners = @(Get-PqgLikelyBackendListeners -RepositoryRoot $root -PythonExecutable $python)
+    foreach ($listener in $listeners) {
+        if ($knownDifferentBackendRootPid -gt 0 -and
+            (Test-PqgProcessDescendant -ChildPid ([int]$listener.pid) -AncestorPid $knownDifferentBackendRootPid)) {
+            continue
+        }
+        throw "Cannot prove target DB offline: untracked PQG uvicorn listener found at PID $($listener.pid), port $($listener.port)."
+    }
+
+    if (-not (Test-PqgExclusiveFileAccess -Path $target)) {
+        throw 'Cannot obtain exclusive access to target DB. Refusing offline restore.'
+    }
 }
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -80,22 +142,29 @@ $previous = "$target.previous"
 
 if ($WhatIf) {
     Write-Host "Validated backup: $backup"
+    Write-Host "Would require provenance/process/listener/exclusive-file proof that target DB is offline: $target"
     Write-Host "Would create safety backup: $safety"
     Write-Host "Would stage and atomically replace: $target"
     Write-Host 'This DB-only tool does not restore workspace files, .env, OAuth or Credential Manager data.'
     exit 0
 }
 
+Assert-TargetDbOffline
+
+if (Test-Path -LiteralPath $previous) {
+    throw 'A previous restore marker already exists. Resolve it before retrying; target was not mutated.'
+}
+if (Test-Path -LiteralPath $stage) {
+    throw 'A restore stage already exists. Resolve it before retrying; target was not mutated.'
+}
+
 Copy-Item -LiteralPath $target -Destination $safety -ErrorAction Stop
 Copy-Item -LiteralPath $backup -Destination $stage -ErrorAction Stop
-if (Test-Path -LiteralPath $previous) {
-    throw 'A previous restore marker already exists. Resolve it before retrying.'
-}
 try {
     Move-Item -LiteralPath $target -Destination $previous -ErrorAction Stop
     Move-Item -LiteralPath $stage -Destination $target -ErrorAction Stop
     $postIntegrity = $validation | & $python - $target $manifest ([System.IO.Path]::GetFileName($backup))
-    if ($postIntegrity -ne 'ok') {
+    if ($LASTEXITCODE -ne 0 -or $postIntegrity -ne 'ok') {
         throw 'Post-restore integrity check failed.'
     }
     Remove-Item -LiteralPath $previous -Force -ErrorAction Stop
@@ -106,9 +175,11 @@ try {
         }
         Move-Item -LiteralPath $previous -Destination $target -ErrorAction SilentlyContinue
     }
-    if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $stage) {
+        Remove-Item -LiteralPath $stage -Force -ErrorAction SilentlyContinue
+    }
     throw
 }
 
 Write-Host "Restore complete. Safety backup retained at: $safety"
-Write-Host 'Start the backend and run check-dev.ps1 for the post-restore health check.'
+Write-Host 'Start the backend and run check-dev.ps1 for separate provenance and health checks.'
