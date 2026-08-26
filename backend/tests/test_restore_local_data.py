@@ -98,23 +98,21 @@ $frontendDir = Join-Path $root 'frontend'
 $sha = Get-PqgCurrentSourceSha -RepositoryRoot $root
 $backendMarker = Get-PqgIdentityMarker -Role backend -RepositoryRoot $root -SourceSha $sha
 $frontendMarker = Get-PqgIdentityMarker -Role frontend -RepositoryRoot $root -SourceSha $sha
-$backendAnchor = 'uvicorn app.main:app'
-$frontendAnchor = 'npm run dev'
+$backendCommand = Get-PqgBackendCommandIdentity -RepositoryRoot $root -SourceSha $sha -BackendDirectory $backendDir -Port {backend_port} -DbPath '{_ps_literal(backend_db)}' -Reload $false
+$frontendCommand = Get-PqgFrontendCommandIdentity -RepositoryRoot $root -SourceSha $sha -FrontendDirectory $frontendDir -Port {frontend_port} -BackendPort {backend_port}
 $realBackend = {real_backend_literal}
 if ($realBackend) {{
-  $backendPayload = "`$pqgIdentity='$backendMarker'; `$env:DB_PATH='{_ps_literal(backend_db)}'; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port {backend_port}"
+  $backendPayload = "`$pqgIdentity='$backendMarker'; `$pqgCommandIdentity='$backendCommand'; `$env:DB_PATH='{_ps_literal(backend_db)}'; Set-Location -LiteralPath '$backendDir'; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port {backend_port}"
 }} else {{
-  $backendPayload = "`$pqgIdentity='$backendMarker'; `$anchor='$backendAnchor'; Start-Sleep -Seconds 120"
+  $backendPayload = "`$pqgIdentity='$backendMarker'; `$pqgCommandIdentity='$backendCommand'; Start-Sleep -Seconds 120"
 }}
-$bp = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $backendDir -PassThru -ArgumentList @(
-  '-NoExit', '-Command', $backendPayload
-)
-$fp = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $frontendDir -PassThru -ArgumentList @(
-  '-NoExit', '-Command', "`$pqgIdentity='$frontendMarker'; `$anchor='$frontendAnchor'; Start-Sleep -Seconds 120"
-)
+$frontendPayload = "`$pqgIdentity='$frontendMarker'; `$pqgCommandIdentity='$frontendCommand'; Start-Sleep -Seconds 120"
+$bp = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $backendDir -PassThru -ArgumentList @('-NoExit', '-Command', $backendPayload)
+$fp = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $frontendDir -PassThru -ArgumentList @('-NoExit', '-Command', $frontendPayload)
 try {{
-  $backend = New-PqgProcessRecord -ProcessId $bp.Id -WorkingDirectory $backendDir -Command $backendAnchor -IdentityMarker $backendMarker -Port {backend_port} -DbPath '{_ps_literal(backend_db)}'
-  $frontend = New-PqgProcessRecord -ProcessId $fp.Id -WorkingDirectory $frontendDir -Command $frontendAnchor -IdentityMarker $frontendMarker -Port {frontend_port}
+  $backend = New-PqgProcessRecord -ProcessId $bp.Id -WorkingDirectory $backendDir -Command $backendCommand -IdentityMarker $backendMarker -Port {backend_port} -DbPath '{_ps_literal(backend_db)}'
+  $backend | Add-Member -NotePropertyName reload -NotePropertyValue $false -Force
+  $frontend = New-PqgProcessRecord -ProcessId $fp.Id -WorkingDirectory $frontendDir -Command $frontendCommand -IdentityMarker $frontendMarker -Port {frontend_port}
   $state = [ordered]@{{
     schemaVersion = 2
     repositoryRoot = $root
@@ -139,7 +137,8 @@ try {{
         timeout=30,
     )
     assert result.returncode == 0, result.stderr or result.stdout
-    return {key: int(value) for key, value in json.loads(result.stdout.strip().splitlines()[-1]).items()}
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    return {key: int(value) for key, value in payload.items()}
 
 
 def _pid_exists(powershell: str, pid: int) -> bool:
@@ -158,7 +157,12 @@ def _pid_exists(powershell: str, pid: int) -> bool:
 
 
 def _kill_tree(pid: int) -> None:
-    subprocess.run(["taskkill.exe", "/PID", str(pid), "/T", "/F"], check=False, capture_output=True, text=True)
+    subprocess.run(
+        ["taskkill.exe", "/PID", str(pid), "/T", "/F"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
 
 def _isolated_restore_fixture(tmp_path: Path) -> tuple[Path, Path]:
@@ -213,7 +217,7 @@ def test_offline_restore_script_validates_manifest_previews_and_swaps_atomically
         "-WhatIf",
         env=env,
     )
-    assert preview.returncode == 0, preview.stderr
+    assert preview.returncode == 0, preview.stderr or preview.stdout
     assert _read_marker(target) == "old"
 
     restored = _run_ps_file(
@@ -235,7 +239,7 @@ def test_offline_restore_script_validates_manifest_previews_and_swaps_atomically
     assert not Path(f"{target}.restore-stage").exists()
 
 
-@pytest.mark.parametrize("mutation", ["hash", "previous_marker", "incomplete_state"])
+@pytest.mark.parametrize("mutation", ["hash", "integrity", "previous_marker", "incomplete_state"])
 def test_restore_failures_do_not_mutate_target(tmp_path: Path, mutation: str) -> None:
     powershell, repo_root = _windows_context()
     script = repo_root / "restore-local-data.ps1"
@@ -248,6 +252,9 @@ def test_restore_failures_do_not_mutate_target(tmp_path: Path, mutation: str) ->
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
         payload["sha256"] = "0" * 64
         manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    elif mutation == "integrity":
+        backup.write_bytes(b"not a sqlite database")
+        _write_manifest(backup)
     elif mutation == "previous_marker":
         Path(f"{target}.previous").write_bytes(b"marker")
     else:
@@ -270,10 +277,14 @@ def test_restore_failures_do_not_mutate_target(tmp_path: Path, mutation: str) ->
     assert target.read_bytes() == before
     assert _read_marker(target) == "old"
     assert not Path(f"{target}.restore-stage").exists()
+    assert not list(tmp_path.glob("target.db.pre-restore-*"))
 
 
 @pytest.mark.parametrize("mutation", ["start_time", "command", "source_sha"])
-def test_stop_dev_refuses_stale_or_mismatched_identity_without_killing(tmp_path: Path, mutation: str) -> None:
+def test_stop_dev_refuses_stale_or_mismatched_identity_without_killing(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
     powershell, repo_root = _windows_context()
     stop_script = repo_root / "stop-dev.ps1"
     backend_db = tmp_path / "configured.db"
@@ -302,7 +313,10 @@ def test_stop_dev_refuses_stale_or_mismatched_identity_without_killing(tmp_path:
 
 
 @pytest.mark.parametrize("mutation", ["start_time", "command", "source_sha"])
-def test_start_dev_refuses_mismatched_state_without_reuse_or_overwrite(tmp_path: Path, mutation: str) -> None:
+def test_start_dev_refuses_mismatched_state_without_reuse_or_overwrite(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
     powershell, repo_root = _windows_context()
     if not (repo_root / "frontend" / "node_modules").is_dir():
         pytest.skip("start-dev mismatch validation requires frontend/node_modules")
@@ -323,7 +337,13 @@ def test_start_dev_refuses_mismatched_state_without_reuse_or_overwrite(tmp_path:
         state_path.write_text(json.dumps(state), encoding="utf-8")
         before = state_path.read_bytes()
 
-        result = _run_ps_file(powershell, start_script, "-DevStatePath", str(state_path), env=env)
+        result = _run_ps_file(
+            powershell,
+            start_script,
+            "-DevStatePath",
+            str(state_path),
+            env=env,
+        )
         assert result.returncode != 0
         assert state_path.read_bytes() == before
         assert _pid_exists(powershell, pids["backendPid"])
@@ -358,13 +378,16 @@ def test_restore_blocks_dynamic_port_backend_bound_to_target_db(tmp_path: Path) 
     target, backup = _isolated_restore_fixture(tmp_path)
     state_path = tmp_path / "dev-state.json"
     backend_port = _free_port()
+    frontend_port = _free_port()
+    while frontend_port == backend_port:
+        frontend_port = _free_port()
     pids = _spawn_recorded_wrappers(
         powershell,
         repo_root,
         state_path,
         target,
         backend_port=backend_port,
-        frontend_port=_free_port(),
+        frontend_port=frontend_port,
         real_backend=True,
     )
     env = _env_with_db(target, tmp_path)
@@ -396,7 +419,11 @@ def test_restore_does_not_use_unrelated_backend_as_false_db_proof(tmp_path: Path
     restore_script = repo_root / "restore-local-data.ps1"
     target, backup = _isolated_restore_fixture(tmp_path)
     unrelated_db = tmp_path / "other.db"
+    _create_db(unrelated_db, "other")
     backend_port = _free_port()
+    frontend_port = _free_port()
+    while frontend_port == backend_port:
+        frontend_port = _free_port()
     state_path = tmp_path / "dev-state.json"
     pids = _spawn_recorded_wrappers(
         powershell,
@@ -404,7 +431,7 @@ def test_restore_does_not_use_unrelated_backend_as_false_db_proof(tmp_path: Path
         state_path,
         unrelated_db,
         backend_port=backend_port,
-        frontend_port=_free_port(),
+        frontend_port=frontend_port,
         real_backend=True,
     )
     env = _env_with_db(unrelated_db, tmp_path)
@@ -465,11 +492,23 @@ def test_start_check_stop_produce_and_verify_complete_isolated_dev_state(tmp_pat
         assert state["schemaVersion"] == 2
         assert Path(state["repositoryRoot"]).resolve() == repo_root.resolve()
         assert len(state["sourceSha"]) == 40
+        assert state["backend"]["reload"] is False
         for role in ("backend", "frontend"):
-            for key in ("pid", "processStartTime", "workingDirectory", "command", "identityMarker", "executable", "port"):
+            for key in (
+                "pid",
+                "processStartTime",
+                "workingDirectory",
+                "command",
+                "identityMarker",
+                "executable",
+                "port",
+            ):
                 assert state[role].get(key)
         assert Path(state["backend"]["dbPath"]).resolve() == isolated_db.resolve()
-        pids = {"backendPid": int(state["backend"]["pid"]), "frontendPid": int(state["frontend"]["pid"])}
+        pids = {
+            "backendPid": int(state["backend"]["pid"]),
+            "frontendPid": int(state["frontend"]["pid"]),
+        }
 
         assert _wait_for_port(backend_port)
         assert _wait_for_port(frontend_port)
@@ -486,12 +525,21 @@ def test_start_check_stop_produce_and_verify_complete_isolated_dev_state(tmp_pat
             env=env,
         )
         assert checked.returncode == 0, checked.stderr or checked.stdout
-        assert "PROOF OK" in checked.stdout
+        assert checked.stdout.count("PROOF OK") >= 5
+        assert "backend DB binding" in checked.stdout
         assert "HTTP/runtime health (khong phai identity proof)" in checked.stdout
 
-        stopped = _run_ps_file(powershell, stop_script, "-DevStatePath", str(state_path), env=env)
+        stopped = _run_ps_file(
+            powershell,
+            stop_script,
+            "-DevStatePath",
+            str(state_path),
+            env=env,
+        )
         assert stopped.returncode == 0, stopped.stderr or stopped.stdout
         assert not state_path.exists()
+        assert not _pid_exists(powershell, pids["backendPid"])
+        assert not _pid_exists(powershell, pids["frontendPid"])
     finally:
         for pid in pids.values():
             _kill_tree(pid)
