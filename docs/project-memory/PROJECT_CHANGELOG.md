@@ -401,3 +401,7 @@
 ### [2026-08-26 21:48:48 UTC+07:00] Local Desktop status handshake receipt
 
 - [2026-08-26 21:48:48 UTC+07:00][recorded_at] A temporary loopback FastAPI process using a newly created temporary SQLite database returned `{"status":"ready","api_version":"v1","backend_version":"2.2.0",...}` from the new endpoint. The built `@pqg/domain-bridge` then performed its real HTTP request to that endpoint and returned `{"state":"ready",...}`. The server process tree was stopped and port `8765` was verified free. This is local service-to-service proof only; Electron GUI proof remains NOT RUN because no user-facing bridge-URL setting was added in this bounded scope.
+
+### [2026-08-26 22:12:30 UTC+07:00] Packaged Electron runtime receipt
+
+- [2026-08-26 22:12:30 UTC+07:00][recorded_at] The Windows unpacked Desktop artifact was rebuilt, then launched with a temporary `DSH_HOME`, a desktop-profile patch configuring the loopback bridge, and advanced mode. The Electron main, renderer and network processes started. Its isolated health snapshot records the `desktop` profile and bridge patch; FastAPI returned `ready` during the run. All temporary Electron and FastAPI processes were stopped and port `8765` was verified free. This proves packaged process startup and configuration loading, not visual UI acceptance or an Electron-rendered bridge-status indicator.
