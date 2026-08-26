@@ -8,12 +8,12 @@ $Root = [System.IO.Path]::GetFullPath((Split-Path -Parent $MyInvocation.MyComman
 . (Join-Path $Root "scripts\dev-provenance.ps1")
 
 $StatePath = Join-Path $Root ".dev\dev-state.json"
-$BackendDir = Get-PqgCanonicalPath (Join-Path $Root "backend")
-$FrontendDir = Get-PqgCanonicalPath (Join-Path $Root "frontend")
-$PythonExe = Get-PqgCanonicalPath (Join-Path $BackendDir ".venv\Scripts\python.exe")
+$BackendDir = Join-Path $Root "backend"
+$FrontendDir = Join-Path $Root "frontend"
+$PythonExe = Join-Path $BackendDir ".venv\Scripts\python.exe"
 $BackendEnv = Join-Path $BackendDir ".env"
-$BackendPortWasExplicit = $PSBoundParameters.ContainsKey('BackendPort') -and $BackendPort -gt 0
-$FrontendPortWasExplicit = $PSBoundParameters.ContainsKey('FrontendPort') -and $FrontendPort -gt 0
+$BackendCommandIdentity = "uvicorn app.main:app"
+$FrontendCommandIdentity = "npm run dev"
 $ProofFailed = $false
 
 function Test-HttpOk {
@@ -23,20 +23,6 @@ function Test-HttpOk {
         return ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500)
     } catch {
         return $false
-    }
-}
-
-function Get-EffectiveBackendDbPath {
-    if (-not (Test-Path -LiteralPath $PythonExe -PathType Leaf)) { return $null }
-    Push-Location $BackendDir
-    try {
-        $output = @(& $PythonExe -c "from app.settings import Settings; print(Settings().db_path_resolved)" 2>$null)
-        if ($LASTEXITCODE -ne 0) { return $null }
-        $value = @($output | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ }) | Select-Object -Last 1
-        if ([string]::IsNullOrWhiteSpace([string]$value)) { return $null }
-        return Get-PqgCanonicalPath ([string]$value)
-    } finally {
-        Pop-Location
     }
 }
 
@@ -81,8 +67,20 @@ try {
 $currentSha = $null
 try {
     $currentSha = Get-PqgCurrentSourceSha -RepositoryRoot $Root
+    Write-Host "INFO source SHA hien tai: $currentSha"
 } catch {
     Write-Proof $false $_.Exception.Message
+}
+
+$effectiveDbPath = $null
+if (Test-Path -LiteralPath $PythonExe -PathType Leaf) {
+    try {
+        $effectiveDbPath = Get-PqgConfiguredDbPath -BackendDirectory $BackendDir -PythonExecutable $PythonExe
+    } catch {
+        Write-Proof $false $_.Exception.Message
+    }
+} else {
+    Write-Proof $false 'Khong co backend Python de resolve configured DB path.'
 }
 
 $headerProof = $null
@@ -95,48 +93,58 @@ if ($null -eq $state) {
     Write-Proof $false 'Khong co current source SHA de doi chieu dev-state.'
 }
 
-$effectiveDbPath = Get-EffectiveBackendDbPath
-if ($null -eq $effectiveDbPath) {
-    Write-Proof $false 'Khong resolve duoc effective backend DB path tu Settings.'
-}
-
-if ($null -ne $state -and $null -ne $headerProof -and $headerProof.status -eq 'Match') {
-    if (-not $BackendPortWasExplicit) {
-        $candidate = ConvertTo-PqgInt $state.backend.port
-        if ($null -ne $candidate -and $candidate -gt 0) { $BackendPort = $candidate }
-    }
-    if (-not $FrontendPortWasExplicit) {
-        $candidate = ConvertTo-PqgInt $state.frontend.port
-        if ($null -ne $candidate -and $candidate -gt 0) { $FrontendPort = $candidate }
+if ($null -ne $state -and $null -ne $headerProof -and $headerProof.status -eq 'Match' -and $null -ne $currentSha) {
+    try {
+        if ($BackendPort -le 0) { $BackendPort = [int]$state.backend.port }
+        if ($FrontendPort -le 0) { $FrontendPort = [int]$state.frontend.port }
+    } catch {
+        Write-Proof $false 'Recorded backend/frontend port khong hop le.'
     }
 
-    $backendProofArgs = @{
-        Record = $state.backend
-        Role = 'backend'
-        ExpectedWorkingDirectory = $BackendDir
-        ExpectedPort = $BackendPort
-        RequireDbPath = $true
+    $powerShellExe = $null
+    try {
+        $powerShellExe = Get-PqgPowerShellExecutable
+    } catch {
+        Write-Proof $false $_.Exception.Message
     }
-    if ($null -ne $effectiveDbPath) { $backendProofArgs.ExpectedDbPath = $effectiveDbPath }
-    $backendProof = Test-PqgProcessRecord @backendProofArgs
-    Write-Proof ($backendProof.status -eq 'Match') "backend process: $($backendProof.reason)"
-    if ($backendProof.status -eq 'Match') {
-        $backendPortOwned = Test-PqgPortOwnedByProcessTree -Port ([int]$state.backend.port) -RootPid ([int]$state.backend.pid)
-        Write-Proof $backendPortOwned "backend port $($state.backend.port) thuoc recorded process tree"
-        if ($null -ne $effectiveDbPath) {
-            Write-Proof (Test-PqgPathEqual ([string]$state.backend.dbPath) $effectiveDbPath) "backend DB: $effectiveDbPath"
+
+    if ($null -ne $powerShellExe -and $BackendPort -gt 0) {
+        $backendMarker = Get-PqgIdentityMarker -Role backend -RepositoryRoot $Root -SourceSha $currentSha
+        $backendArgs = @{
+            Record = $state.backend
+            Role = 'backend'
+            ExpectedWorkingDirectory = $BackendDir
+            ExpectedCommand = $BackendCommandIdentity
+            ExpectedIdentityMarker = $backendMarker
+            ExpectedExecutable = $powerShellExe
+            ExpectedPort = $BackendPort
+            RequireDbPath = $true
+        }
+        if ($null -ne $effectiveDbPath) { $backendArgs.ExpectedDbPath = $effectiveDbPath }
+        $backendProof = Test-PqgProcessRecord @backendArgs
+        Write-Proof ($backendProof.status -eq 'Match') "backend process: $($backendProof.reason)"
+        if ($backendProof.status -eq 'Match') {
+            Write-Proof (Test-PqgPortOwnedByProcessTree -Port $BackendPort -RootProcessId ([int]$state.backend.pid)) "backend port $BackendPort thuoc recorded process tree"
+            if ($null -ne $effectiveDbPath) {
+                Write-Proof (Test-PqgPathEqual ([string]$state.backend.dbPath) $effectiveDbPath) "backend DB binding: $effectiveDbPath"
+            }
         }
     }
 
-    $frontendProof = Test-PqgProcessRecord `
-        -Record $state.frontend `
-        -Role frontend `
-        -ExpectedWorkingDirectory $FrontendDir `
-        -ExpectedPort $FrontendPort
-    Write-Proof ($frontendProof.status -eq 'Match') "frontend process: $($frontendProof.reason)"
-    if ($frontendProof.status -eq 'Match') {
-        $frontendPortOwned = Test-PqgPortOwnedByProcessTree -Port ([int]$state.frontend.port) -RootPid ([int]$state.frontend.pid)
-        Write-Proof $frontendPortOwned "frontend port $($state.frontend.port) thuoc recorded process tree"
+    if ($null -ne $powerShellExe -and $FrontendPort -gt 0) {
+        $frontendMarker = Get-PqgIdentityMarker -Role frontend -RepositoryRoot $Root -SourceSha $currentSha
+        $frontendProof = Test-PqgProcessRecord `
+            -Record $state.frontend `
+            -Role frontend `
+            -ExpectedWorkingDirectory $FrontendDir `
+            -ExpectedCommand $FrontendCommandIdentity `
+            -ExpectedIdentityMarker $frontendMarker `
+            -ExpectedExecutable $powerShellExe `
+            -ExpectedPort $FrontendPort
+        Write-Proof ($frontendProof.status -eq 'Match') "frontend process: $($frontendProof.reason)"
+        if ($frontendProof.status -eq 'Match') {
+            Write-Proof (Test-PqgPortOwnedByProcessTree -Port $FrontendPort -RootProcessId ([int]$state.frontend.pid)) "frontend port $FrontendPort thuoc recorded process tree"
+        }
     }
 }
 
@@ -152,7 +160,7 @@ if (Test-HttpOk "$backendUrl/health") {
     try {
         $runtime = Invoke-RestMethod "$backendUrl/api/runtime/status" -TimeoutSec 5
         Write-Host "HEALTH OK   DB status: $($runtime.db.status)" -ForegroundColor Green
-        Write-Host "HEALTH INFO runtime assistant status: $($runtime.hermes.status)"
+        Write-Host "HEALTH INFO assistant compatibility status: $($runtime.hermes.status)"
         Write-Host "HEALTH INFO n8n configured: $($runtime.n8n.configured)"
     } catch {
         Write-Host "HEALTH WARN backend chay nhung runtime status khong doc duoc" -ForegroundColor Yellow
