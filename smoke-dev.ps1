@@ -59,13 +59,24 @@ if (Test-Path $VenvPython) {
     Assert-Ok ($null -ne $Python) "Python is required to run the native GYO acceptance journey"
     $PythonCommand = $Python.Source
 }
+Assert-Ok ($TimeoutSeconds -gt 0) "TimeoutSeconds must be greater than zero"
 
 $PreviousLocation = Get-Location
 try {
     Set-Location (Join-Path $Root "backend")
     Write-Host "RUN native GYO integrated journey (offline/provider-independent)"
-    & $PythonCommand -m pytest tests/test_uat_p0_local_pilot.py -q
-    Assert-Ok ($LASTEXITCODE -eq 0) "Native GYO integrated journey failed"
+    $pytest = Start-Process `
+        -FilePath $PythonCommand `
+        -ArgumentList @("-m", "pytest", "tests/test_uat_p0_local_pilot.py", "-q") `
+        -NoNewWindow `
+        -PassThru
+    $timeoutMilliseconds = [int][Math]::Min(([double]$TimeoutSeconds * 1000), [int]::MaxValue)
+    if (-not $pytest.WaitForExit($timeoutMilliseconds)) {
+        Stop-Process -Id $pytest.Id -Force -ErrorAction SilentlyContinue
+        $pytest.WaitForExit()
+        throw "Native GYO integrated journey timed out after $TimeoutSeconds seconds"
+    }
+    Assert-Ok ($pytest.ExitCode -eq 0) "Native GYO integrated journey failed"
 } finally {
     Set-Location $PreviousLocation
 }
