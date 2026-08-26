@@ -10,15 +10,17 @@ $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Split-Path -Parent $MyInvocation.MyCommand.Path))
 . (Join-Path $root 'scripts\dev-provenance.ps1')
 
-$backendDir = Get-PqgCanonicalPath (Join-Path $root 'backend')
-$frontendDir = Get-PqgCanonicalPath (Join-Path $root 'frontend')
-$python = Get-PqgCanonicalPath (Join-Path $backendDir '.venv\Scripts\python.exe')
+$backendDir = Join-Path $root 'backend'
+$frontendDir = Join-Path $root 'frontend'
+$python = Join-Path $backendDir '.venv\Scripts\python.exe'
 $statePath = Join-Path $root '.dev\dev-state.json'
 $defaultTarget = Get-PqgCanonicalPath (Join-Path $backendDir 'app.db')
 $targetInput = if ($TargetPath) { $TargetPath } else { $defaultTarget }
 $target = Get-PqgCanonicalPath $targetInput
 $backup = (Resolve-Path -LiteralPath $BackupPath).Path
 $manifest = "$backup.manifest.json"
+$backendCommandIdentity = 'uvicorn app.main:app'
+$frontendCommandIdentity = 'npm run dev'
 
 if (-not (Test-Path -LiteralPath $backup -PathType Leaf)) {
     throw 'Backup path must point to a backup database file.'
@@ -68,12 +70,15 @@ if ($LASTEXITCODE -ne 0 -or $integrity -ne 'ok') {
     throw 'Backup manifest/hash/integrity validation failed; no data was changed.'
 }
 
+$currentSha = Get-PqgCurrentSourceSha -RepositoryRoot $root
+$powerShellExe = Get-PqgPowerShellExecutable
+$configuredDbPath = Get-PqgConfiguredDbPath -BackendDirectory $backendDir -PythonExecutable $python
+$backendMarker = Get-PqgIdentityMarker -Role backend -RepositoryRoot $root -SourceSha $currentSha
+$frontendMarker = Get-PqgIdentityMarker -Role frontend -RepositoryRoot $root -SourceSha $currentSha
+
 function Assert-TargetDbOffline {
     $state = $null
-    $backendProof = $null
-    $frontendProof = $null
-    $stateDbMatchesTarget = $false
-    $knownDifferentBackendRootPid = 0
+    $knownDifferentBackendRootProcessId = 0
 
     if (Test-Path -LiteralPath $statePath -PathType Leaf) {
         try {
@@ -82,7 +87,7 @@ function Assert-TargetDbOffline {
             throw "Cannot prove target DB offline because dev-state is invalid: $($_.Exception.Message)"
         }
 
-        $headerProof = Test-PqgStateHeader -State $state -RepositoryRoot $root
+        $headerProof = Test-PqgStateHeader -State $state -RepositoryRoot $root -CurrentSourceSha $currentSha -RequireCurrentSource
         if ($headerProof.status -ne 'Match') {
             throw "Cannot prove target DB offline from dev-state: $($headerProof.reason)"
         }
@@ -91,11 +96,18 @@ function Assert-TargetDbOffline {
             -Record $state.backend `
             -Role backend `
             -ExpectedWorkingDirectory $backendDir `
+            -ExpectedCommand $backendCommandIdentity `
+            -ExpectedIdentityMarker $backendMarker `
+            -ExpectedExecutable $powerShellExe `
+            -ExpectedDbPath $configuredDbPath `
             -RequireDbPath
         $frontendProof = Test-PqgProcessRecord `
             -Record $state.frontend `
             -Role frontend `
-            -ExpectedWorkingDirectory $frontendDir
+            -ExpectedWorkingDirectory $frontendDir `
+            -ExpectedCommand $frontendCommandIdentity `
+            -ExpectedIdentityMarker $frontendMarker `
+            -ExpectedExecutable $powerShellExe
 
         if ($backendProof.status -in @('Mismatch', 'Incomplete')) {
             throw "Cannot prove target DB offline because backend provenance is uncertain: $($backendProof.reason)"
@@ -105,26 +117,18 @@ function Assert-TargetDbOffline {
         }
 
         $stateDbMatchesTarget = Test-PqgPathEqual ([string]$state.backend.dbPath) $target
-        if ($stateDbMatchesTarget) {
-            if ($backendProof.status -eq 'Match') {
-                throw "Restore blocked: recorded backend PID $($state.backend.pid) is running and is bound to target DB $target."
-            }
-            $recordedPort = ConvertTo-PqgInt $state.backend.port
-            if ($null -eq $recordedPort -or $recordedPort -le 0) {
-                throw 'Cannot prove target DB offline because recorded backend port is invalid.'
-            }
-            if (Test-PqgPortListener -Port $recordedPort) {
-                throw "Restore blocked: recorded dynamic backend port $recordedPort is still listening while target DB matches dev-state."
-            }
-        } elseif ($backendProof.status -eq 'Match') {
-            $knownDifferentBackendRootPid = [int]$state.backend.pid
+        if ($backendProof.status -eq 'Match' -and $stateDbMatchesTarget) {
+            throw "Restore blocked: recorded backend PID $($state.backend.pid) is running and is bound to target DB $target."
+        }
+        if ($backendProof.status -eq 'Match' -and -not $stateDbMatchesTarget) {
+            $knownDifferentBackendRootProcessId = [int]$state.backend.pid
         }
     }
 
-    $listeners = @(Get-PqgLikelyBackendListeners -RepositoryRoot $root -PythonExecutable $python)
+    $listeners = @(Get-PqgLikelyBackendListeners -PythonExecutable $python)
     foreach ($listener in $listeners) {
-        if ($knownDifferentBackendRootPid -gt 0 -and
-            (Test-PqgProcessDescendant -ChildPid ([int]$listener.pid) -AncestorPid $knownDifferentBackendRootPid)) {
+        if ($knownDifferentBackendRootProcessId -gt 0 -and
+            (Test-PqgProcessDescendant -ChildProcessId ([int]$listener.pid) -AncestorProcessId $knownDifferentBackendRootProcessId)) {
             continue
         }
         throw "Cannot prove target DB offline: untracked PQG uvicorn listener found at PID $($listener.pid), port $($listener.port)."
@@ -135,14 +139,14 @@ function Assert-TargetDbOffline {
     }
 }
 
-$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss-ffff'
 $safety = "$target.pre-restore-$stamp"
 $stage = "$target.restore-stage"
 $previous = "$target.previous"
 
 if ($WhatIf) {
     Write-Host "Validated backup: $backup"
-    Write-Host "Would require provenance/process/listener/exclusive-file proof that target DB is offline: $target"
+    Write-Host "ConfirmRestore will require exact repo/source/process/dynamic-port proof plus exclusive access for target DB: $target"
     Write-Host "Would create safety backup: $safety"
     Write-Host "Would stage and atomically replace: $target"
     Write-Host 'This DB-only tool does not restore workspace files, .env, OAuth or Credential Manager data.'
