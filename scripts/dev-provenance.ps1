@@ -25,8 +25,14 @@ function Test-PqgHasProperty {
 
 function Get-PqgCurrentSourceSha {
     param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
-    $sha = (& git -C $RepositoryRoot rev-parse HEAD 2>$null | Select-Object -First 1)
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$sha)) { throw 'Cannot determine the current Git source SHA.' }
+    $gitOutput = & git -C $RepositoryRoot rev-parse HEAD 2>$null
+    $gitExitCode = $LASTEXITCODE
+    if ($gitExitCode -ne 0) { throw 'Cannot determine the current Git source SHA.' }
+    $sha = @($gitOutput) |
+        ForEach-Object { ([string]$_).Trim() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace([string]$sha)) { throw 'Cannot determine the current Git source SHA.' }
     $sha = ([string]$sha).Trim().ToLowerInvariant()
     if ($sha -notmatch '^[0-9a-f]{40}$') { throw "Invalid Git source SHA: $sha" }
     return $sha
@@ -151,12 +157,17 @@ function Get-PqgProcessSnapshot {
     if ($null -eq $cim) { return $null }
     $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
     if ($null -eq $process) { return $null }
+    $startTime = $null
+    try { $startTime = $process.StartTime }
+    catch [System.InvalidOperationException] { return $null }
+    catch [System.ComponentModel.Win32Exception] { return $null }
+    if ($null -eq $startTime) { return $null }
     $executable = [string]$cim.ExecutablePath
     if ([string]::IsNullOrWhiteSpace($executable)) { try { $executable=[string]$process.Path } catch { $executable='' } }
     return [pscustomobject]@{
         pid=$ProcessId
         parentPid=[int]$cim.ParentProcessId
-        processStartTime=$process.StartTime.ToUniversalTime().ToString('o')
+        processStartTime=$startTime.ToUniversalTime().ToString('o')
         commandLine=[string]$cim.CommandLine
         executable=$executable
     }

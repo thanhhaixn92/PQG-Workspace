@@ -77,6 +77,92 @@ def _ps_literal(value: Path | str) -> str:
     return str(value).replace("'", "''")
 
 
+def _assert_windows_powershell_git_sha_with_space_path(
+    powershell: str,
+    repo_root: Path,
+    tmp_path: Path,
+) -> None:
+    spaced_repo = tmp_path / "git repository with spaces"
+    init = subprocess.run(
+        ["git", "init", str(spaced_repo)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert init.returncode == 0, init.stderr or init.stdout
+    (spaced_repo / "marker.txt").write_text("p0-03\n", encoding="utf-8")
+    staged = subprocess.run(
+        ["git", "-C", str(spaced_repo), "add", "marker.txt"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert staged.returncode == 0, staged.stderr or staged.stdout
+    committed = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(spaced_repo),
+            "-c",
+            "user.name=PQG Test",
+            "-c",
+            "user.email=pqg-test@example.invalid",
+            "commit",
+            "-m",
+            "test source",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert committed.returncode == 0, committed.stderr or committed.stdout
+    expected = subprocess.run(
+        ["git", "-C", str(spaced_repo), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout.strip()
+    helper = repo_root / "scripts" / "dev-provenance.ps1"
+    command = rf"""
+if ($PSVersionTable.PSVersion.Major -ne 5) {{ throw 'Windows PowerShell 5.1 is required' }}
+. '{_ps_literal(helper)}'
+Get-PqgCurrentSourceSha -RepositoryRoot '{_ps_literal(spaced_repo)}'
+"""
+    result = subprocess.run(
+        [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert result.stdout.strip() == expected
+
+    missing_start_time = rf"""
+. '{_ps_literal(helper)}'
+function Get-CimInstance {{
+  [pscustomobject]@{{ ExecutablePath = 'C:\fake.exe'; ParentProcessId = 1; CommandLine = 'fake' }}
+}}
+function Get-Process {{
+  [pscustomobject]@{{ Path = 'C:\fake.exe'; StartTime = $null }}
+}}
+$snapshot = Get-PqgProcessSnapshot -ProcessId 12345
+if ($null -ne $snapshot) {{ throw 'A vanished process must return a null snapshot' }}
+"""
+    result = subprocess.run(
+        [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", missing_start_time],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
 def _spawn_recorded_wrappers(
     powershell: str,
     repo_root: Path,
@@ -200,6 +286,7 @@ def _wait_for_port(port: int, timeout: float = 15.0) -> bool:
 
 def test_offline_restore_script_validates_manifest_previews_and_swaps_atomically(tmp_path: Path) -> None:
     powershell, repo_root = _windows_context()
+    _assert_windows_powershell_git_sha_with_space_path(powershell, repo_root, tmp_path)
     script = repo_root / "restore-local-data.ps1"
     state_path = tmp_path / "dev-state.json"
     target, backup = _isolated_restore_fixture(tmp_path)
