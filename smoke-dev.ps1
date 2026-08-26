@@ -7,13 +7,25 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $StatePath = Join-Path $Root ".dev\dev-state.json"
+$BackendPortWasExplicit = $PSBoundParameters.ContainsKey('BackendPort')
 
-if ((Test-Path $StatePath) -and $BackendPort -eq 0) {
-    $state = Get-Content $StatePath -Raw | ConvertFrom-Json
-    $BackendPort = [int]$state.backendPort
-}
-
-if ($BackendPort -eq 0) {
+if ($BackendPortWasExplicit) {
+    if ($BackendPort -le 0 -or $BackendPort -gt 65535) { throw 'BackendPort must be between 1 and 65535.' }
+} elseif (Test-Path -LiteralPath $StatePath -PathType Leaf) {
+    try { $state = Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json }
+    catch { throw "Dev-state exists but is not valid JSON: $StatePath" }
+    if ($null -eq $state.PSObject.Properties['schemaVersion'] -or [int]$state.schemaVersion -ne 2) {
+        throw "Dev-state schemaVersion must be 2: $StatePath"
+    }
+    if ($null -eq $state.backend -or $null -eq $state.backend.PSObject.Properties['port']) {
+        throw "Dev-state backend.port is required: $StatePath"
+    }
+    $recordedBackendPort = 0
+    if (-not [int]::TryParse([string]$state.backend.port, [ref]$recordedBackendPort) -or $recordedBackendPort -le 0 -or $recordedBackendPort -gt 65535) {
+        throw "Dev-state backend.port must be between 1 and 65535: $StatePath"
+    }
+    $BackendPort = $recordedBackendPort
+} else {
     $BackendPort = 8000
 }
 
