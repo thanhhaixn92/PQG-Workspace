@@ -2,5 +2,5 @@ PQG Workspace GitHub Agent Preflight trigger.
 
 This file is intentionally updated by ChatGPT Project / GitHub-connected agents when a fresh Agent Preflight receipt is required and workflow_dispatch is not exposed by the connector.
 
-Last trigger: 2026-08-24 23:01:33 UTC+07:00
-Reason: fresh exact-ref Agent Preflight before Package E3 bounded-exception implementation. User explicitly approved immutable-SHA pins for official GitHub Actions post-release security-fixed commits when current stable releases retain a known High advisory, conditional on patched actual distributed artifacts, suitable upstream validation, and PQG Preflight/Smoke/Windows PASS. This bootstrap write opens only the preflight path and no E4 provider/credential/network, G branch protection, H acceptance, F/F9, schema/migration, deployment, or checkpoint/state promotion scope.
+Last trigger: 2026-08-26 08:26:32 UTC+07:00
+Reason: fresh exact-ref Agent Preflight before P0-03 Local Provenance and Restore Safety implementation on branch chatgpt/p0-03-provenance-restore, based only on pqg-workspace@4712f64f3ac900c4a343d4f3ad3e6030729f633b. This bootstrap write opens only the preflight path. It does not authorize schema/migration/dependency changes, provider/network/credential use, user app.db/app.db.baseline mutation, deployment/publish, state/checkpoint/F9 promotion, P0-04, or any other scope outside P0-03.
