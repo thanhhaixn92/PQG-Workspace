@@ -1,6 +1,11 @@
 # PQG Workspace - Project Canon v2.2
 
-File nay la muc luc va nguon tham chieu chinh cho Antigravity va Codex trong qua trinh xay dung PQG Workspace. Runtime tro ly hien hanh la GYO qua `GyoOrchestrator`; Hermes/ACP chi con la identifier ky thuat hoac compatibility/historical path, khong phai fallback cua runtime hien hanh.
+File nay la muc luc va nguon tham chieu san pham cho PQG Workspace. Dieu phoi
+coding-agent hien hanh theo Issue #13 va root `AGENTS.md`; Antigravity va cac
+handoff cu chi la tham chieu lich su/compatibility, khong phai active route.
+Runtime tro ly hien hanh la GYO qua `GyoOrchestrator`; Hermes/ACP chi con la
+identifier ky thuat hoac compatibility/historical path, khong phai fallback cua
+runtime hien hanh.
 
 ## Bo Tai Lieu Chuan
 
@@ -9,7 +14,8 @@ File nay la muc luc va nguon tham chieu chinh cho Antigravity va Codex trong qua
 3. [03_EXECUTION_PRINCIPLES.md](03_EXECUTION_PRINCIPLES.md) - Nguyen tac thuc hien va engineering rules.
 4. [04_SECURITY_PERMISSION_POLICY.md](04_SECURITY_PERMISSION_POLICY.md) - Bao mat, permission, approval, audit.
 5. [05_ACCEPTANCE_EVALUATION.md](05_ACCEPTANCE_EVALUATION.md) - Tieu chi nghiem thu va danh gia.
-6. [06_HANDOFF_REVIEW_PROTOCOL.md](06_HANDOFF_REVIEW_PROTOCOL.md) - Giao thuc ban giao Antigravity -> Codex.
+6. [06_HANDOFF_REVIEW_PROTOCOL.md](06_HANDOFF_REVIEW_PROTOCOL.md) - giao thuc
+   Antigravity -> Codex lich su/compatibility, khong phai active routing.
 7. [07_DECISION_LOG.md](07_DECISION_LOG.md) - Quyet dinh kien truc da chot.
 8. [08_TEST_DATA_SCENARIOS.md](08_TEST_DATA_SCENARIOS.md) - Bo scenario test/eval mau.
 9. [implementation/CURRENT_CHECKPOINT.md](implementation/CURRENT_CHECKPOINT.md) - checkpoint hien hanh.
@@ -20,19 +26,34 @@ File nay la muc luc va nguon tham chieu chinh cho Antigravity va Codex trong qua
 
 Neu cac tai lieu co noi dung xung dot, ap dung thu tu sau:
 
-1. Yeu cau moi nhat cua nguoi dung.
-2. `AI_STATE.json`, `PROJECT_STATE.md`, `implementation/CURRENT_CHECKPOINT.md`.
-3. `04_SECURITY_PERMISSION_POLICY.md`.
-4. `01_PRD.md`.
-5. `02_DATA_STORAGE_MODEL.md` va `07_DECISION_LOG.md`.
-6. `03_EXECUTION_PRINCIPLES.md`.
-7. Cac tai lieu con lai; ke hoach Antigravity chi la bang chung lich su.
+1. Yeu cau hien hanh ro rang cua nguoi dung, kem rang buoc platform va an toan.
+2. `AGENTS.md`.
+3. `PROJECT_STATE.md`, `AI_STATE.json`, va
+   `implementation/CURRENT_CHECKPOINT.md`.
+4. Product canon, security policy, va data model.
+5. Current source, contracts, va focused tests.
+6. Project Memory.
+7. Historical handoffs, plans, chat, va evidence.
 
 ## Vai Tro
 
-- Antigravity: trien khai theo plan, cap nhat handoff sau tung phase.
-- Codex: checker, reviewer, chay test, xac nhan acceptance criteria, yeu cau fix neu chua dat.
-- User: chi can tham gia khi co quyet dinh ngoai plan, rui ro cao, credential, external publish, hoac thay doi pham vi.
+- **Codex Desktop**
+  - sole repository implementation writer cho repository-changing packages;
+  - local filesystem/shell/Git worktree actor;
+  - technical decision authority trong approved scope;
+  - co the commit/push feature branch va quan ly authorized package PR metadata;
+  - khong merge protected PR neu chua co separate authority.
+- **ChatGPT Web**
+  - GitHub-connected research/audit/evidence/independent review actor;
+  - thuc hien supported GitHub-side operations;
+  - khong claim local shell/filesystem execution;
+  - hand local/repository-changing work cho Codex.
+- **GitHub**
+  - canonical source, branch, PR, CI va merge-history authority.
+- **User**
+  - cung cap product intent;
+  - cung cap explicit approval chi khi platform/repository/current policy yeu
+    cau protected approval.
 
 ## Nguyen Tac Canon
 

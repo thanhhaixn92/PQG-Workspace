@@ -6,6 +6,12 @@
 
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] Authority order: `docs/00_PROJECT_CANON.md` > `AGENTS.md` > `PROJECT_STATE.md` > `AI_STATE.json` > `docs/implementation/CURRENT_CHECKPOINT.md` > `docs/AI_AGENT_ROUTING.md` and task canon/security/data documents > current source/contracts/tests > `docs/14_AGENT_OPERATING_CONTRACT.md` > Project Memory > historical handoff/chat.
 - [2026-08-24 19:03:27 UTC+07:00][recorded_at] Memory never overrides canon, live state, current source or newer evidence. Every new or corrected memory fact has a second-precision timestamp; memory synchronization records the underlying event and is non-recursive.
+- [2026-08-26 13:46:29 UTC+07:00][recorded_at] Supersession: the active authority order is current explicit user request plus platform/safety constraints > root `AGENTS.md` > state triplet (`PROJECT_STATE.md`, `AI_STATE.json`, current checkpoint) > product canon/security/data model > current source/contracts/tests > Project Memory > historical handoffs/plans/chat/evidence. The 2026-08-24 ordering above is retained only as historical context.
+
+## Coding-agent role model
+
+- [2026-08-26 13:46:29 UTC+07:00][recorded_at] Codex Desktop is the sole local filesystem/shell/worktree actor and repository implementation writer within an authorized package; ChatGPT Web owns GitHub-only research, evidence and independent review; GitHub owns canonical source/PR/CI/merge history; the user supplies product intent and approvals that are explicitly protected.
+- [2026-08-26 13:46:29 UTC+07:00][recorded_at] GitHub Issue #13 is the active coding-operations coordination plan. Dynamic source, validation and workflow identifiers stay in GitHub evidence until OPS-03 establishes a durable exact-SHA handoff mechanism; Project Memory never fabricates a self-referential commit SHA.
 
 ## Identity and state promotion
 

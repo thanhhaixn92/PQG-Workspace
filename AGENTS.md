@@ -1,5 +1,36 @@
 # AGENTS.md — Mandatory pre-code contract
 
+## Authority precedence
+
+When active sources conflict, use this order and stop for reconciliation if the
+state triplet disagrees internally:
+
+1. Current explicit user request plus platform and safety constraints.
+2. This `AGENTS.md` execution and permission contract.
+3. `PROJECT_STATE.md`, `AI_STATE.json`, and
+   `docs/implementation/CURRENT_CHECKPOINT.md`.
+4. Product canon, security policy, and data model.
+5. Current source, public contracts, and focused tests.
+6. Project Memory continuity files.
+7. Historical handoffs, plans, chat, and evidence.
+
+GitHub is canonical for source, branches, pull requests, CI, and merge history.
+Issue [#13](https://github.com/thanhhaixn92/PQG-Workspace/issues/13) is the
+current coding-operations coordination plan; it does not override this order.
+
+## Current agent roles
+
+- **Codex Desktop** is the sole local filesystem/shell/worktree actor and the
+  sole repository implementation writer. Within an authorized package it may
+  inspect, edit, test, commit and push its feature branch and create/update its
+  pull request; it does not merge a protected pull request without separate
+  authority.
+- **ChatGPT Web** performs research, GitHub-only work, evidence management and
+  independent review. It never claims local shell or filesystem execution.
+- **GitHub** is the canonical source/PR/CI/merge-history authority.
+- **User** supplies product intent and approvals that platform, policy or law
+  require. Routine technical decisions stay with Codex inside package scope.
+
 ## Applies to every coding agent
 
 Before inspecting broadly, changing code, tests, schemas, migrations, or state,
@@ -117,10 +148,12 @@ or chain-of-thought in project memory.
   or any Action Package execution semantics.
 - Scope not named by the user or not permitted by the current checkpoint.
 
-Never commit, push, merge, deploy, reset, clean, stash, rebase, amend a commit,
-delete a branch, delete broadly, print a secret, or use a permission/sandbox
-bypass. Preserve the dirty worktree, distinguish pre-existing changes from your
-own, and do not overwrite existing state merely to make the worktree clean.
+An authorized package may explicitly permit a bounded feature-branch commit,
+push, and pull-request update. It never implicitly permits merge, deploy,
+release, reset, clean, stash, rebase, amend, branch deletion, broad deletion,
+permission/sandbox bypass, or secret disclosure. Preserve the dirty worktree,
+distinguish pre-existing changes from your own, and do not overwrite existing
+state merely to make the worktree clean.
 
 ## Change-scope safeguards
 

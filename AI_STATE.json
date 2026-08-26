@@ -1,14 +1,59 @@
 {
-  "task_id": "dirap-v22-completion",
+  "schema_version": 2,
+  "task_id": "coding-operations-stabilization",
   "state": "DIRAP_V22_IMPLEMENTATION_IN_PROGRESS",
-  "baseline": [
-    "DIRAP_V3_CONTROLLED_SEARCH_ACCEPTED",
-    "DIRAP_V3_MEMORY_HUB_4_1_VALIDATED"
+  "checkpoint_status": "PARTIAL",
+  "coding_operations_plan": "https://github.com/thanhhaixn92/PQG-Workspace/issues/13",
+  "coding_operations_ready": false,
+  "completed_gates": {
+    "G0": "PASS",
+    "M1": "PASS"
+  },
+  "active_package": {
+    "id": "OPS-01",
+    "status": "REVIEW_PENDING",
+    "branch": "codex/ops-01-authority-state-normalization",
+    "pr_number": null,
+    "base_sha": "f5d21dbdfe643b44ecf3ede7104b7850f546aed3",
+    "source_head_sha": null,
+    "validation_sha": null,
+    "workflow_run": null,
+    "blockers": [
+      "Canonical PR CI and independent ChatGPT Web review must pass before merge disposition.",
+      "Merge remains a separately protected action."
+    ]
+  },
+  "actor": "codex-desktop",
+  "next_actor": "chatgpt-web",
+  "next_action": "Independently review the OPS-01 pull request and exact GitHub evidence; do not merge or begin OPS-02.",
+  "autonomous_actions": [
+    "Read and audit within the active package.",
+    "Make bounded edits inside the approved file allowlist.",
+    "Run focused and proportional validation.",
+    "Create bounded feature-branch commits and push without force.",
+    "Create or update the package pull request and GitHub evidence.",
+    "Review GitHub metadata and remediate the same root cause inside package scope."
   ],
-  "next_agent": "codex",
-  "lock": null,
-  "last_agent": "codex",
-  "last_result": "Reconciliation 2026-08-22: E2 bounded real-provider PASS theo receipt package-e2-bounded-20260822-063658; F1 PASS claim hẹp, remote compute stop NOT PROVEN; G-SYNTHETIC aggregate package-g-synthetic-aggregate-20260822-0837 PASS nhưng không phải human usability. Backend focused 46 passed, frontend canonical 33 passed và type-check PASS. Giữ DIRAP_V22_IMPLEMENTATION_IN_PROGRESS/PARTIAL, không nâng DIRAP_V22_VALIDATED.",
+  "protected_actions": [
+    "Merge or close a protected pull request when separate authority is required.",
+    "Deploy, release, or create public exposure.",
+    "Change migrations or schemas.",
+    "Access or change credentials, secrets, billing, or provider configuration.",
+    "Access or modify real user data.",
+    "Perform destructive deletion or branch deletion.",
+    "Change branch protection, security, approval, audit, or execution semantics.",
+    "Promote product state or checkpoint."
+  ],
+  "package_blockers": [
+    "OPS-02 through OPS-05 are not started.",
+    "P0-04 and MVP Gate remain blocked until CODING_OPERATIONS_READY."
+  ],
+  "dynamic_evidence_authority": "GitHub pull request and Issue #13 evidence are authoritative for source_head_sha, validation_sha, workflow_run, and PR number until OPS-03 implements durable exact-SHA handoff.",
   "human_approval_required": true,
+  "human_approval_guard": "DEPRECATED fail-closed compatibility guard for legacy launchers until OPS-04; not the authoritative decision model.",
+  "next_agent": "chatgpt-web",
+  "lock": null,
+  "last_agent": "codex-desktop",
+  "last_result": "G0 and M1 passed. OPS-01 normalizes authority and state without promoting the product checkpoint.",
   "risk_level": "medium"
 }
