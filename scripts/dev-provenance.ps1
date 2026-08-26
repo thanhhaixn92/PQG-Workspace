@@ -33,6 +33,16 @@ function Test-PqgHasProperty {
     return ($null -ne $Object -and $null -ne $Object.PSObject.Properties[$Name])
 }
 
+function ConvertTo-PqgInt {
+    param([object]$Value)
+
+    $parsed = 0
+    if (-not [int]::TryParse([string]$Value, [ref]$parsed)) {
+        return $null
+    }
+    return $parsed
+}
+
 function Get-PqgCurrentSourceSha {
     param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
 
@@ -90,7 +100,7 @@ function Test-PqgStateHeader {
             return New-PqgProofResult -Status 'Incomplete' -Reason "dev-state is missing $name"
         }
     }
-    if ([int]$State.schemaVersion -ne 2) {
+    if ([string]$State.schemaVersion -ne '2') {
         return New-PqgProofResult -Status 'Incomplete' -Reason 'dev-state schemaVersion must be 2'
     }
     if (-not (Test-PqgPathEqual ([string]$State.repositoryRoot) $RepositoryRoot)) {
@@ -135,9 +145,12 @@ function Get-PqgProcessSnapshot {
         try { $executable = [string]$process.Path } catch { $executable = '' }
     }
 
+    $parentPid = ConvertTo-PqgInt $cim.ParentProcessId
+    if ($null -eq $parentPid) { $parentPid = 0 }
+
     return [pscustomobject]@{
         pid = $Pid
-        parentPid = [int]$cim.ParentProcessId
+        parentPid = $parentPid
         processStartTime = $process.StartTime.ToUniversalTime().ToString('o')
         commandLine = [string]$cim.CommandLine
         executable = $executable
@@ -150,6 +163,7 @@ function Test-PqgProcessRecord {
         [Parameter(Mandatory = $true)][ValidateSet('backend', 'frontend')][string]$Role,
         [Parameter(Mandatory = $true)][string]$ExpectedWorkingDirectory,
         [int]$ExpectedPort = 0,
+        [string]$ExpectedDbPath,
         [switch]$RequireDbPath
     )
 
@@ -164,9 +178,9 @@ function Test-PqgProcessRecord {
         }
     }
 
-    $pidValue = [int]$Record.pid
-    $portValue = [int]$Record.port
-    if ($pidValue -le 0 -or $portValue -le 0 -or $portValue -gt 65535) {
+    $pidValue = ConvertTo-PqgInt $Record.pid
+    $portValue = ConvertTo-PqgInt $Record.port
+    if ($null -eq $pidValue -or $null -eq $portValue -or $pidValue -le 0 -or $portValue -le 0 -or $portValue -gt 65535) {
         return New-PqgProofResult -Status 'Incomplete' -Reason "$Role PID or port is invalid"
     }
     if ($ExpectedPort -gt 0 -and $portValue -ne $ExpectedPort) {
@@ -183,6 +197,12 @@ function Test-PqgProcessRecord {
     if ($RequireDbPath -and [string]::IsNullOrWhiteSpace([string]$Record.dbPath)) {
         return New-PqgProofResult -Status 'Incomplete' -Reason 'backend dbPath is missing'
     }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedDbPath)) {
+        if (-not (Test-PqgHasProperty $Record 'dbPath') -or
+            -not (Test-PqgPathEqual ([string]$Record.dbPath) $ExpectedDbPath)) {
+            return New-PqgProofResult -Status 'Mismatch' -Reason 'backend dbPath does not match the expected database'
+        }
+    }
 
     $expectedStart = [DateTimeOffset]::MinValue
     if (-not [DateTimeOffset]::TryParse([string]$Record.processStartTime, [ref]$expectedStart)) {
@@ -193,7 +213,10 @@ function Test-PqgProcessRecord {
     if ($null -eq $snapshot) {
         return New-PqgProofResult -Status 'NotRunning' -Reason "$Role PID is not running"
     }
-    $actualStart = [DateTimeOffset]::Parse([string]$snapshot.processStartTime)
+    $actualStart = [DateTimeOffset]::MinValue
+    if (-not [DateTimeOffset]::TryParse([string]$snapshot.processStartTime, [ref]$actualStart)) {
+        return New-PqgProofResult -Status 'Mismatch' -Reason "$Role live process start-time is unavailable" -Snapshot $snapshot
+    }
     if ($expectedStart.UtcDateTime.Ticks -ne $actualStart.UtcDateTime.Ticks) {
         return New-PqgProofResult -Status 'Mismatch' -Reason "$Role PID start-time does not match dev-state" -Snapshot $snapshot
     }
@@ -259,6 +282,23 @@ function Test-PqgPortListener {
     return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1)
 }
 
+function Test-PqgPortOwnedByProcessTree {
+    param(
+        [Parameter(Mandatory = $true)][int]$Port,
+        [Parameter(Mandatory = $true)][int]$RootPid
+    )
+
+    $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    if (-not $listeners) { return $false }
+    foreach ($listener in $listeners) {
+        $ownerPid = ConvertTo-PqgInt $listener.OwningProcess
+        if ($null -ne $ownerPid -and $ownerPid -gt 0 -and (Test-PqgProcessDescendant -ChildPid $ownerPid -AncestorPid $RootPid)) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Get-PqgLikelyBackendListeners {
     param(
         [Parameter(Mandatory = $true)][string]$RepositoryRoot,
@@ -269,8 +309,8 @@ function Get-PqgLikelyBackendListeners {
     $results = @()
     $connections = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue)
     foreach ($connection in $connections) {
-        $ownerPid = [int]$connection.OwningProcess
-        if ($ownerPid -le 0) { continue }
+        $ownerPid = ConvertTo-PqgInt $connection.OwningProcess
+        if ($null -eq $ownerPid -or $ownerPid -le 0) { continue }
         $snapshot = Get-PqgProcessSnapshot -Pid $ownerPid
         if ($null -eq $snapshot -or [string]::IsNullOrWhiteSpace([string]$snapshot.executable)) { continue }
         if (-not (Test-PqgPathEqual ([string]$snapshot.executable) $expectedPython)) { continue }
