@@ -19,6 +19,8 @@ $BackendEnv = Join-Path $BackendDir ".env"
 
 $BackendCommandIdentity = "uvicorn app.main:app"
 $FrontendCommandIdentity = "npm run dev"
+$BackendPortWasExplicit = $PSBoundParameters.ContainsKey('BackendPort')
+$FrontendPortWasExplicit = $PSBoundParameters.ContainsKey('FrontendPort')
 $SourceSha = Get-PqgCurrentSourceSha -RepositoryRoot $Root
 $PowerShellExe = Get-PqgPowerShellExecutable
 
@@ -49,52 +51,7 @@ function Find-AvailablePort {
             return $candidate
         }
     }
-
     throw "Khong tim thay cong trong tu $StartPort den $($StartPort + $MaxAttempts - 1)."
-}
-
-function Get-ReusableRecord {
-    param(
-        [object]$State,
-        [Parameter(Mandatory = $true)][ValidateSet("backend", "frontend")][string]$Role,
-        [Parameter(Mandatory = $true)][int]$Port,
-        [Parameter(Mandatory = $true)][string]$IdentityMarker,
-        [string]$DbPath
-    )
-
-    if ($null -eq $State) { return $null }
-    $header = Test-PqgStateHeader -State $State -RepositoryRoot $Root -CurrentSourceSha $SourceSha -RequireCurrentSource
-    if ($header.status -ne "Match") { return $null }
-
-    if ($Role -eq "backend") {
-        $proof = Test-PqgProcessRecord `
-            -Record $State.backend `
-            -Role backend `
-            -ExpectedWorkingDirectory $BackendDir `
-            -ExpectedCommand $BackendCommandIdentity `
-            -ExpectedIdentityMarker $IdentityMarker `
-            -ExpectedExecutable $PowerShellExe `
-            -ExpectedPort $Port `
-            -ExpectedDbPath $DbPath `
-            -RequireDbPath
-        $record = $State.backend
-    } else {
-        $proof = Test-PqgProcessRecord `
-            -Record $State.frontend `
-            -Role frontend `
-            -ExpectedWorkingDirectory $FrontendDir `
-            -ExpectedCommand $FrontendCommandIdentity `
-            -ExpectedIdentityMarker $IdentityMarker `
-            -ExpectedExecutable $PowerShellExe `
-            -ExpectedPort $Port
-        $record = $State.frontend
-    }
-
-    if ($proof.status -ne "Match") { return $null }
-    if (-not (Test-PqgPortOwnedByProcessTree -Port $Port -RootProcessId ([int]$record.pid))) {
-        return $null
-    }
-    return $record
 }
 
 function Write-DevState {
@@ -106,7 +63,6 @@ function Write-DevState {
     if (-not (Test-Path -LiteralPath $DevDir)) {
         New-Item -ItemType Directory -Path $DevDir | Out-Null
     }
-
     $payload = [ordered]@{
         schemaVersion = 2
         repositoryRoot = $Root
@@ -120,13 +76,12 @@ function Write-DevState {
 
 Write-Host "Khoi dong moi truong phat trien PQG Workspace" -ForegroundColor Cyan
 
-if (-not (Test-Path -LiteralPath $PythonExe)) {
+if (-not (Test-Path -LiteralPath $PythonExe -PathType Leaf)) {
     Write-Host "Chua co moi truong Python: backend\.venv" -ForegroundColor Yellow
     Write-Host "Tao bang lenh: cd backend; py -3.11 -m venv .venv; .venv\Scripts\pip.exe install -e `".[dev]`""
     exit 1
 }
-
-if (-not (Test-Path -LiteralPath (Join-Path $FrontendDir "node_modules"))) {
+if (-not (Test-Path -LiteralPath (Join-Path $FrontendDir "node_modules") -PathType Container)) {
     Write-Host "Chua cai dependency frontend: frontend\node_modules" -ForegroundColor Yellow
     Write-Host "Cai bang lenh: cd frontend; npm install"
     exit 1
@@ -136,7 +91,7 @@ $BackendDbPath = Get-PqgConfiguredDbPath -BackendDirectory $BackendDir -PythonEx
 $BackendIdentityMarker = Get-PqgIdentityMarker -Role backend -RepositoryRoot $Root -SourceSha $SourceSha
 $FrontendIdentityMarker = Get-PqgIdentityMarker -Role frontend -RepositoryRoot $Root -SourceSha $SourceSha
 
-if (-not (Test-Path -LiteralPath $BackendEnv)) {
+if (-not (Test-Path -LiteralPath $BackendEnv -PathType Leaf)) {
     Write-Host "Chua co backend\.env" -ForegroundColor Yellow
     Write-Host "Tao tu template bang lenh: Copy-Item backend\.env.example backend\.env"
 } else {
@@ -144,83 +99,147 @@ if (-not (Test-Path -LiteralPath $BackendEnv)) {
 }
 
 $state = $null
-try {
-    $state = Read-PqgDevState -StatePath $StatePath
-} catch {
-    Write-Host "WARN dev-state hien tai khong hop le; se khong reuse bat ky process nao." -ForegroundColor Yellow
+if (Test-Path -LiteralPath $StatePath -PathType Leaf) {
+    try {
+        $state = Read-PqgDevState -StatePath $StatePath
+    } catch {
+        throw "Dev-state ton tai nhung khong doc duoc. Tu choi overwrite provenance khong xac minh duoc: $($_.Exception.Message)"
+    }
 }
 
 $BackendRecord = $null
 $FrontendRecord = $null
+$backendProof = $null
+$frontendProof = $null
 
-if (-not (Test-PortAvailable $BackendPort)) {
-    $reusable = $null
-    if (-not $Fresh) {
-        $reusable = Get-ReusableRecord -State $state -Role backend -Port $BackendPort -IdentityMarker $BackendIdentityMarker -DbPath $BackendDbPath
+if ($null -ne $state) {
+    $headerProof = Test-PqgStateHeader -State $state -RepositoryRoot $Root -CurrentSourceSha $SourceSha -RequireCurrentSource
+    if ($headerProof.status -ne 'Match') {
+        throw "Dev-state ton tai nhung khong khop checkout hien tai: $($headerProof.reason). Tu choi reuse va tu choi overwrite state."
     }
-    if ($null -ne $reusable -and (Test-HttpOk "http://127.0.0.1:$BackendPort/health")) {
-        $BackendRecord = $reusable
-        Write-Host "Backend dang chay va provenance khop tai http://127.0.0.1:$BackendPort" -ForegroundColor Green
-    } else {
-        $oldPort = $BackendPort
-        $BackendPort = Find-AvailablePort ($BackendPort + 1)
-        Write-Host "Cong backend $oldPort dang ban nhung identity khong duoc chung minh. Khong reuse; dung cong moi: $BackendPort" -ForegroundColor Yellow
+
+    try {
+        $recordedBackendPort = [int]$state.backend.port
+        $recordedFrontendPort = [int]$state.frontend.port
+    } catch {
+        throw 'Dev-state co port khong hop le. Tu choi overwrite.'
+    }
+
+    $backendProof = Test-PqgProcessRecord `
+        -Record $state.backend `
+        -Role backend `
+        -ExpectedWorkingDirectory $BackendDir `
+        -ExpectedCommand $BackendCommandIdentity `
+        -ExpectedIdentityMarker $BackendIdentityMarker `
+        -ExpectedExecutable $PowerShellExe `
+        -ExpectedPort $recordedBackendPort `
+        -ExpectedDbPath $BackendDbPath `
+        -RequireDbPath
+    $frontendProof = Test-PqgProcessRecord `
+        -Record $state.frontend `
+        -Role frontend `
+        -ExpectedWorkingDirectory $FrontendDir `
+        -ExpectedCommand $FrontendCommandIdentity `
+        -ExpectedIdentityMarker $FrontendIdentityMarker `
+        -ExpectedExecutable $PowerShellExe `
+        -ExpectedPort $recordedFrontendPort
+
+    if ($backendProof.status -in @('Mismatch', 'Incomplete')) {
+        throw "Tu choi start/reuse/overwrite backend state: $($backendProof.reason)"
+    }
+    if ($frontendProof.status -in @('Mismatch', 'Incomplete')) {
+        throw "Tu choi start/reuse/overwrite frontend state: $($frontendProof.reason)"
+    }
+    if ($Fresh -and ($backendProof.status -eq 'Match' -or $frontendProof.status -eq 'Match')) {
+        throw '-Fresh khong duoc orphan recorded process dang chay. Hay chay stop-dev.ps1 truoc.'
+    }
+
+    if ($backendProof.status -eq 'Match') {
+        if ($BackendPortWasExplicit -and $BackendPort -ne $recordedBackendPort) {
+            throw "Backend recorded dang chay o port $recordedBackendPort; tu choi ghi de bang port $BackendPort."
+        }
+        $BackendPort = $recordedBackendPort
+        if (-not (Test-PqgPortOwnedByProcessTree -Port $BackendPort -RootProcessId ([int]$state.backend.pid))) {
+            throw 'Backend process identity khop nhung recorded port khong thuoc process tree do. Tu choi reuse.'
+        }
+        if (-not (Test-HttpOk "http://127.0.0.1:$BackendPort/health")) {
+            throw 'Backend process/port identity khop nhung health khong dat. Tu choi reuse im lang.'
+        }
+        $BackendRecord = $state.backend
+        Write-Host "Reuse backend da duoc chung minh tai http://127.0.0.1:$BackendPort" -ForegroundColor Green
+    } elseif (-not $BackendPortWasExplicit) {
+        $BackendPort = $recordedBackendPort
+    }
+
+    if ($frontendProof.status -eq 'Match') {
+        if ($FrontendPortWasExplicit -and $FrontendPort -ne $recordedFrontendPort) {
+            throw "Frontend recorded dang chay o port $recordedFrontendPort; tu choi ghi de bang port $FrontendPort."
+        }
+        $FrontendPort = $recordedFrontendPort
+        if (-not (Test-PqgPortOwnedByProcessTree -Port $FrontendPort -RootProcessId ([int]$state.frontend.pid))) {
+            throw 'Frontend process identity khop nhung recorded port khong thuoc process tree do. Tu choi reuse.'
+        }
+        if (-not (Test-HttpOk "http://localhost:$FrontendPort")) {
+            throw 'Frontend process/port identity khop nhung HTTP health khong dat. Tu choi reuse im lang.'
+        }
+        $FrontendRecord = $state.frontend
+        Write-Host "Reuse frontend da duoc chung minh tai http://localhost:$FrontendPort" -ForegroundColor Green
+    } elseif (-not $FrontendPortWasExplicit) {
+        $FrontendPort = $recordedFrontendPort
     }
 }
 
-if (-not (Test-PortAvailable $FrontendPort)) {
-    $reusable = $null
-    if (-not $Fresh) {
-        $reusable = Get-ReusableRecord -State $state -Role frontend -Port $FrontendPort -IdentityMarker $FrontendIdentityMarker
+if ($null -eq $BackendRecord -and -not (Test-PortAvailable $BackendPort)) {
+    $oldPort = $BackendPort
+    $BackendPort = Find-AvailablePort ($BackendPort + 1)
+    Write-Host "Cong backend $oldPort dang ban nhung khong thuoc reusable provenance. Khong adopt; dung cong moi: $BackendPort" -ForegroundColor Yellow
+}
+if ($null -eq $FrontendRecord -and -not (Test-PortAvailable $FrontendPort)) {
+    $oldPort = $FrontendPort
+    $FrontendPort = Find-AvailablePort ($FrontendPort + 1)
+    Write-Host "Cong frontend $oldPort dang ban nhung khong thuoc reusable provenance. Khong adopt; dung cong moi: $FrontendPort" -ForegroundColor Yellow
+}
+
+$NewBackendProcessId = 0
+$NewFrontendProcessId = 0
+try {
+    if ($null -eq $BackendRecord) {
+        Write-Host "Dang chay backend tai http://127.0.0.1:$BackendPort"
+        $reloadFlag = if ($NoReload) { "" } else { " --reload" }
+        $safeActor = $LocalActorSubject -replace "'", "''"
+        $backendCommand = "`$pqgIdentity='$BackendIdentityMarker'; `$env:CORS_ORIGINS='http://localhost:$FrontendPort'; `$env:LOCAL_ACTOR_SUBJECT='$safeActor'; .\.venv\Scripts\python.exe -m uvicorn app.main:app$reloadFlag --host 127.0.0.1 --port $BackendPort"
+        $backendProcess = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $BackendDir -PassThru -ArgumentList @('-NoExit', '-Command', $backendCommand)
+        $NewBackendProcessId = $backendProcess.Id
+        $BackendRecord = New-PqgProcessRecord `
+            -ProcessId $NewBackendProcessId `
+            -WorkingDirectory $BackendDir `
+            -Command $BackendCommandIdentity `
+            -IdentityMarker $BackendIdentityMarker `
+            -Port $BackendPort `
+            -DbPath $BackendDbPath
     }
-    if ($null -ne $reusable -and (Test-HttpOk "http://localhost:$FrontendPort")) {
-        $FrontendRecord = $reusable
-        Write-Host "Frontend dang chay va provenance khop tai http://localhost:$FrontendPort" -ForegroundColor Green
-    } else {
-        $oldPort = $FrontendPort
-        $FrontendPort = Find-AvailablePort ($FrontendPort + 1)
-        Write-Host "Cong frontend $oldPort dang ban nhung identity khong duoc chung minh. Khong reuse; dung cong moi: $FrontendPort" -ForegroundColor Yellow
+
+    Start-Sleep -Seconds 2
+
+    if ($null -eq $FrontendRecord) {
+        Write-Host "Dang chay frontend tai http://localhost:$FrontendPort"
+        $frontendCommand = "`$pqgIdentity='$FrontendIdentityMarker'; Remove-Item Env:VITE_API_BASE_URL -ErrorAction SilentlyContinue; `$env:VITE_API_PROXY_TARGET='http://127.0.0.1:$BackendPort'; npm run dev -- --host 127.0.0.1 --port $FrontendPort"
+        $frontendProcess = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $FrontendDir -PassThru -ArgumentList @('-NoExit', '-Command', $frontendCommand)
+        $NewFrontendProcessId = $frontendProcess.Id
+        $FrontendRecord = New-PqgProcessRecord `
+            -ProcessId $NewFrontendProcessId `
+            -WorkingDirectory $FrontendDir `
+            -Command $FrontendCommandIdentity `
+            -IdentityMarker $FrontendIdentityMarker `
+            -Port $FrontendPort
     }
+
+    Write-DevState -BackendRecord $BackendRecord -FrontendRecord $FrontendRecord
+} catch {
+    if ($NewFrontendProcessId -gt 0) { & taskkill.exe /PID $NewFrontendProcessId /T /F 2>$null | Out-Null }
+    if ($NewBackendProcessId -gt 0) { & taskkill.exe /PID $NewBackendProcessId /T /F 2>$null | Out-Null }
+    throw
 }
-
-if ($null -eq $BackendRecord) {
-    Write-Host "Dang chay backend tai http://127.0.0.1:$BackendPort"
-    $reloadFlag = if ($NoReload) { "" } else { " --reload" }
-    $safeActor = $LocalActorSubject -replace "'", "''"
-    $backendCommand = "`$pqgIdentity='$BackendIdentityMarker'; `$env:CORS_ORIGINS='http://localhost:$FrontendPort'; `$env:LOCAL_ACTOR_SUBJECT='$safeActor'; .\.venv\Scripts\python.exe -m uvicorn app.main:app$reloadFlag --host 127.0.0.1 --port $BackendPort"
-    $backendProcess = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $BackendDir -PassThru -ArgumentList @(
-        "-NoExit",
-        "-Command",
-        $backendCommand
-    )
-    $BackendRecord = New-PqgProcessRecord `
-        -ProcessId $backendProcess.Id `
-        -WorkingDirectory $BackendDir `
-        -Command $BackendCommandIdentity `
-        -IdentityMarker $BackendIdentityMarker `
-        -Port $BackendPort `
-        -DbPath $BackendDbPath
-}
-
-Start-Sleep -Seconds 2
-
-if ($null -eq $FrontendRecord) {
-    Write-Host "Dang chay frontend tai http://localhost:$FrontendPort"
-    $frontendCommand = "`$pqgIdentity='$FrontendIdentityMarker'; Remove-Item Env:VITE_API_BASE_URL -ErrorAction SilentlyContinue; `$env:VITE_API_PROXY_TARGET='http://127.0.0.1:$BackendPort'; npm run dev -- --host 127.0.0.1 --port $FrontendPort"
-    $frontendProcess = Start-Process powershell -WindowStyle Hidden -WorkingDirectory $FrontendDir -PassThru -ArgumentList @(
-        "-NoExit",
-        "-Command",
-        $frontendCommand
-    )
-    $FrontendRecord = New-PqgProcessRecord `
-        -ProcessId $frontendProcess.Id `
-        -WorkingDirectory $FrontendDir `
-        -Command $FrontendCommandIdentity `
-        -IdentityMarker $FrontendIdentityMarker `
-        -Port $FrontendPort
-}
-
-Write-DevState -BackendRecord $BackendRecord -FrontendRecord $FrontendRecord
 
 Write-Host ""
 Write-Host "Mo ung dung tai http://localhost:$FrontendPort" -ForegroundColor Green
