@@ -1,8 +1,23 @@
 # Project State
 
+## Active coding-operations overlay
+
+- Coding operations plan: [GitHub Issue #13](https://github.com/thanhhaixn92/PQG-Workspace/issues/13).
+- Coding operations gate: `OPS-01`.
+- Coding operations status: `REVIEW_PENDING` once this package is committed and
+  pushed; until then it is `IN_PROGRESS` on its feature branch.
+- Completed prerequisite gates: `G0 = PASS`, `M1 = PASS`.
+- `CODING_OPERATIONS_READY = false` / not yet reached.
+- `P0-04 = BLOCKED` and `MVP Gate = BLOCKED` until OPS-01 through OPS-05 pass.
+- Product state remains `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`; this
+  operations overlay is not a product checkpoint promotion.
+
 > Current routing update (2026-08-14): `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS` là trạng thái đang triển khai. Checkpoint `DIRAP_LOCAL_MVP_WORK_HUB_VALIDATED` ngày 2026-08-12 được giữ làm baseline đã kiểm chứng; chưa phải nghiệm thu v2.2. Không được quảng bá v2.2 thành validated khi còn hard-stop hoặc chưa hoàn tất UAT.
 
-> Current routing update (2026-08-12): `DIRAP_LOCAL_MVP_REMEDIATION_V1_2_VALIDATED` là checkpoint hiện hành. Baseline giữ nguyên gồm `DIRAP_V3_CONTROLLED_SEARCH_ACCEPTED` và `DIRAP_V3_MEMORY_HUB_4_1_VALIDATED`. Các gate integrity, trust-boundary, session/scope isolation, UX/recovery và UAT local đã đạt trong môi trường cô lập; đây chưa phải production readiness.
+> Historical routing update (2026-08-12, superseded as active routing):
+> `DIRAP_LOCAL_MVP_REMEDIATION_V1_2_VALIDATED` was the then-current checkpoint.
+> It remains historical baseline evidence and does not override the active v2.2
+> `PARTIAL` checkpoint or Coding Operations Stabilization.
 
 ## Active v2.2 implementation checkpoint
 
@@ -20,7 +35,7 @@
 
 > Historical baseline (2026-08-10): `DIRAP_V3_MEMORY_HUB_3A_4_VALIDATED` was the active local MVP checkpoint before remediation v1.2. Controlled Knowledge Search remains an accepted earlier slice. This paragraph is retained as history and does not override the active remediation checkpoint above.
 
-Last updated: 2026-08-17
+Last updated: 2026-08-26
 
 ## Historical checkpoint — Controlled Knowledge Search
 
@@ -49,7 +64,7 @@ Latest verified by Antigravity (Checker):
 - Chỉ đọc tuyệt đối: không audit, không ghi trạng thái, không lưu kết quả tìm kiếm, không migration.
 - Chi tiết bằng chứng đầy đủ: `AI_VERIFICATION.md`; checkpoint đã được khóa tại `AI_STATE.json` là `DIRAP_V3_CONTROLLED_SEARCH_ACCEPTED`.
 
-## Current Decision
+## Historical Decision
 
 Người dùng đã phê duyệt gói thiết kế DIRAP v2.3 và cho phép bắt đầu v3.0 trong worktree riêng.
 
@@ -68,9 +83,11 @@ Người dùng đã phê duyệt gói thiết kế DIRAP v2.3 và cho phép bắ
 
 Conflict order:
 
-1. `docs/00_PROJECT_CANON.md`
-2. `AGENTS.md`
-3. `PROJECT_STATE.md`
-4. `docs/implementation/CURRENT_CHECKPOINT.md`
-5. Feature-specific docs routed by `docs/AI_AGENT_ROUTING.md`
-6. Long-term roadmap docs
+1. Current explicit user request plus platform and safety constraints.
+2. `AGENTS.md`.
+3. `PROJECT_STATE.md`, `AI_STATE.json`, and
+   `docs/implementation/CURRENT_CHECKPOINT.md`.
+4. Product canon, security policy, and data model.
+5. Current source, contracts, and focused tests.
+6. Project Memory.
+7. Historical handoffs, plans, chat, and evidence.

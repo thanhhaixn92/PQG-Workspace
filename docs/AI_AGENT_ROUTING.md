@@ -14,6 +14,15 @@ never load every project document by default.
 The active state files define the gate. Historical plans, historical test counts
 and older checkpoint wording do not authorize a change.
 
+## Active coding-operations route
+
+For coding-operations state, checkpoint, evidence, or handoff work, read the
+current [Issue #13](https://github.com/thanhhaixn92/PQG-Workspace/issues/13),
+the active state triplet, root `AGENTS.md`, and the operating contract. Issue
+#13 is the active coordination plan; exact dynamic SHA/run evidence remains in
+GitHub. CP6, Outbox, Antigravity, Hermes/ACP launcher flows, PR #9, and old MVP
+plans are historical or compatibility inputs, not active routing.
+
 ## Task routing
 
 | Task | Read first | Inspect next | Prove with |
@@ -28,7 +37,7 @@ and older checkpoint wording do not authorize a change.
 | Files/artifacts/reports | data model, security policy | file/artifact routes, sandbox, explorer/reports | managed-root/path-escape tests |
 | Knowledge, Skill, Memory review | PRD, security policy | source lifecycle route + Review Inbox | lifecycle/concurrency/deep-link tests |
 | App shell or responsive UI | `DESIGN.md` plus state | AppLayout, target component, CSS, focused test | loading/error/keyboard/reflow browser evidence |
-| State/checkpoint/evidence | handoff review protocol, acceptance | active state files and exact evidence scripts | actual commands/artifacts only |
+| State/checkpoint/evidence | Issue #13, active state triplet, `AGENTS.md`, operating contract | exact GitHub evidence plus affected governance files | state consistency, exact commands/artifacts, scoped diff |
 | Migration/dependency/config | data model, security policy | migration/config/package manifest | explicit approval then isolated upgrade/rollback |
 | GitHub/GitLab/Codex CI, mirror or connector | `docs/15_GITHUB_GITLAB_CODEX_WORKFLOW.md`, security policy | `.gitlab-ci.yml`, GitHub workflows, live protection/mirror settings | exact SHA equality, CI Lint, exact pipeline receipt, secret-safe diff |
 

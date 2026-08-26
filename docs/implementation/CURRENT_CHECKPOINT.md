@@ -1,6 +1,19 @@
 # Current Checkpoint
 
-Last updated: 2026-08-22
+Last updated: 2026-08-26
+
+## Coding Operations Stabilization — separate operations gate
+
+This operations gate does not promote or replace the product checkpoint below.
+
+- Coordination plan: [GitHub Issue #13](https://github.com/thanhhaixn92/PQG-Workspace/issues/13).
+- `G0`: **PASS**.
+- `M1`: **PASS**.
+- `OPS-01`: **ACTIVE / REVIEW PENDING**.
+- `OPS-02`, `OPS-03`, `OPS-04`, `OPS-05`: **NOT RUN**.
+- `CODING_OPERATIONS_READY`: **false / not reached**.
+- `P0-04` and MVP Gate remain blocked by the coding-operations gate.
+- Product state remains `DIRAP_V22_IMPLEMENTATION_IN_PROGRESS / PARTIAL`.
 
 ## Active checkpoint
 

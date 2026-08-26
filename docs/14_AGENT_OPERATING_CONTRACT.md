@@ -4,7 +4,7 @@
 
 This is the implementation companion to root `AGENTS.md`. It makes a coding
 agent's pre-code checks repeatable without turning historical plans into active
-scope. It applies to Codex, Hermes Desktop and any delegated coding agent.
+scope. It applies to Codex Desktop, ChatGPT Web and any delegated coding agent.
 
 ## Mandatory pre-code receipt
 
@@ -51,16 +51,35 @@ test from another revision as permission to edit outside this task.
 Use this order when sources conflict:
 
 1. User's current explicit request and platform safety rules.
-2. `PROJECT_STATE.md`, `AI_STATE.json`, and
+2. Root `AGENTS.md` for execution and permission rules.
+3. `PROJECT_STATE.md`, `AI_STATE.json`, and
    `docs/implementation/CURRENT_CHECKPOINT.md` for active stage/gate.
-3. Canon, security policy and accepted decisions for durable boundaries.
-4. Current route/schema/service code plus focused tests for implemented runtime
+4. Product canon, security policy and data model for durable boundaries.
+5. Current route/schema/service code, public contracts and focused tests for implemented runtime
    behaviour.
-5. Historical handoffs, old plans and historical evidence.
+6. Project Memory for curated continuity.
+7. Historical handoffs, old plans, chat and historical evidence.
 
 If a durable document conflicts with verified current runtime, do not silently
 rewrite either during a feature patch. Report the exact conflict, follow the
 active gate, and request a documentation-reconciliation scope when needed.
+
+## Roles and protected actions
+
+- Codex Desktop is the sole local/worktree actor and repository implementation
+  writer. An authorized package may include bounded feature-branch commit, push
+  and pull-request updates.
+- ChatGPT Web performs GitHub-only work, research, evidence management and
+  independent review; it does not claim local execution.
+- GitHub is authoritative for source, PR, CI and merge history.
+- The user is asked only for decisions that platform, policy, law, security or
+  material product scope require; Codex resolves routine technical decisions.
+
+Merge/close disposition when separately protected, deploy/release/public
+exposure, migrations/schema, credentials/secrets/billing, real user data,
+destructive deletion, branch protection, security/approval/execution semantics,
+and product state/checkpoint promotion require their specific authority. An
+authorized package does not implicitly grant any of them.
 
 ## Current non-negotiable boundaries
 
