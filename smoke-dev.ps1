@@ -35,7 +35,8 @@ function Assert-Ok {
 
 Write-Host "Smoke test PQG Workspace" -ForegroundColor Cyan
 Write-Host "Backend: $BackendUrl"
-Write-Host "Workspace: $WorkspacePath"
+Write-Host "Runtime workspace: $WorkspacePath"
+Write-Host "Native GYO acceptance uses its own temporary SQLite DB/workspace and no provider network."
 
 $health = Invoke-RestMethod "$BackendUrl/health" -TimeoutSec 10
 Assert-Ok ($health.status -eq "ok") "Backend health failed"
@@ -44,68 +45,41 @@ Write-Host "OK  health"
 $runtime = Invoke-RestMethod "$BackendUrl/api/runtime/status" -TimeoutSec 10
 Assert-Ok ($runtime.backend -eq "ok") "Runtime status failed"
 Assert-Ok ($runtime.db.status -eq "ok") "DB status failed"
-Write-Host "OK  runtime: Hermes=$($runtime.hermes.status), n8n=$($runtime.n8n.configured)"
+Write-Host "OK  runtime backend + DB readiness"
 
-$sessionBody = @{
-    title = "Smoke Test $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-    workspace_path = $WorkspacePath
-} | ConvertTo-Json
-
-$session = Invoke-RestMethod "$BackendUrl/api/sessions" -Method Post -ContentType "application/json" -Body $sessionBody -TimeoutSec 10
-Assert-Ok ($null -ne $session.id) "Session creation failed"
-Write-Host "OK  session: $($session.id)"
-
-$promptBody = @{
-    prompt = "Tra loi dung mot tu: OK"
-} | ConvertTo-Json
-
-$task = Invoke-RestMethod "$BackendUrl/api/sessions/$($session.id)/prompt" -Method Post -ContentType "application/json" -Body $promptBody -TimeoutSec 10
-Assert-Ok ($null -ne $task.id) "Prompt submit failed"
-Write-Host "OK  prompt queued: $($task.id)"
-
-$eventUrl = "$BackendUrl/api/sessions/$($session.id)/events"
-$request = [System.Net.HttpWebRequest]::Create($eventUrl)
-$request.Method = "GET"
-$request.Timeout = $TimeoutSeconds * 1000
-$request.ReadWriteTimeout = $TimeoutSeconds * 1000
-$response = $request.GetResponse()
-$stream = $response.GetResponseStream()
-$reader = New-Object System.IO.StreamReader($stream)
-
-$events = New-Object System.Collections.Generic.List[string]
-$payloadText = ""
-$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-
-try {
-    while ((Get-Date) -lt $deadline) {
-        $line = $reader.ReadLine()
-        if ($null -eq $line) {
-            Start-Sleep -Milliseconds 100
-            continue
-        }
-        if ($line.StartsWith("event: ")) {
-            $name = $line.Substring(7)
-            $events.Add($name)
-            if ($name -eq "done") {
-                break
-            }
-        } elseif ($line.StartsWith("data: ")) {
-            $payloadText += $line.Substring(6)
-        }
-    }
-} finally {
-    $reader.Dispose()
-    $response.Dispose()
-}
-
-Assert-Ok ($events.Contains("done")) "SSE did not emit done"
-Assert-Ok (($events.Contains("token")) -or ($events.Contains("error"))) "SSE emitted neither token nor error"
-
-if ($events.Contains("error")) {
-    Write-Host "WARN SSE emitted error. Payload:"
-    Write-Host $payloadText
+# The product acceptance journey is the deterministic current durable GYO test,
+# not the historical /api/sessions/{id}/prompt + Hermes event stream. Running
+# it here keeps local smoke provider-independent and avoids writing to the live
+# runtime database/workspace while still exercising the real FastAPI/GYO path.
+$VenvPython = Join-Path $Root "backend\.venv\Scripts\python.exe"
+if (Test-Path $VenvPython) {
+    $PythonCommand = $VenvPython
 } else {
-    Write-Host "OK  SSE token stream completed"
+    $Python = Get-Command python -ErrorAction SilentlyContinue
+    Assert-Ok ($null -ne $Python) "Python is required to run the native GYO acceptance journey"
+    $PythonCommand = $Python.Source
+}
+Assert-Ok ($TimeoutSeconds -gt 0) "TimeoutSeconds must be greater than zero"
+
+$PreviousLocation = Get-Location
+try {
+    Set-Location (Join-Path $Root "backend")
+    Write-Host "RUN native GYO integrated journey (offline/provider-independent)"
+    $pytest = Start-Process `
+        -FilePath $PythonCommand `
+        -ArgumentList @("-m", "pytest", "tests/test_uat_p0_local_pilot.py", "-q") `
+        -NoNewWindow `
+        -PassThru
+    $timeoutMilliseconds = [int][Math]::Min(([double]$TimeoutSeconds * 1000), [int]::MaxValue)
+    if (-not $pytest.WaitForExit($timeoutMilliseconds)) {
+        Stop-Process -Id $pytest.Id -Force -ErrorAction SilentlyContinue
+        $pytest.WaitForExit()
+        throw "Native GYO integrated journey timed out after $TimeoutSeconds seconds"
+    }
+    Assert-Ok ($pytest.ExitCode -eq 0) "Native GYO integrated journey failed"
+} finally {
+    Set-Location $PreviousLocation
 }
 
+Write-Host "OK  native GYO integrated journey completed"
 Write-Host "OK  smoke test completed"
