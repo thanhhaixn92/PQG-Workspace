@@ -163,6 +163,66 @@ if ($null -ne $snapshot) {{ throw 'A vanished process must return a null snapsho
     assert result.returncode == 0, result.stderr or result.stdout
 
 
+def _assert_smoke_dev_uses_schema_v2_backend_port(
+    powershell: str,
+    repo_root: Path,
+    tmp_path: Path,
+) -> None:
+    smoke_root = tmp_path / "isolated smoke consumer"
+    state_dir = smoke_root / ".dev"
+    state_dir.mkdir(parents=True)
+    smoke_script = smoke_root / "smoke-dev.ps1"
+    shutil.copy2(repo_root / "smoke-dev.ps1", smoke_script)
+
+    def run_smoke(backend_port: int | None = None) -> subprocess.CompletedProcess[str]:
+        arguments = "" if backend_port is None else f"-BackendPort {backend_port}"
+        command = rf"""
+function Invoke-RestMethod {{
+  param([string]$Uri, [int]$TimeoutSec)
+  throw "Network disabled for isolated port-resolution test: $Uri"
+}}
+& '{_ps_literal(smoke_script)}' {arguments}
+"""
+        return subprocess.run(
+            [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+    dynamic_port = _free_port()
+    while dynamic_port == 8000:
+        dynamic_port = _free_port()
+    state_path = state_dir / "dev-state.json"
+    state_path.write_text(
+        json.dumps({"schemaVersion": 2, "backend": {"port": dynamic_port}}),
+        encoding="utf-8",
+    )
+    from_state = run_smoke()
+    assert from_state.returncode != 0
+    assert f"Backend: http://127.0.0.1:{dynamic_port}" in from_state.stdout
+    assert "http://127.0.0.1:8000" not in from_state.stdout
+
+    explicit_port = _free_port()
+    explicit = run_smoke(explicit_port)
+    assert explicit.returncode != 0
+    assert f"Backend: http://127.0.0.1:{explicit_port}" in explicit.stdout
+    assert f"Backend: http://127.0.0.1:{dynamic_port}" not in explicit.stdout
+
+    invalid_states = (
+        {"schemaVersion": 1, "backend": {"port": dynamic_port}},
+        {"schemaVersion": 2, "backend": {}},
+        {"schemaVersion": 2, "backend": {"port": 0}},
+    )
+    for invalid_state in invalid_states:
+        state_path.write_text(json.dumps(invalid_state), encoding="utf-8")
+        invalid = run_smoke()
+        assert invalid.returncode != 0
+        assert "Backend: http://" not in invalid.stdout
+        assert "Dev-state" in invalid.stderr
+
+
 def _spawn_recorded_wrappers(
     powershell: str,
     repo_root: Path,
@@ -287,6 +347,7 @@ def _wait_for_port(port: int, timeout: float = 15.0) -> bool:
 def test_offline_restore_script_validates_manifest_previews_and_swaps_atomically(tmp_path: Path) -> None:
     powershell, repo_root = _windows_context()
     _assert_windows_powershell_git_sha_with_space_path(powershell, repo_root, tmp_path)
+    _assert_smoke_dev_uses_schema_v2_backend_port(powershell, repo_root, tmp_path)
     script = repo_root / "restore-local-data.ps1"
     state_path = tmp_path / "dev-state.json"
     target, backup = _isolated_restore_fixture(tmp_path)
