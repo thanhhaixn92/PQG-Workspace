@@ -247,6 +247,8 @@ async def test_p0_native_gyo_integrated_journey_isolated(tmp_path, monkeypatch):
             assert len(adapter.requests) == 1
             assert adapter.requests[0].work_id == work_id
             assert adapter.requests[0].assistant_turn_id == assistant_turn_id
+            assert "## source-1.txt" in adapter.requests[0].context
+            assert "Nguồn kiểm soát cho hành trình native GYO." in adapter.requests[0].context
 
             persisted = await _assistant_turn(client, thread_id, assistant_turn_id)
             assert persisted["status"] == "completed"
