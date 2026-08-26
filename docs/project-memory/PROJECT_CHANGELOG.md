@@ -397,3 +397,7 @@
 
 - [2026-08-26 21:43:50 UTC+07:00][recorded_at] Under explicit user approval, the isolated local branch `codex/desktop-status-readonly` adds `GET /api/desktop/v1/status` only. The endpoint performs a non-mutating `SELECT 1`, returns only `status`, `api_version`, `backend_version`, and `timestamp`, and fails closed as `degraded` without exposing database details. No migration, schema/data, provider/credential, Action Package, authorization, deployment, remote write, state or checkpoint change occurred.
 - [2026-08-26 21:43:50 UTC+07:00][recorded_at] Fresh local preflight passed on this worktree. Focused endpoint/health/runtime/settings/release-version tests passed (23 passed, 3 skipped, 0 failures); the known Pydantic-settings and TestClient deprecation warnings remain non-blocking. Desktop-to-FastAPI live runtime proof is not yet recorded and must not be inferred from these automated tests.
+
+### [2026-08-26 21:48:48 UTC+07:00] Local Desktop status handshake receipt
+
+- [2026-08-26 21:48:48 UTC+07:00][recorded_at] A temporary loopback FastAPI process using a newly created temporary SQLite database returned `{"status":"ready","api_version":"v1","backend_version":"2.2.0",...}` from the new endpoint. The built `@pqg/domain-bridge` then performed its real HTTP request to that endpoint and returned `{"state":"ready",...}`. The server process tree was stopped and port `8765` was verified free. This is local service-to-service proof only; Electron GUI proof remains NOT RUN because no user-facing bridge-URL setting was added in this bounded scope.
